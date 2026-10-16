@@ -5,6 +5,10 @@ import CSQLite
 public final class HistoryStore {
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private static let concealedTitle = "Скрытая запись"
+    private static func concealedSearch(source: String) -> String {
+        SearchFilter.normalize(concealedTitle + " " + source)
+    }
 
     public init(url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
@@ -16,7 +20,19 @@ public final class HistoryStore {
             sqlite3_busy_timeout(db, 3000)
             try execute("PRAGMA journal_mode=WAL")
             try execute("PRAGMA foreign_keys=ON")
-            try execute("""
+            try migrate()
+        } catch { sqlite3_close(db); db = nil; throw error }
+    }
+
+    deinit { sqlite3_close(db) }
+
+    private func migrate() throws {
+        try execute("BEGIN IMMEDIATE")
+        do {
+            let version = try schemaVersion()
+            guard version <= 2 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
+            if version < 2 {
+                try execute("""
                 CREATE TABLE IF NOT EXISTS clips (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL UNIQUE,
                     date REAL NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
@@ -28,31 +44,48 @@ public final class HistoryStore {
                     data BLOB NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS clips_date ON clips(date DESC, id DESC);
-                PRAGMA user_version=1;
+                ALTER TABLE clips ADD COLUMN is_concealed INTEGER NOT NULL DEFAULT 0;
+                PRAGMA user_version=2;
                 """)
-        } catch { sqlite3_close(db); db = nil; throw error }
+            }
+            try execute("COMMIT")
+        } catch { try? execute("ROLLBACK"); throw error }
     }
 
-    deinit { sqlite3_close(db) }
+    private func schemaVersion() throws -> Int {
+        let statement = try prepare("PRAGMA user_version")
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw failure() }
+        return Int(sqlite3_column_int(statement, 0))
+    }
 
     @discardableResult
     public func insert(payload: ClipPayload, kind: ClipKind, title: String, text: String,
-                       source: String, date: Date = Date(), maxCount: Int = 50_000,
+                       source: String, isConcealed: Bool = false, date: Date = Date(), maxCount: Int = 50_000,
                        maxBytes: Int = 5_000_000_000) throws -> Int64 {
         guard !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else { throw HistoryError.invalidPayload }
         let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
         let encoded = try encoder.encode(payload)
+        let storedTitle = isConcealed ? Self.concealedTitle : title
+        let storedText = isConcealed ? "" : text
+        let concealedSearch = Self.concealedSearch(source: source)
+        let storedSearch = isConcealed ? concealedSearch : SearchFilter.normalize(title + " " + text + " " + source)
         try execute("BEGIN IMMEDIATE")
         do {
             let statement = try prepare("""
-                INSERT INTO clips(fingerprint,date,kind,title,text,source,search,bytes) VALUES(?,?,?,?,?,?,?,?)
-                ON CONFLICT(fingerprint) DO UPDATE SET date=excluded.date, source=excluded.source, search=excluded.search
+                INSERT INTO clips(fingerprint,date,kind,title,text,source,search,bytes,is_concealed) VALUES(?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(fingerprint) DO UPDATE SET date=excluded.date, source=excluded.source,
+                    is_concealed=MAX(clips.is_concealed,excluded.is_concealed),
+                    title=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN ? ELSE clips.title END,
+                    text=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN '' ELSE clips.text END,
+                    search=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN ? ELSE excluded.search END
                 RETURNING id
                 """)
             defer { sqlite3_finalize(statement) }
             try bind([.text(payload.fingerprint), .number(date.timeIntervalSince1970), .text(kind.rawValue),
-                      .text(title), .text(text), .text(source), .text(SearchFilter.normalize(title + " " + text + " " + source)),
-                      .integer(Int64(encoded.count))], to: statement)
+                      .text(storedTitle), .text(storedText), .text(source), .text(storedSearch),
+                      .integer(Int64(encoded.count)), .integer(isConcealed ? 1 : 0),
+                      .text(Self.concealedTitle), .text(concealedSearch)], to: statement)
             guard sqlite3_step(statement) == SQLITE_ROW else { throw failure() }
             let id = sqlite3_column_int64(statement, 0)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
@@ -68,7 +101,7 @@ public final class HistoryStore {
 
     public func search(_ filter: SearchFilter, limit: Int = 150, offset: Int = 0) throws -> [ClipSummary] {
         let (clause, bindings) = predicate(filter)
-        let statement = try prepare("SELECT id,date,kind,title,text,source,bytes FROM clips \(clause) ORDER BY date DESC,id DESC LIMIT ? OFFSET ?")
+        let statement = try prepare("SELECT id,date,kind,title,text,source,bytes,is_concealed FROM clips \(clause) ORDER BY date DESC,id DESC LIMIT ? OFFSET ?")
         defer { sqlite3_finalize(statement) }
         try bind(bindings + [.integer(Int64(limit)), .integer(Int64(offset))], to: statement)
         var result: [ClipSummary] = []
@@ -77,7 +110,8 @@ public final class HistoryStore {
             result.append(ClipSummary(id: sqlite3_column_int64(statement, 0),
                 date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
                 kind: ClipKind(rawValue: string(statement, 2)) ?? .other, title: string(statement, 3),
-                text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6))))
+                text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6)),
+                isConcealed: sqlite3_column_int(statement, 7) != 0))
             status = sqlite3_step(statement)
         }
         guard status == SQLITE_DONE else { throw failure() }
@@ -91,6 +125,22 @@ public final class HistoryStore {
         try bind(bindings, to: statement)
         guard sqlite3_step(statement) == SQLITE_ROW else { throw failure() }
         return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    public func sources() throws -> [String] {
+        let statement = try prepare("SELECT DISTINCT source FROM clips WHERE source<>''")
+        defer { sqlite3_finalize(statement) }
+        var result: [String] = []
+        var status = sqlite3_step(statement)
+        while status == SQLITE_ROW {
+            result.append(string(statement, 0))
+            status = sqlite3_step(statement)
+        }
+        guard status == SQLITE_DONE else { throw failure() }
+        return result.sorted {
+            let order = $0.caseInsensitiveCompare($1)
+            return order == .orderedSame ? $0 < $1 : order == .orderedAscending
+        }
     }
 
     public func payload(id: Int64) throws -> ClipPayload {
@@ -108,6 +158,27 @@ public final class HistoryStore {
         defer { sqlite3_finalize(statement) }
         try bind([.integer(id)], to: statement)
         guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+    }
+
+    public func conceal(id: Int64) throws {
+        try execute("BEGIN IMMEDIATE")
+        do {
+            let source: String
+            do {
+                let statement = try prepare("SELECT source FROM clips WHERE id=?")
+                defer { sqlite3_finalize(statement) }
+                try bind([.integer(id)], to: statement)
+                let status = sqlite3_step(statement)
+                if status == SQLITE_DONE { throw HistoryError.missing }
+                guard status == SQLITE_ROW else { throw failure() }
+                source = string(statement, 0)
+            }
+            let statement = try prepare("UPDATE clips SET is_concealed=1,title=?,text='',search=? WHERE id=?")
+            defer { sqlite3_finalize(statement) }
+            try bind([.text(Self.concealedTitle), .text(Self.concealedSearch(source: source)), .integer(id)], to: statement)
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            try execute("COMMIT")
+        } catch { try? execute("ROLLBACK"); throw error }
     }
 
     private func prune(maxCount: Int, maxBytes: Int) throws {
@@ -134,6 +205,7 @@ public final class HistoryStore {
             clauses.append("search LIKE ? ESCAPE '\\'"); bindings.append(.text("%\(escaped)%"))
         }
         if let kind = filter.kind { clauses.append("kind=?"); bindings.append(.text(kind.rawValue)) }
+        if let source = filter.source { clauses.append("source=?"); bindings.append(.text(source)) }
         if let from = filter.from { clauses.append("date>=?"); bindings.append(.number(from.timeIntervalSince1970)) }
         if let until = filter.until { clauses.append("date<?"); bindings.append(.number(until.timeIntervalSince1970)) }
         return (clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND "), bindings)

@@ -1,6 +1,7 @@
 import AppKit
 import BuferaCore
 import UniformTypeIdentifiers
+import os
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -10,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
     private var generation = 0
+    private var confirmationToken = 0
+    private let logger = Logger(subsystem: "local.bufera.app", category: "confirmation")
+    private let temporaryImageExports = TemporaryImageExports()
+    private var exportCleanupTimer: Timer?
     private var lastError: Error?
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
@@ -29,13 +34,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catch { showError(error, alert: true); return }
         panel = HistoryPanel()
         connectPanel()
+        cleanupExports()
+        exportCleanupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.cleanupExports() }
         clipboard.onCapture = { [weak self] clip in
             guard let self else { return }
             let date = Date(); let count = self.countLimit; let bytes = self.byteLimit
             self.work.async {
                 do {
                     try self.store.insert(payload: clip.payload, kind: clip.kind, title: clip.title, text: clip.text,
-                                          source: clip.source, date: date, maxCount: count, maxBytes: bytes)
+                                          source: clip.source, isConcealed: clip.isConcealed, date: date, maxCount: count, maxBytes: bytes)
                 } catch { DispatchQueue.main.async { self.showError(error) } }
             }
         }
@@ -44,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeys.onPress = { [weak self] delta in
             guard let self else { return }
             if self.panel.isInteracting { self.panel.move(delta) }
-            else if delta > 0 { self.open(activateApplication: false) }
+            else if delta > 0 { self.open() }
         }
         registerShortcuts()
         applicationExitObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didTerminateApplicationNotification,
@@ -65,28 +72,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if offset == 0 { self.generation += 1 }
             let generation = self.generation
             self.work.async {
-                let result = Result { (try self.store.search(filter, offset: offset), try self.store.count(filter)) }
+                let result = Result { (try self.store.search(filter, offset: offset), try self.store.count(filter),
+                                       offset == 0 ? try self.store.sources() : nil) }
                 DispatchQueue.main.async {
                     guard generation == self.generation, self.panel.window.isVisible else { return }
                     switch result {
-                    case .success(let (rows, count)): self.panel.receive(rows, total: count, offset: offset)
+                    case .success(let (rows, count, sources)):
+                        if let sources { self.panel.setSources(sources) }
+                        self.panel.receive(rows, total: count, offset: offset)
                     case .failure(let error): self.panel.failed(error); self.showError(error)
                     }
                 }
             }
         }
         panel.onConfirm = { [weak self] id in
-            self?.loadPayload(id) { [weak self] payload in
-                guard let self, self.panel.window.isVisible, self.panel.selected?.id == id else { return }
-                do { try self.clipboard.restore(payload); self.panel.close() }
-                catch { self.panel.failed(error); self.showError(error) }
+            guard let self else { return }
+            self.confirmationToken += 1
+            let token = self.confirmationToken
+            // Confirmation owns a snapshot of the choice. Search refreshes must
+            // not silently drop it; only closing/reopening the panel cancels it.
+            self.work.async {
+                let result = Result { try self.store.payload(id: id) }
+                DispatchQueue.main.async {
+                    guard token == self.confirmationToken, self.panel.window.isVisible else {
+                        self.logger.notice("Confirm cancelled"); return
+                    }
+                    do {
+                        try self.clipboard.restore(result.get())
+                        self.logger.notice("Confirm completed")
+                        self.panel.close()
+                    } catch {
+                        self.logger.error("Confirm failed")
+                        self.panel.failed(error); self.showError(error)
+                    }
+                }
             }
         }
-        panel.onSelection = { [weak self] clip in
-            guard clip.kind == .image else { return }
-            self?.loadPayload(clip.id) { [weak self] payload in
-                let image = ClipboardService.imageData(payload).flatMap { NSImage(data: $0.0) }
-                self?.panel.setImage(image, id: clip.id)
+        panel.requestThumbnail = { [weak self] id, completion in
+            guard let self else { return }
+            let current = self.generation
+            self.work.async {
+                let result = Result { ClipboardService.thumbnail(try self.store.payload(id: id)) }
+                DispatchQueue.main.async {
+                    guard current == self.generation else { return }
+                    switch result {
+                    case .success(let image): completion(image)
+                    case .failure(let error): self.showError(error); completion(nil)
+                    }
+                }
+            }
+        }
+        panel.onReveal = { [weak self] id, token in
+            self?.loadPayload(id) { [weak self] payload in self?.panel.showConcealedText(ClipboardService.revealedText(payload), id: id, token: token) }
+        }
+        panel.onConceal = { [weak self] id in
+            guard let self else { return }
+            self.work.async {
+                do { try self.store.conceal(id: id); DispatchQueue.main.async { self.panel.refresh() } }
+                catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
             }
         }
         panel.onExport = { [weak self] id, chooseDestination in
@@ -101,6 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panel.onClose = { [weak self] in
             self?.generation += 1
+            self?.confirmationToken += 1
             try? self?.hotKeys.setPreviousEnabled(false)
         }
     }
@@ -128,10 +172,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if response == .OK, let url = dialog.url { self?.writeImage(data, to: url, reveal: false) }
             }
         } else {
-            let exports = folder.appendingPathComponent("Exports", isDirectory: true)
             do {
-                try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
-                writeImage(data, to: exports.appendingPathComponent(name), reveal: true)
+                let url = try temporaryImageExports.file(data: data, id: id, fileExtension: ext)
+                panel.close(restoreFocus: false)
+                NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch { panel.failed(error); showError(error) }
         }
     }
@@ -143,12 +187,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch { panel.failed(error); showError(error) }
     }
 
-    private func open(activateApplication: Bool = true) {
+    private func open() {
         guard panel != nil else { if let lastError { showError(lastError, alert: true) }; return }
-        panel.open(activateApplication: activateApplication)
+        confirmationToken += 1
+        panel.open()
         do { try hotKeys.setPreviousEnabled(true) } catch { panel.failed(error); showError(error) }
     }
     @objc private func showHistory() { open() }
+    private func cleanupExports() {
+        do { try temporaryImageExports.cleanup() } catch { showError(error) }
+    }
     @objc private func registerShortcuts() {
         do {
             try hotKeys.register()
@@ -171,7 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func help() {
         let alert = NSAlert(); alert.messageText = "Bufera — клавиши и история"
-        alert.informativeText = "⌘⌥V — открыть / следующий элемент\n⌘⌥C — предыдущий в открытом окне\n↑ ↓ — выбрать, Enter — подтвердить\n⌘F — перейти к поиску\nEscape — отменить\n⌘⌫ — удалить запись из истории\n\nПосле отпускания клавиш окно остаётся открытым. Выбор подтверждается Enter или двойным щелчком.\n\nВставку выполняете сами, обычным сочетанием вашего приложения (на Mac обычно ⌘V).\n\nИстория хранится только на этом Mac. Лимиты применяются при следующем копировании. Картинки в папке Exports сохраняются отдельно и не удаляются вместе с историей."
+        alert.informativeText = "⌘⌥V — открыть / следующий элемент\n⌘⌥C — предыдущий в открытом окне\n↑ ↓ — выбрать, Enter — в буфер и закрыть\n⌘F — перейти к поиску\nEscape — отменить\n⌘⌫ — удалить запись из истории\n\nПосле отпускания клавиш окно остаётся открытым. Вставку выполняете сами (на Mac обычно ⌘V).\n\nФильтры: тип, дата и приложение. Даты можно выбрать в календаре.\n\n«Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа после последнего открытия, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.\n\nПомеченные пароли скрыты точками и не участвуют в текстовом поиске. «Показать» раскрывает выбранную запись до смены выбора или закрытия окна. Маскировка не шифрует локальную базу. Непомеченный пароль может выглядеть как обычный текст."
         alert.runModal()
     }
 
