@@ -34,87 +34,215 @@ enum HistoryDateFilter {
     var isActive: Bool { if case .all = self { return false }; return true }
 }
 
-private final class FilterChip: NSButton {
-    var active = false { didSet { updateColors() } }
-    override var intrinsicContentSize: NSSize { NSSize(width: super.intrinsicContentSize.width + 16, height: 28) }
+private final class SidebarFilterRow: NSButton {
+    let value: String?
+    var selected = false { didSet { updateAppearance() } }
+    override var mouseDownCanMoveWindow: Bool { false }
 
-    init(title: String, symbol: String) {
+    init(title: String, image: NSImage?, value: String?) {
+        self.value = value
         super.init(frame: .zero)
-        self.title = title; image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        imagePosition = .imageLeading; imageScaling = .scaleProportionallyDown
-        bezelStyle = .roundRect; isBordered = false; font = .systemFont(ofSize: 12, weight: .medium)
+        self.title = title; self.image = image
+        alignment = .left; imagePosition = .imageLeading; imageScaling = .scaleProportionallyDown
+        font = .systemFont(ofSize: 12); isBordered = false
         cell?.lineBreakMode = .byTruncatingTail
-        wantsLayer = true; layer?.cornerRadius = 8
+        toolTip = title
+        wantsLayer = true; layer?.cornerRadius = 5
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        updateColors()
+        heightAnchor.constraint(equalToConstant: 25).isActive = true
+        updateAppearance()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); updateColors() }
-    private func updateColors() {
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); updateAppearance() }
+    private func updateAppearance() {
+        state = selected ? .on : .off
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = (active ? NSColor.controlAccentColor.withAlphaComponent(0.18) : NSColor.labelColor.withAlphaComponent(0.07)).cgColor
+            layer?.backgroundColor = selected ? NSColor.controlAccentColor.withAlphaComponent(0.16).cgColor : NSColor.clear.cgColor
         }
-        contentTintColor = active ? .controlAccentColor : .secondaryLabelColor
+        contentTintColor = selected ? .controlAccentColor : .labelColor
     }
 }
 
+private final class SidebarSourceList: NSStackView {
+    override var isFlipped: Bool { true }
+}
+
 final class HistoryFilters: NSView, NSPopoverDelegate {
-    private let kindButton = FilterChip(title: "Тип", symbol: "square.grid.2x2")
-    private let dateButton = FilterChip(title: "Дата", symbol: "calendar")
-    private let sourceButton = FilterChip(title: "Приложение", symbol: "app")
-    private let resetButton = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Сбросить фильтры")!, target: nil, action: nil)
+    let sidebar: NSView = NSVisualEffectView()
+    private let toolbarButton = NSButton(image: NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Фильтры")!, target: nil, action: nil)
+    private let sidebarDateButton = SidebarFilterRow(title: "Всё время", image: NSImage(systemSymbolName: "calendar", accessibilityDescription: nil), value: nil)
+    private let sourceRowsContainer = SidebarSourceList()
+    private var kindRows: [SidebarFilterRow] = []
+    private var sourceRows: [SidebarFilterRow] = []
+    private var interactionEnabled = true
     private let datePopover = NSPopover()
+    private weak var dateAnchor: NSView?
     private var trackingMenu: NSMenu?
+    private var pendingDatePresentation = false
     private var kind: ClipKind?
     private var source: String?
     private var date: HistoryDateFilter = .all
     private var sources: [String] = []
     var onChange: (() -> Void)?
     var onPopoverClosed: (() -> Void)?
-    var isPresenting: Bool { datePopover.isShown || trackingMenu != nil }
+    var isPresenting: Bool { datePopover.isShown || trackingMenu != nil || pendingDatePresentation }
+    var hasActiveFilters: Bool { kind != nil || source != nil || date.isActive }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        let row = NSStackView(views: [kindButton, dateButton, sourceButton, resetButton]); row.spacing = 6
-        row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
+        toolbarButton.translatesAutoresizingMaskIntoConstraints = false
+        toolbarButton.isBordered = false
+        toolbarButton.image?.size = NSSize(width: 16, height: 16)
+        toolbarButton.target = self; toolbarButton.action = #selector(showFilterMenu)
+        addSubview(toolbarButton)
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: leadingAnchor), row.trailingAnchor.constraint(equalTo: trailingAnchor),
-            row.topAnchor.constraint(equalTo: topAnchor), row.bottomAnchor.constraint(equalTo: bottomAnchor),
-            heightAnchor.constraint(equalToConstant: 28), kindButton.widthAnchor.constraint(equalToConstant: 106),
-            dateButton.widthAnchor.constraint(equalToConstant: 136), sourceButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
-            resetButton.widthAnchor.constraint(equalToConstant: 24)
+            toolbarButton.leadingAnchor.constraint(equalTo: leadingAnchor), toolbarButton.trailingAnchor.constraint(equalTo: trailingAnchor),
+            toolbarButton.topAnchor.constraint(equalTo: topAnchor), toolbarButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+            widthAnchor.constraint(equalToConstant: 26), heightAnchor.constraint(equalToConstant: 26)
         ])
-        kindButton.target = self; kindButton.action = #selector(showKinds)
-        sourceButton.target = self; sourceButton.action = #selector(showSources)
-        dateButton.target = self; dateButton.action = #selector(showDates)
-        resetButton.target = self; resetButton.action = #selector(resetClicked)
-        resetButton.isBordered = false; resetButton.contentTintColor = .secondaryLabelColor
-        resetButton.toolTip = "Сбросить тип, дату и приложение"
+        sidebarDateButton.target = self; sidebarDateButton.action = #selector(showSidebarDates)
         datePopover.behavior = .transient; datePopover.animates = false; datePopover.delegate = self
+        buildSidebar()
         updateTitles()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func reset() { kind = nil; source = nil; date = .all; dismiss(); updateTitles() }
     func setInteractionEnabled(_ enabled: Bool) {
-        for button in [kindButton, dateButton, sourceButton] { button.isEnabled = enabled }
-        resetButton.isEnabled = enabled && (kind != nil || source != nil || date.isActive)
+        interactionEnabled = enabled
+        toolbarButton.isEnabled = enabled; sidebarDateButton.isEnabled = enabled
+        for button in kindRows + sourceRows { button.isEnabled = enabled }
     }
-    func setSources(_ values: [String]) { sources = values }
-    func dismiss() { datePopover.close(); trackingMenu?.cancelTracking() }
+    func setSources(_ values: [String]) {
+        let ownNames = Set([
+            "Bufera", NSRunningApplication.current.localizedName,
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+        ].compactMap { $0 }.map { $0.lowercased() })
+        let visibleSources = values.filter { !$0.isEmpty && !ownNames.contains($0.lowercased()) }
+        if sources != visibleSources { sources = visibleSources; rebuildSourceRows() }
+        updateTitles()
+    }
+    func setSidebarVisible(_ visible: Bool) {
+        if !visible, dateAnchor === sidebarDateButton { datePopover.close() }
+    }
+    func dismiss() { pendingDatePresentation = false; datePopover.close(); trackingMenu?.cancelTracking() }
     func apply(to filter: inout SearchFilter) { filter.kind = kind; filter.source = source; date.apply(to: &filter) }
-    func popoverDidClose(_ notification: Notification) { onPopoverClosed?() }
+    func popoverDidClose(_ notification: Notification) { dateAnchor = nil; onPopoverClosed?() }
     @objc private func resetClicked() { reset(); onChange?() }
 
     private func updateTitles() {
-        kindButton.title = kind?.label ?? "Тип"; kindButton.active = kind != nil
-        dateButton.title = date.title; dateButton.active = date.isActive
-        sourceButton.title = source ?? "Приложение"; sourceButton.active = source != nil
-        kindButton.toolTip = "Тип содержимого: \(kind?.label ?? "все")"
-        dateButton.toolTip = "Дата копирования: \(date.isActive ? date.title : "за всё время")"
-        sourceButton.toolTip = "Приложение: \(source ?? "все")"
-        resetButton.isEnabled = kind != nil || source != nil || date.isActive
+        let summary = [kind?.label, date.isActive ? date.title : nil, source].compactMap { $0 }.joined(separator: ", ")
+        toolbarButton.toolTip = summary.isEmpty ? "Фильтры" : "Фильтры: \(summary)"
+        toolbarButton.setAccessibilityLabel(toolbarButton.toolTip)
+        toolbarButton.contentTintColor = hasActiveFilters ? .controlAccentColor : .secondaryLabelColor
+        sidebarDateButton.title = date.isActive ? date.title : "Всё время"
+        sidebarDateButton.toolTip = "Период: \(sidebarDateButton.title)"
+        sidebarDateButton.selected = date.isActive
+        for row in kindRows { row.selected = row.value == kind?.rawValue }
+        for row in sourceRows { row.selected = row.value == source }
     }
+
+    private func buildSidebar() {
+        if let effect = sidebar as? NSVisualEffectView {
+            effect.material = .sidebar; effect.blendingMode = .withinWindow; effect.state = .active
+            effect.wantsLayer = true; effect.layer?.cornerRadius = 8; effect.layer?.masksToBounds = true
+        }
+        let typeHeading = heading("Тип содержимого")
+        let types = NSStackView(); types.orientation = .vertical; types.alignment = .leading; types.spacing = 1
+        let allTypes = sidebarRow("Все типы", symbol: "square.grid.2x2", value: nil, action: #selector(sidebarKindClicked))
+        kindRows = [allTypes] + ClipKind.allCases.map {
+            sidebarRow($0.label, symbol: $0.symbol, value: $0.rawValue, action: #selector(sidebarKindClicked))
+        }
+        for row in kindRows {
+            types.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: types.widthAnchor).isActive = true
+        }
+        let dateHeading = heading("Период")
+        let appHeading = heading("Приложения")
+        let appsScroll = NSScrollView()
+        appsScroll.drawsBackground = false; appsScroll.hasVerticalScroller = true; appsScroll.autohidesScrollers = true
+        appsScroll.borderType = .noBorder
+        sourceRowsContainer.orientation = .vertical; sourceRowsContainer.alignment = .leading; sourceRowsContainer.spacing = 1
+        sourceRowsContainer.translatesAutoresizingMaskIntoConstraints = false
+        appsScroll.documentView = sourceRowsContainer
+        for view in [typeHeading, types, dateHeading, sidebarDateButton, appHeading, appsScroll] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            sidebar.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            typeHeading.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 10),
+            typeHeading.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -10),
+            typeHeading.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 10),
+            types.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
+            types.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -8),
+            types.topAnchor.constraint(equalTo: typeHeading.bottomAnchor, constant: 5),
+            dateHeading.leadingAnchor.constraint(equalTo: typeHeading.leadingAnchor),
+            dateHeading.trailingAnchor.constraint(equalTo: typeHeading.trailingAnchor),
+            dateHeading.topAnchor.constraint(equalTo: types.bottomAnchor, constant: 12),
+            sidebarDateButton.leadingAnchor.constraint(equalTo: types.leadingAnchor),
+            sidebarDateButton.trailingAnchor.constraint(equalTo: types.trailingAnchor),
+            sidebarDateButton.topAnchor.constraint(equalTo: dateHeading.bottomAnchor, constant: 5),
+            appHeading.leadingAnchor.constraint(equalTo: typeHeading.leadingAnchor),
+            appHeading.trailingAnchor.constraint(equalTo: typeHeading.trailingAnchor),
+            appHeading.topAnchor.constraint(equalTo: sidebarDateButton.bottomAnchor, constant: 12),
+            appsScroll.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
+            appsScroll.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -8),
+            appsScroll.topAnchor.constraint(equalTo: appHeading.bottomAnchor, constant: 5),
+            appsScroll.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -8),
+            appsScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 26),
+            sourceRowsContainer.topAnchor.constraint(equalTo: appsScroll.contentView.topAnchor),
+            sourceRowsContainer.leadingAnchor.constraint(equalTo: appsScroll.contentView.leadingAnchor),
+            sourceRowsContainer.widthAnchor.constraint(equalTo: appsScroll.contentView.widthAnchor)
+        ])
+        rebuildSourceRows()
+    }
+
+    private func heading(_ title: String) -> NSTextField {
+        let field = NSTextField(labelWithString: title)
+        field.font = .systemFont(ofSize: 11, weight: .semibold); field.textColor = .secondaryLabelColor
+        field.lineBreakMode = .byTruncatingTail
+        return field
+    }
+
+    private func sidebarRow(_ title: String, symbol: String, value: String?, action: Selector) -> SidebarFilterRow {
+        let row = SidebarFilterRow(title: title, image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil), value: value)
+        row.target = self; row.action = action; row.isEnabled = interactionEnabled
+        return row
+    }
+
+    private func rebuildSourceRows() {
+        for view in sourceRowsContainer.arrangedSubviews {
+            sourceRowsContainer.removeArrangedSubview(view); view.removeFromSuperview()
+        }
+        sourceRows = [sidebarRow("Все приложения", symbol: "app", value: nil, action: #selector(sidebarSourceClicked))]
+        sourceRows += sources.map { name in
+            let row = sidebarRow(name, symbol: "app", value: name, action: #selector(sidebarSourceClicked))
+            if let image = applicationIcon(named: name) { row.image = image }
+            return row
+        }
+        for row in sourceRows {
+            sourceRowsContainer.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: sourceRowsContainer.widthAnchor).isActive = true
+        }
+    }
+
+    private func applicationIcon(named name: String) -> NSImage? {
+        guard let icon = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == name })?.icon?.copy() as? NSImage else { return nil }
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
+    }
+
+    private func chooseKind(_ value: String?) {
+        guard interactionEnabled else { return }
+        kind = value.flatMap(ClipKind.init(rawValue:)); updateTitles(); onChange?()
+    }
+    private func chooseSource(_ value: String?) {
+        guard interactionEnabled else { return }
+        source = value; updateTitles(); onChange?()
+    }
+    @objc private func sidebarKindClicked(_ sender: SidebarFilterRow) { chooseKind(sender.value) }
+    @objc private func sidebarSourceClicked(_ sender: SidebarFilterRow) { chooseSource(sender.value) }
 
     private func item(_ title: String, symbol: String?, selected: Bool, action: Selector, value: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self
@@ -123,45 +251,72 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         return item
     }
     private func presentMenu(_ menu: NSMenu, from button: NSButton) {
-        guard trackingMenu == nil else { return }
+        guard trackingMenu == nil, !pendingDatePresentation, interactionEnabled else { return }
         trackingMenu = menu
         datePopover.close()
         defer {
             trackingMenu = nil
-            onPopoverClosed?()
+            if pendingDatePresentation {
+                // The panel remains in an interaction while AppKit finishes closing
+                // the menu, then the same calendar takes over keyboard focus.
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.pendingDatePresentation else { return }
+                    if self.interactionEnabled, self.window?.isVisible == true, NSApp.isActive {
+                        self.showDates(from: self.toolbarButton)
+                    }
+                    self.pendingDatePresentation = false
+                    if !self.datePopover.isShown { self.onPopoverClosed?() }
+                }
+            } else { onPopoverClosed?() }
         }
         // popUp returns only after selection or cancellation ends menu tracking.
         // Keep the history panel's keyboard handlers suspended for that whole loop.
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
     }
-    @objc private func showKinds() {
+    @objc private func showFilterMenu() {
+        let menu = NSMenu(); menu.autoenablesItems = false
+        let typeItem = NSMenuItem(title: kind.map { "Тип: \($0.label)" } ?? "Тип", action: nil, keyEquivalent: "")
+        typeItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
+        typeItem.submenu = kindsMenu(); menu.addItem(typeItem)
+        menu.addItem(item(date.isActive ? "Дата: \(date.title)…" : "Дата…", symbol: "calendar", selected: date.isActive,
+                          action: #selector(showMenuDates)))
+        let sourceItem = NSMenuItem(title: source.map { "Приложения: \($0)" } ?? "Приложения", action: nil, keyEquivalent: "")
+        sourceItem.image = NSImage(systemSymbolName: "app", accessibilityDescription: nil)
+        sourceItem.submenu = sourcesMenu(); menu.addItem(sourceItem)
+        menu.addItem(.separator())
+        let reset = item("Сбросить фильтры", symbol: "arrow.counterclockwise", selected: false, action: #selector(resetClicked))
+        reset.isEnabled = hasActiveFilters; menu.addItem(reset)
+        presentMenu(menu, from: toolbarButton)
+    }
+    private func kindsMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(item("Все типы", symbol: "square.grid.2x2", selected: kind == nil, action: #selector(selectKind)))
         menu.addItem(.separator())
         for type in ClipKind.allCases {
             menu.addItem(item(type.label, symbol: type.symbol, selected: kind == type, action: #selector(selectKind), value: type.rawValue))
         }
-        presentMenu(menu, from: kindButton)
+        return menu
     }
     @objc private func selectKind(_ sender: NSMenuItem) {
-        kind = (sender.representedObject as? String).flatMap(ClipKind.init(rawValue:)); updateTitles(); onChange?()
+        chooseKind(sender.representedObject as? String)
     }
-    @objc private func showSources() {
+    private func sourcesMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(item("Все приложения", symbol: "app", selected: source == nil, action: #selector(selectSource)))
         menu.addItem(.separator())
         for name in sources {
             let entry = item(name, symbol: "app", selected: name == source, action: #selector(selectSource), value: name)
-            if let icon = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == name })?.icon?.copy() as? NSImage {
-                icon.size = NSSize(width: 16, height: 16); entry.image = icon
-            }
+            if let icon = applicationIcon(named: name) { entry.image = icon }
             menu.addItem(entry)
         }
         if sources.isEmpty { let empty = NSMenuItem(title: "Пока нет записей", action: nil, keyEquivalent: ""); menu.addItem(empty) }
-        presentMenu(menu, from: sourceButton)
+        return menu
     }
-    @objc private func selectSource(_ sender: NSMenuItem) { source = sender.representedObject as? String; updateTitles(); onChange?() }
-    @objc private func showDates() {
+    @objc private func selectSource(_ sender: NSMenuItem) { chooseSource(sender.representedObject as? String) }
+    @objc private func showMenuDates() { pendingDatePresentation = true }
+    @objc private func showSidebarDates() { showDates(from: sidebarDateButton) }
+    private func showDates(from anchor: NSView) {
+        guard interactionEnabled, anchor.window?.isVisible == true else { return }
         if datePopover.isShown { datePopover.close(); return }
         let controller = HistoryDatePicker(selection: date)
         controller.onSelect = { [weak self] value in
@@ -171,7 +326,8 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         }
         datePopover.contentViewController = controller
         datePopover.contentSize = controller.view.fittingSize
-        datePopover.show(relativeTo: dateButton.bounds, of: dateButton, preferredEdge: .maxY)
+        dateAnchor = anchor
+        datePopover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
     }
 }
 

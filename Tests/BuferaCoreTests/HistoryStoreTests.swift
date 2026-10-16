@@ -138,12 +138,139 @@ final class HistoryStoreTests {
         try checkEqual(try store.count(), 8)
         let records = try store.search(SearchFilter())
         try checkEqual(records.map(\.title), (1...8).reversed().map { "legacy \($0)" })
-        try check(records.allSatisfy { !$0.isConcealed })
+        try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite })
         for index in 1...8 { try checkEqual(try store.payload(id: Int64(index)), payload("legacy \(index)")) }
-        try checkEqual(try rawSchemaVersion(at: url), 2)
+        try checkEqual(try rawSchemaVersion(at: url), 3)
         store = nil; store = try HistoryStore(url: url)
         try checkEqual(try store.count(), 8)
-        try checkEqual(try rawSchemaVersion(at: url), 2)
+        try checkEqual(try rawSchemaVersion(at: url), 3)
+    }
+
+    func testVersionTwoMigrationPreservesConcealmentAndPayloads() throws {
+        let url = directory.appendingPathComponent("version-two.sqlite")
+        let original = payload("concealed-v2-fixture")
+        let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
+        let encoded = try encoder.encode(original)
+        let hex = encoded.map { String(format: "%02x", $0) }.joined()
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, """
+                CREATE TABLE clips (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL UNIQUE,
+                    date REAL NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+                    text TEXT NOT NULL, source TEXT NOT NULL, search TEXT NOT NULL, bytes INTEGER NOT NULL,
+                    is_concealed INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE payloads (clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE, data BLOB NOT NULL);
+                CREATE INDEX clips_date ON clips(date DESC,id DESC);
+                INSERT INTO clips VALUES(42,'\(original.fingerprint)',123,'text','Скрытая запись','','Old App','скрытая запись old app',\(encoded.count),1);
+                INSERT INTO payloads VALUES(42,X'\(hex)');
+                PRAGMA user_version=2;
+                """, nil, nil, nil), SQLITE_OK)
+        }
+        store = nil; store = try HistoryStore(url: url)
+        let record = try store.search(SearchFilter())[0]
+        try checkEqual(try store.count(), 1)
+        try checkEqual(record.id, 42); try checkEqual(record.date, Date(timeIntervalSince1970: 123))
+        try checkEqual(record.title, "Скрытая запись"); try checkEqual(record.text, "")
+        try checkEqual(record.source, "Old App"); try checkEqual(record.byteCount, encoded.count)
+        try check(record.isConcealed && !record.isFavorite)
+        try checkEqual(try store.payload(id: 42), original)
+        try checkEqual(try rawSchemaVersion(at: url), 3)
+        try store.setFavorite(id: 42, isFavorite: true)
+        store = nil; store = try HistoryStore(url: url)
+        try check(try store.search(SearchFilter())[0].isFavorite)
+        try checkEqual(try store.payload(id: 42), original)
+    }
+
+    func testFavoriteSurvivesRepeatSetReopenDeduplicationAndConcealment() throws {
+        let id = try insert("favorite-fixture", time: 100)
+        try check(!store.search(SearchFilter())[0].isFavorite)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 3)
+        try store.setFavorite(id: id, isFavorite: true)
+        try store.setFavorite(id: id, isFavorite: true)
+        try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 100))
+        store = nil; store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        try check(try store.search(SearchFilter())[0].isFavorite)
+        try checkEqual(try insert("favorite-fixture", time: 200, source: "New App"), id)
+        try store.conceal(id: id)
+        let record = try store.search(SearchFilter())[0]
+        try check(record.isFavorite && record.isConcealed)
+        try checkEqual(record.id, id); try checkEqual(record.source, "New App")
+        try checkEqual(try store.payload(id: id), payload("favorite-fixture"))
+        try store.setFavorite(id: id, isFavorite: false)
+        try store.setFavorite(id: id, isFavorite: false)
+        store = nil; store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        try check(!store.search(SearchFilter())[0].isFavorite)
+        try check(try store.search(SearchFilter())[0].isConcealed)
+        try checkEqual(try store.count(), 1)
+    }
+
+    func testFavoriteFilterCombinesWithOtherFiltersAndPagination() throws {
+        let wanted = try insert("Проект ссылка выбранная", time: 100, kind: .link, source: "Safari")
+        let second = try insert("Проект ссылка вторая", time: 101, kind: .link, source: "Safari")
+        let otherSource = try insert("Проект ссылка Notes", time: 150, kind: .link, source: "Notes")
+        let otherKind = try insert("Проект ссылка текст", time: 150, source: "Safari")
+        let otherDate = try insert("Проект ссылка поздняя", time: 200, kind: .link, source: "Safari")
+        let otherQuery = try insert("Иное содержимое", time: 150, kind: .link, source: "Safari")
+        try insert("Проект ссылка обычная", time: 150, kind: .link, source: "Safari")
+        for id in [wanted, second, otherSource, otherKind, otherDate, otherQuery] {
+            try store.setFavorite(id: id, isFavorite: true)
+        }
+        var filter = SearchFilter()
+        filter.query = "ссылка ПРОЕКТ"; filter.kind = .link; filter.source = "Safari"
+        filter.from = Date(timeIntervalSince1970: 100); filter.until = Date(timeIntervalSince1970: 200)
+        filter.favoritesOnly = true
+        try checkEqual(try store.count(filter), 2)
+        try checkEqual(try store.search(filter).map(\.id), [second, wanted])
+        try checkEqual(try store.search(filter, limit: 1).map(\.id), [second])
+        try checkEqual(try store.search(filter, limit: 1, offset: 1).map(\.id), [wanted])
+        filter.favoritesOnly = false
+        try checkEqual(try store.count(filter), 3)
+        try checkEqual(try store.search(filter).count, 3)
+    }
+
+    func testFavoriteExcludedFromCountLimitUntilNextCaptureAfterUnstar() throws {
+        let favorite = try insert("old favorite", time: 1)
+        try store.setFavorite(id: favorite, isFavorite: true)
+        let old = try insert("old ordinary", time: 2)
+        try insert("middle", time: 3)
+        try insert("new", time: 4, maxCount: 2)
+        try checkEqual(try store.search(SearchFilter()).map(\.title), ["new", "middle", "old favorite"])
+        try checkThrows(try store.payload(id: old))
+        try checkEqual(try store.payload(id: favorite), payload("old favorite"))
+        try store.setFavorite(id: favorite, isFavorite: false)
+        try checkEqual(try store.count(), 3)
+        try checkEqual(try store.payload(id: favorite), payload("old favorite"))
+        try insert("next capture", time: 5, maxCount: 2)
+        try checkEqual(try store.search(SearchFilter()).map(\.title), ["next capture", "new"])
+        try checkThrows(try store.payload(id: favorite))
+    }
+
+    func testFavoriteExcludedFromByteLimitAndExplicitDeletionStillCascades() throws {
+        let large = String(repeating: "x", count: 5000)
+        let favorite = try insert(large, time: 1)
+        try store.setFavorite(id: favorite, isFavorite: true)
+        let old = try insert("small old", time: 2)
+        let budget = try store.search(SearchFilter()).first { $0.id == old }!.byteCount
+        let newest = try insert("small new", time: 3, maxBytes: budget)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [newest, favorite])
+        try checkThrows(try store.payload(id: old))
+        try checkEqual(try store.payload(id: favorite), payload(large))
+        try store.delete(id: favorite)
+        try checkEqual(try store.count(), 1)
+        try checkThrows(try store.payload(id: favorite))
+    }
+
+    func testSettingMissingFavoriteThrowsMissingAndLeavesStoreUsable() throws {
+        for value in [true, false] {
+            do {
+                try store.setFavorite(id: 42, isFavorite: value)
+                throw CheckFailure(description: "Expected missing record")
+            } catch HistoryError.missing { }
+        }
+        let id = try insert("after missing favorite")
+        try store.setFavorite(id: id, isFavorite: true)
+        try check(try store.search(SearchFilter())[0].isFavorite)
     }
 
     func testConcealedMetadataNeverContainsPayloadText() throws {
@@ -190,10 +317,10 @@ final class HistoryStoreTests {
     func testNewerSchemaIsNotDowngraded() throws {
         let url = directory.appendingPathComponent("future.sqlite")
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=99", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=4", nil, nil, nil), SQLITE_OK)
         }
         try checkThrows(try HistoryStore(url: url))
-        try checkEqual(try rawSchemaVersion(at: url), 99)
+        try checkEqual(try rawSchemaVersion(at: url), 4)
     }
 
     func testManualConcealmentPreservesPayloadAndSurvivesReopen() throws {

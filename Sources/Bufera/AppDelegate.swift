@@ -128,8 +128,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onConceal = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.conceal(id: id); DispatchQueue.main.async { self.panel.refresh() } }
+                do { try self.store.conceal(id: id); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
+            }
+        }
+        panel.onFavorite = { [weak self] id, isFavorite in
+            guard let self else { return }
+            self.work.async {
+                do {
+                    try self.store.setFavorite(id: id, isFavorite: isFavorite)
+                    DispatchQueue.main.async { self.panel.favoriteFinished(id: id, isFavorite: isFavorite, error: nil) }
+                } catch {
+                    DispatchQueue.main.async { self.panel.favoriteFinished(id: id, isFavorite: isFavorite, error: error); self.showError(error) }
+                }
+            }
+        }
+        panel.onPreview = { [weak self] clip, token in
+            guard let self, !clip.isConcealed else { return }
+            let current = self.generation
+            self.work.async {
+                let content: ClipPreviewContent
+                do { content = ClipPreviewContent.decode(try self.store.payload(id: clip.id), kind: clip.kind) }
+                catch { content = .unavailable(error.localizedDescription) }
+                DispatchQueue.main.async {
+                    guard current == self.generation else { return }
+                    self.panel.showPreview(content, id: clip.id, token: token)
+                }
             }
         }
         panel.onExport = { [weak self] id, chooseDestination in
@@ -138,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onDelete = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.delete(id: id); DispatchQueue.main.async { self.panel.refresh() } }
+                do { try self.store.delete(id: id); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
@@ -194,6 +218,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do { try hotKeys.setPreviousEnabled(true) } catch { panel.failed(error); showError(error) }
     }
     @objc private func showHistory() { open() }
+    @objc private func showAppearance() {
+        if panel?.isInteracting != true { open() }
+        DispatchQueue.main.async { [weak self] in self?.panel?.showAppearanceSettings() }
+    }
     private func cleanupExports() {
         do { try temporaryImageExports.cleanup() } catch { showError(error) }
     }
@@ -219,7 +247,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func help() {
         let alert = NSAlert(); alert.messageText = "Bufera — клавиши и история"
-        alert.informativeText = "⌘⌥V — открыть / следующий элемент\n⌘⌥C — предыдущий в открытом окне\n↑ ↓ — выбрать, Enter — в буфер и закрыть\n⌘F — перейти к поиску\nEscape — отменить\n⌘⌫ — удалить запись из истории\n\nПосле отпускания клавиш окно остаётся открытым. Вставку выполняете сами (на Mac обычно ⌘V).\n\nФильтры: тип, дата и приложение. Даты можно выбрать в календаре.\n\n«Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа после последнего открытия, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.\n\nПомеченные пароли скрыты точками и не участвуют в текстовом поиске. «Показать» раскрывает выбранную запись до смены выбора или закрытия окна. Маскировка не шифрует локальную базу. Непомеченный пароль может выглядеть как обычный текст."
+        let actions = ClipCardAction.allCases.map { "\($0.shortcut) — \($0.title)" }.joined(separator: "\n")
+        alert.informativeText = """
+        ⌘⌥V — открыть / следующий элемент
+        ⌘⌥C — предыдущий в открытом окне
+        Стрелки — выбрать запись
+        ⌘⌥S — скрыть или показать боковое меню
+        ⌘, — настроить вид окна
+        ⌘1–9 — выбрать одну из первых девяти записей
+        ⌘F — перейти к поиску, ⌘0 — вся история
+        Escape — закрыть просмотр или окно
+
+        \(actions)
+
+        Действия находятся внутри карточек и в их контекстном меню. Подсказки кнопок показывают сочетания. Пробел открывает просмотр при выборе записи; в поле поиска он вводит пробел. ⌘Y открывает просмотр и из поиска.
+
+        Запрос, фильтры и раздел сохраняются между открытиями окна до перезапуска Bufera. Избранное хранится постоянно и не удаляется автоматически при достижении лимитов обычной истории.
+
+        Enter копирует запись и закрывает окно. Вставку выполняете сами (на Mac обычно ⌘V).
+
+        «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
+
+        Помеченные пароли скрыты точками. Кнопка глаза раскрывает скрытую запись или скрывает обычный текст. Маскировка не шифрует локальную базу.
+        """
         alert.runModal()
     }
 
@@ -246,6 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
         _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
+        _ = add("Внешний вид…    ⌘,", #selector(showAppearance))
         shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
         pauseItem = add("Приостановить запись", #selector(togglePause))
         menu.addItem(.separator())
@@ -270,6 +321,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Standard editing commands are needed for the search field in an accessory app.
         let mainMenu = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: "Bufera")
+        let appearanceItem = NSMenuItem(title: "Внешний вид…", action: #selector(showAppearance), keyEquivalent: ",")
+        appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())
         let helpItem = NSMenuItem(title: "Клавиши и справка…", action: #selector(help), keyEquivalent: "")
         helpItem.target = self; appMenu.addItem(helpItem); appMenu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Завершить Bufera", action: #selector(quit), keyEquivalent: "q")

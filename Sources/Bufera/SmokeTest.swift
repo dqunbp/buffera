@@ -1,5 +1,6 @@
 import AppKit
 import BuferaCore
+import ImageIO
 
 func runSmokeTest() throws {
     let pasteboard = NSPasteboard.withUniqueName()
@@ -69,5 +70,57 @@ func runSmokeTest() throws {
     guard pasteboard.writeObjects([sourceItem]), let sourced = try service.capture(), !sourced.isConcealed,
           !sourced.payload.items.joined().contains(where: { $0.type == "org.nspasteboard.source" }) else {
         throw HistoryError.database("Clipboard source bookkeeping leaked into the restored payload")
+    }
+    try runPreviewSmokeChecks()
+}
+
+private func runPreviewSmokeChecks() throws {
+    func payload(_ type: NSPasteboard.PasteboardType, _ data: Data) -> ClipPayload {
+        ClipPayload(items: [[Representation(type: type.rawValue, data: data)]])
+    }
+    let original = "Первая строка\nВторая строка 🐈"
+    guard case .text(let text) = ClipPreviewContent.decode(payload(.string, Data(original.utf8)), kind: .text),
+          text == original else {
+        throw HistoryError.database("Preview changed Unicode text or line breaks")
+    }
+    let longText = String(repeating: "ж", count: 500_001)
+    guard case .text(let truncated) = ClipPreviewContent.decode(payload(.string, Data(longText.utf8)), kind: .text),
+          truncated.hasPrefix(String(repeating: "ж", count: 500_000)),
+          truncated.contains("500 000"), truncated.count < 500_100 else {
+        throw HistoryError.database("Preview did not limit text with a truncation notice")
+    }
+    let path = "/tmp/проверка фото.png"
+    let fileURL = URL(fileURLWithPath: path).absoluteString
+    guard case .text(let fileText) = ClipPreviewContent.decode(payload(.fileURL, Data(fileURL.utf8)), kind: .file),
+          fileText == path else {
+        throw HistoryError.database("Preview did not decode a file URL to a readable path")
+    }
+    guard case .unavailable = ClipPreviewContent.decode(payload(.fileURL, Data("https://example.invalid/".utf8)), kind: .file) else {
+        throw HistoryError.database("Preview accepted a nonfile URL as a file path")
+    }
+    guard case .unavailable = ClipPreviewContent.decode(payload(.png, Data([0, 1, 2])), kind: .image) else {
+        throw HistoryError.database("Preview did not handle a corrupt image")
+    }
+    guard let context = CGContext(data: nil, width: 3_000, height: 2_000, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+          let image = context.makeImage() else {
+        throw HistoryError.database("Could not create preview image fixture")
+    }
+    let data = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else {
+        throw HistoryError.database("Could not encode preview image fixture")
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination),
+          case .image(let preview) = ClipPreviewContent.decode(payload(.png, data as Data), kind: .image),
+          preview.size.width > 0, preview.size.height > 0,
+          preview.size.width <= 1_600, preview.size.height <= 1_600,
+          abs(preview.size.width / preview.size.height - 1.5) < 0.01 else {
+        throw HistoryError.database("Preview did not downsample an image while preserving its proportions")
+    }
+    let binary = payload(.init("synthetic.binary"), Data([0, 1, 2]))
+    guard case .text(let summary) = ClipPreviewContent.decode(binary, kind: .other),
+          summary.contains("synthetic.binary"), !summary.contains("\u{0}") else {
+        throw HistoryError.database("Preview did not summarize binary formats without displaying raw data")
     }
 }

@@ -159,7 +159,7 @@ final class ClipboardService {
                   let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 96
+                    kCGImageSourceThumbnailMaxPixelSize: 320
                   ] as CFDictionary) else { continue }
             return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         }

@@ -60,11 +60,13 @@ public struct ClipSummary: Identifiable {
     public let source: String
     public let byteCount: Int
     public let isConcealed: Bool
+    public let isFavorite: Bool
 
     public init(id: Int64, date: Date, kind: ClipKind, title: String, text: String,
-                source: String, byteCount: Int, isConcealed: Bool = false) {
+                source: String, byteCount: Int, isConcealed: Bool = false, isFavorite: Bool = false) {
         self.id = id; self.date = date; self.kind = kind; self.title = title; self.text = text
         self.source = source; self.byteCount = byteCount; self.isConcealed = isConcealed
+        self.isFavorite = isFavorite
     }
 }
 
@@ -72,6 +74,7 @@ public struct SearchFilter {
     public var query = ""
     public var kind: ClipKind?
     public var source: String?
+    public var favoritesOnly = false
     public var from: Date?
     public var until: Date? // Exclusive upper bound.
     public init() {}

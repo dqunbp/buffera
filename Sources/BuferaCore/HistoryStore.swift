@@ -30,7 +30,7 @@ public final class HistoryStore {
         try execute("BEGIN IMMEDIATE")
         do {
             let version = try schemaVersion()
-            guard version <= 2 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
+            guard version <= 3 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
             if version < 2 {
                 try execute("""
                 CREATE TABLE IF NOT EXISTS clips (
@@ -45,7 +45,12 @@ public final class HistoryStore {
                 );
                 CREATE INDEX IF NOT EXISTS clips_date ON clips(date DESC, id DESC);
                 ALTER TABLE clips ADD COLUMN is_concealed INTEGER NOT NULL DEFAULT 0;
-                PRAGMA user_version=2;
+                """)
+            }
+            if version < 3 {
+                try execute("""
+                ALTER TABLE clips ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
+                PRAGMA user_version=3;
                 """)
             }
             try execute("COMMIT")
@@ -101,7 +106,7 @@ public final class HistoryStore {
 
     public func search(_ filter: SearchFilter, limit: Int = 150, offset: Int = 0) throws -> [ClipSummary] {
         let (clause, bindings) = predicate(filter)
-        let statement = try prepare("SELECT id,date,kind,title,text,source,bytes,is_concealed FROM clips \(clause) ORDER BY date DESC,id DESC LIMIT ? OFFSET ?")
+        let statement = try prepare("SELECT id,date,kind,title,text,source,bytes,is_concealed,is_favorite FROM clips \(clause) ORDER BY date DESC,id DESC LIMIT ? OFFSET ?")
         defer { sqlite3_finalize(statement) }
         try bind(bindings + [.integer(Int64(limit)), .integer(Int64(offset))], to: statement)
         var result: [ClipSummary] = []
@@ -111,7 +116,8 @@ public final class HistoryStore {
                 date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
                 kind: ClipKind(rawValue: string(statement, 2)) ?? .other, title: string(statement, 3),
                 text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6)),
-                isConcealed: sqlite3_column_int(statement, 7) != 0))
+                isConcealed: sqlite3_column_int(statement, 7) != 0,
+                isFavorite: sqlite3_column_int(statement, 8) != 0))
             status = sqlite3_step(statement)
         }
         guard status == SQLITE_DONE else { throw failure() }
@@ -160,6 +166,17 @@ public final class HistoryStore {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
     }
 
+    /// Setting the same value again is safe. Removing a favorite does not immediately prune history.
+    public func setFavorite(id: Int64, isFavorite: Bool) throws {
+        let statement = try prepare("UPDATE clips SET is_favorite=? WHERE id=? RETURNING id")
+        defer { sqlite3_finalize(statement) }
+        try bind([.integer(isFavorite ? 1 : 0), .integer(id)], to: statement)
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { throw HistoryError.missing }
+        guard status == SQLITE_ROW else { throw failure() }
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+    }
+
     public func conceal(id: Int64) throws {
         try execute("BEGIN IMMEDIATE")
         do {
@@ -182,12 +199,12 @@ public final class HistoryStore {
     }
 
     private func prune(maxCount: Int, maxBytes: Int) throws {
-        // Window sum keeps the newest prefix within both configured limits.
+        // Favorites are outside the automatic limits. Keep the newest ordinary prefix within both limits.
         let statement = try prepare("""
             DELETE FROM clips WHERE id IN (
                 SELECT id FROM (
                     SELECT id, ROW_NUMBER() OVER (ORDER BY date DESC,id DESC) AS position,
-                    SUM(bytes) OVER (ORDER BY date DESC,id DESC) AS total FROM clips
+                    SUM(bytes) OVER (ORDER BY date DESC,id DESC) AS total FROM clips WHERE is_favorite=0
                 ) WHERE position > ? OR total > ?
             )
             """)
@@ -206,6 +223,7 @@ public final class HistoryStore {
         }
         if let kind = filter.kind { clauses.append("kind=?"); bindings.append(.text(kind.rawValue)) }
         if let source = filter.source { clauses.append("source=?"); bindings.append(.text(source)) }
+        if filter.favoritesOnly { clauses.append("is_favorite=1") }
         if let from = filter.from { clauses.append("date>=?"); bindings.append(.number(from.timeIntervalSince1970)) }
         if let until = filter.until { clauses.append("date<?"); bindings.append(.number(until.timeIntervalSince1970)) }
         return (clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND "), bindings)
