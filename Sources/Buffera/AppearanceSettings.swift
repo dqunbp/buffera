@@ -203,7 +203,7 @@ private final class SettingsContentController: NSViewController {
         groups.orientation = .horizontal; groups.alignment = .top; groups.spacing = 24
         groups.distribution = .fillEqually
         left.widthAnchor.constraint(equalTo: right.widthAnchor).isActive = true
-        let note = paragraph("Пробел открывает просмотр, когда выбрана запись. Из поля поиска используйте ⌘Y. Enter копирует запись и закрывает окно; для вставки нажмите ⌘V в нужном приложении.")
+        let note = paragraph("Одно ⌘⌥V с отпусканием оставляет окно открытым; дальше V/C только двигают выбор. Для быстрого выбора удерживайте ⌘⌥ с самого открытия, нажмите V/C ещё раз и отпустите. Enter — выбрать, пробел — просмотр (из поиска — ⌘Y). Вставка — ⌘V в нужном приложении.")
         let page = vertical([groups, note], spacing: 18)
         groups.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
         note.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true

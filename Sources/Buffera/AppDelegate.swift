@@ -78,10 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         clipboard.onError = { [weak self] error in self?.showError(error) }
         clipboard.start()
-        hotKeys.onPress = { [weak self] delta in
+        hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
-            if self.panel.isInteracting { self.panel.move(delta) }
-            else if delta > 0 { self.open() }
+            if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat) }
+            else if delta > 0, !isRepeat { self.open(fromShortcut: true) }
         }
         registerShortcuts()
         applicationExitObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didTerminateApplicationNotification,
@@ -209,10 +209,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
+        panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetPressedKeys() }
         panel.onClose = { [weak self] in
             self?.generation += 1
             self?.searchGeneration += 1
             self?.confirmationToken += 1
+            self?.hotKeys.resetPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
         }
     }
@@ -255,10 +257,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch { panel.failed(error); showError(error) }
     }
 
-    private func open() {
+    private func open(fromShortcut: Bool = false) {
         guard panel != nil else { if let lastError { showError(lastError, alert: true) }; return }
         confirmationToken += 1
-        panel.open()
+        panel.open(fromShortcut: fromShortcut)
         do { try hotKeys.setPreviousEnabled(true) } catch { panel.failed(error); showError(error) }
     }
     @objc private func showHistory() { open() }

@@ -44,6 +44,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var previewToken = 0
     private var previewRequestPending = false
     private var commandHeld = false
+    private var shortcutGesture = HistoryShortcutGesture()
+    private var shortcutModifiersTimer: Timer?
     private var cardMenuTracking = false
     private var pendingSelectionID: Int64?
     private var retainedSelectionID: Int64?
@@ -72,11 +74,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onFavorite: ((Int64, Bool) -> Void)?
     var onPreview: ((ClipSummary, Int) -> Void)?
     var onClose: (() -> Void)?
+    var onShortcutGestureEnd: (() -> Void)?
     var onShowSettings: (() -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
+    var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
 
     override init() {
         super.init()
@@ -90,7 +94,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             return self.handle(event) == nil
         }
         window.onFlagsChanged = { [weak self] flags in
-            self?.commandHeld = flags.contains(.command); self?.updateVisibleCards()
+            self?.modifiersChanged(flags)
         }
         filters.onChange = { [weak self] in self?.refresh() }
         filters.onPopoverClosed = { [weak self] in self?.closeIfUnfocused() }
@@ -115,7 +119,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if appearance.mode != .floating { positionDockedWindow() }
     }
 
-    func open() {
+    func open(fromShortcut: Bool = false) {
+        cancelShortcutGesture()
         if let frontmost = NSWorkspace.shared.frontmostApplication,
            frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = frontmost }
         presentationToken += 1; isClosing = false
@@ -149,6 +154,48 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
         refresh(preservingSelection: true)
+        if fromShortcut { recordShortcutPress() }
+    }
+
+    func shortcutPressed(_ delta: Int, isRepeat: Bool = false) {
+        guard !isRepeat, isAvailableForShortcut, !confirming, !commitWhenLoaded,
+              !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
+        // Only the hold that opened this presentation can enable quick selection.
+        // Once released, later shortcuts navigate the persistent window.
+        if shortcutGesture.isActive { recordShortcutPress() }
+        move(delta)
+    }
+
+    private func recordShortcutPress() {
+        shortcutGesture.press()
+        guard shortcutModifiersTimer == nil else { return }
+        // A quick first tap can release its modifiers before the panel becomes
+        // key and receives flagsChanged. Observe the current flags only during a gesture.
+        let timer = Timer(timeInterval: 0.025, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            self.modifiersChanged(NSEvent.modifierFlags)
+        }
+        shortcutModifiersTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
+        let held = flags.contains(.command)
+        if commandHeld != held { commandHeld = held; updateVisibleCards() }
+        let wasActive = shortcutGesture.isActive
+        let shouldConfirm = shortcutGesture.modifiersChanged(flags)
+        if wasActive && !shortcutGesture.isActive {
+            shortcutModifiersTimer?.invalidate(); shortcutModifiersTimer = nil
+            onShortcutGestureEnd?()
+        }
+        if shouldConfirm, isAvailableForShortcut { confirm() }
+    }
+
+    private func cancelShortcutGesture() {
+        let wasActive = shortcutGesture.isActive
+        shortcutGesture.cancel()
+        shortcutModifiersTimer?.invalidate(); shortcutModifiersTimer = nil
+        if wasActive { onShortcutGestureEnd?() }
     }
 
     func move(_ delta: Int) {
@@ -199,6 +246,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func failed(_ error: Error) {
+        cancelShortcutGesture()
         loading = false; commitWhenLoaded = false; confirming = false; search.isEnabled = true
         filters.setInteractionEnabled(true)
         scope.isEnabled = true
@@ -223,6 +271,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func close(restoreFocus: Bool = true) {
+        cancelShortcutGesture()
         guard !isClosing else { return }
         cancelSearchIndexRefresh()
         logger.notice("Panel closed: restoreFocus=\(restoreFocus)")
@@ -323,11 +372,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if flags.contains(.command) && event.keyCode == 3 {
             dismissPreview(); window.makeFirstResponder(search); return nil
         }
-        if flags.contains([.command, .option]) {
+        if flags.contains(HistoryShortcutGesture.requiredModifiers) {
             // Carbon consumes physical hotkeys. Handle directly delivered key events too
             // (for example accessibility input targeting this window instead of the session).
-            if event.keyCode == 9 { move(1); return nil }
-            if event.keyCode == 8 { move(-1); return nil }
+            if event.keyCode == 9 { shortcutPressed(1, isRepeat: event.isARepeat); return nil }
+            if event.keyCode == 8 { shortcutPressed(-1, isRepeat: event.isARepeat); return nil }
             return event
         }
         if flags.contains(.command) {
@@ -367,6 +416,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func confirm() {
+        cancelShortcutGesture()
         guard !isClosing, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if loading && rows.isEmpty {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)

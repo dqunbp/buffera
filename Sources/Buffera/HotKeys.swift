@@ -6,10 +6,11 @@ final class HotKeys {
     private var nextRef: EventHotKeyRef?
     private var previousRef: EventHotKeyRef?
     private var handler: EventHandlerRef?
+    private var pressedIDs: Set<UInt32> = []
     private static let signature: OSType = 0x42554652
     private let logger = Logger(subsystem: "local.buffera.app", category: "hotkeys")
     var isRegistered: Bool { nextRef != nil }
-    var onPress: ((Int) -> Void)?
+    var onPress: ((Int, Bool) -> Void)?
 
     func register() throws {
         guard nextRef == nil else { return }
@@ -18,7 +19,10 @@ final class HotKeys {
     }
 
     private func installHandler() throws {
-        var specification = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        var specifications = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
         let status = InstallEventHandler(GetEventDispatcherTarget(), { _, event, context in
             guard let event, let context else { return OSStatus(eventNotHandledErr) }
             var id = EventHotKeyID()
@@ -27,17 +31,26 @@ final class HotKeys {
             guard result == noErr else { return result }
             guard id.signature == HotKeys.signature, id.id == 1 || id.id == 2 else { return OSStatus(eventNotHandledErr) }
             let owner = Unmanaged<HotKeys>.fromOpaque(context).takeUnretainedValue()
+            if GetEventKind(event) == UInt32(kEventHotKeyReleased) {
+                owner.pressedIDs.remove(id.id)
+                return noErr
+            }
+            let isRepeat = !owner.pressedIDs.insert(id.id).inserted
             owner.logger.notice("Global shortcut received: id=\(id.id)")
-            owner.onPress?(id.id == 1 ? 1 : -1)
+            owner.onPress?(id.id == 1 ? 1 : -1, isRepeat)
             return noErr
-        }, 1, &specification, Unmanaged.passUnretained(self).toOpaque(), &handler)
+        }, specifications.count, &specifications, Unmanaged.passUnretained(self).toOpaque(), &handler)
         guard status == noErr else { throw HotKeyError(status: status) }
     }
 
     func setPreviousEnabled(_ enabled: Bool) throws {
         if enabled && previousRef == nil { try add(key: UInt32(kVK_ANSI_C), id: 2, ref: &previousRef) }
-        if !enabled, let previousRef { UnregisterEventHotKey(previousRef); self.previousRef = nil }
+        if !enabled, let previousRef {
+            UnregisterEventHotKey(previousRef); self.previousRef = nil; pressedIDs.remove(2)
+        }
     }
+
+    func resetPressedKeys() { pressedIDs.removeAll() }
 
     private func add(key: UInt32, id: UInt32, ref: inout EventHotKeyRef?) throws {
         let status = RegisterEventHotKey(key, UInt32(cmdKey | optionKey), EventHotKeyID(signature: Self.signature, id: id),

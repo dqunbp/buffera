@@ -258,4 +258,50 @@ contentWindow.setContentSize(NSSize(width: 230, height: 640))
 contentGrid.layoutSubtreeIfNeeded()
 check(contentGrid.effectiveColumns == 1 && itemFrame(0).height == 74 && itemFrame(4).height > preferredWrapping,
       "returning to a narrow content-sized panel remeasures wrapping and short records")
+
+// Reopening refreshes through an empty result before restoring the selected
+// record. Realize the viewport synchronously, before the panel configures cards.
+for contentSized in [false, true] {
+    let reopening = HistoryCardsView(frame: NSRect(x: 0, y: 0, width: 444, height: 640))
+    let reopeningWindow = NSWindow(contentRect: reopening.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    reopeningWindow.contentView = reopening
+    reopeningWindow.setFrameOrigin(NSPoint(x: -20_000, y: -20_000))
+    reopeningWindow.orderFront(nil)
+    var reopeningClips = (0..<80).map(fixture)
+    reopening.sizesToContent = contentSized
+    reopening.heightForCard = { index, width, maximum in
+        ClipCardView.preferredHeight(for: reopeningClips[index], revealedText: nil,
+                                     width: width, maximumHeight: maximum)
+    }
+    reopening.makeCard = { ClipCardView(clip: reopeningClips[$0], revealedText: nil, thumbnail: nil) { _ in } }
+    reopening.layoutSubtreeIfNeeded()
+    reopening.reload(count: reopeningClips.count, selectedIndex: 0, scrollToSelection: true)
+    let reopeningCollection = reopening.scrollView.documentView as! NSCollectionView
+    let mode = contentSized ? "content-sized" : "fixed"
+    for retainedSelection in [0, 70] {
+        // The first case scrolls without selecting a card. The second restores a
+        // selected record far below the first viewport.
+        reopening.select(retainedSelection, scrollIntoView: false)
+        reopening.scrollView.contentView.scroll(to: NSPoint(x: 0, y: 5_000))
+        reopening.scrollView.reflectScrolledClipView(reopening.scrollView.contentView)
+        reopeningCollection.layoutSubtreeIfNeeded()
+        check(reopening.scrollView.contentView.bounds.origin.y > 4_000,
+              "\(mode) reopen fixture begins deeply scrolled with selection \(retainedSelection)")
+        reopeningWindow.orderOut(nil)
+        reopeningWindow.orderFront(nil)
+        reopeningClips = []
+        reopening.reload(count: 0, selectedIndex: -1, scrollToSelection: false)
+        reopeningClips = (0..<80).map(fixture)
+        reopening.reload(count: reopeningClips.count, selectedIndex: retainedSelection, scrollToSelection: true)
+        let visible = reopening.visibleIndices()
+        check(!visible.isEmpty && visible.contains(retainedSelection),
+              "\(mode) reopen immediately realizes the restored viewport for selection \(retainedSelection)")
+        check(visible.allSatisfy { index in
+            guard let card = reopening.card(at: index), card.superview != nil else { return false }
+            return descendants(of: card).compactMap { $0 as? NSTextField }
+                .contains { $0.stringValue == reopeningClips[index].text }
+        }, "\(mode) reopened cards contain visible record content for selection \(retainedSelection)")
+    }
+    reopeningWindow.orderOut(nil)
+}
 print("\(checkCount) history cards checks passed")

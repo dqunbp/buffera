@@ -6,7 +6,7 @@ import BufferaCore
 // every preference they touch before asserting their results.
 // mkdir -p .build/history-panel-checks
 // swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
+// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
 // .build/history-panel-checks/checks
 
 var checkCount = 0
@@ -210,5 +210,209 @@ func settingsChecks() -> [(Bool, String)] {
     return results
 }
 for (passed, message) in settingsChecks() { check(passed, message) }
+
+func shortcutChecks() -> [(Bool, String)] {
+    let defaults = UserDefaults.standard
+    let keys = ["historyAppearance.mode", "historyAppearance.columns", "historyAppearance.visibleRows",
+                "historyAppearance.sidebarVisible", "NSWindow Frame BufferaHistory"]
+    let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+    var harnesses: [PanelHarness] = []
+    defer {
+        for harness in harnesses { harness.panel.close(restoreFocus: false); harness.finish() }
+        for (key, value) in saved {
+            if let value { defaults.set(value, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+    }
+    // Disable dock animations for deterministic synchronous shortcut sequences.
+    HistoryAppearance(mode: .floating, columns: 1, visibleRows: 6, sidebarVisible: false).save()
+    let clips = (1...20).map(fixture)
+    let held = HistoryShortcutGesture.requiredModifiers
+    var results: [(Bool, String)] = []
+
+    func opened(load: Bool = true, fromShortcut: Bool = true) -> PanelHarness {
+        let harness = PanelHarness(rows: clips)
+        harnesses.append(harness)
+        harness.panel.open(fromShortcut: fromShortcut)
+        if load { harness.panel.receive(clips, total: clips.count, offset: 0) }
+        return harness
+    }
+    func key(_ harness: PanelHarness, code: UInt16, characters: String,
+             flags: NSEvent.ModifierFlags = [], isRepeat: Bool = false) {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                    windowNumber: harness.panel.window.windowNumber, context: nil,
+                                    characters: characters, charactersIgnoringModifiers: characters,
+                                    isARepeat: isRepeat, keyCode: code)!
+        harness.panel.window.sendEvent(event)
+    }
+
+    let single = opened()
+    single.panel.window.onFlagsChanged?(held)
+    single.panel.window.onFlagsChanged?([])
+    results.append((single.panel.window.isVisible && single.confirmations.isEmpty
+                    && single.panel.selected?.id == 1 && single.search.isEnabled,
+                    "one opening shortcut remains visible and does not confirm on modifier release"))
+    single.panel.shortcutPressed(1)
+    single.panel.shortcutPressed(1)
+    single.panel.window.onFlagsChanged?([])
+    results.append((single.panel.window.isVisible && single.confirmations.isEmpty
+                    && single.panel.selected?.id == 3 && single.search.isEnabled,
+                    "two later presses in one hold cannot rearm a persistent presentation"))
+    single.panel.shortcutPressed(-1)
+    single.panel.window.onFlagsChanged?([])
+    single.panel.shortcutPressed(-1)
+    single.panel.window.onFlagsChanged?([])
+    results.append((single.panel.window.isVisible && single.confirmations.isEmpty
+                    && single.panel.selected?.id == 1 && single.search.isEnabled,
+                    "later separate holds also keep the same presentation persistent"))
+    single.panel.close(restoreFocus: false)
+    single.panel.open(fromShortcut: true)
+    single.panel.receive(clips, total: clips.count, offset: 0)
+    single.panel.shortcutPressed(1)
+    single.panel.window.onFlagsChanged?([])
+    results.append((single.confirmations == [2],
+                    "closing a persistent panel allows release confirmation in a fresh opening hold"))
+
+    let cycling = opened()
+    cycling.panel.shortcutPressed(1)
+    cycling.panel.window.onFlagsChanged?(held)
+    results.append((cycling.panel.selected?.id == 2 && cycling.confirmations.isEmpty,
+                    "a second press in the opening hold moves once without confirming early"))
+    cycling.panel.window.onFlagsChanged?([.option])
+    cycling.panel.window.onFlagsChanged?([])
+    results.append((cycling.confirmations == [2] && !cycling.search.isEnabled,
+                    "releasing Command after cycling confirms the selected record exactly once"))
+
+    let reverse = opened()
+    reverse.panel.shortcutPressed(1)
+    reverse.panel.shortcutPressed(1)
+    reverse.panel.shortcutPressed(-1)
+    reverse.panel.window.onFlagsChanged?([.command])
+    results.append((reverse.confirmations == [2],
+                    "reverse cycling returns to the previous record and releasing Option confirms it"))
+
+    let separate = opened()
+    separate.panel.window.onFlagsChanged?([])
+    separate.panel.shortcutPressed(1)
+    separate.panel.window.onFlagsChanged?([])
+    separate.panel.shortcutPressed(-1)
+    separate.panel.window.onFlagsChanged?([])
+    results.append((separate.confirmations.isEmpty && separate.panel.window.isVisible
+                    && separate.panel.selected?.id == 1,
+                    "separate shortcut holds move selection while keeping the panel persistent"))
+
+    let repeats = opened()
+    repeats.panel.shortcutPressed(1, isRepeat: true)
+    key(repeats, code: 9, characters: "v", flags: held, isRepeat: true)
+    repeats.panel.window.onFlagsChanged?([])
+    results.append((repeats.confirmations.isEmpty && repeats.panel.selected?.id == 1,
+                    "global and direct-window autorepeats neither move nor arm an opening tap"))
+    key(repeats, code: 9, characters: "v", flags: held)
+    key(repeats, code: 9, characters: "v", flags: held, isRepeat: true)
+    repeats.panel.window.onFlagsChanged?([])
+    results.append((repeats.confirmations.isEmpty && repeats.panel.selected?.id == 2,
+                    "a direct-window single tap moves once and ignores its autorepeat"))
+    key(repeats, code: 9, characters: "v", flags: held)
+    key(repeats, code: 8, characters: "c", flags: held)
+    repeats.panel.window.onFlagsChanged?([])
+    results.append((repeats.confirmations.isEmpty && repeats.panel.window.isVisible
+                    && repeats.panel.selected?.id == 2 && repeats.search.isEnabled,
+                    "direct-window V then C keeps an already persistent presentation open"))
+
+    let directOpening = opened()
+    key(directOpening, code: 9, characters: "v", flags: held)
+    key(directOpening, code: 8, characters: "c", flags: held)
+    directOpening.panel.window.onFlagsChanged?([])
+    results.append((directOpening.confirmations == [1] && !directOpening.search.isEnabled,
+                    "direct-window V then C confirms when the initial opening hold is still active"))
+
+    let ordinary = opened(fromShortcut: false)
+    ordinary.panel.shortcutPressed(1)
+    key(ordinary, code: 9, characters: "v", flags: held)
+    key(ordinary, code: 8, characters: "c", flags: held)
+    ordinary.panel.window.onFlagsChanged?([])
+    results.append((ordinary.panel.window.isVisible && ordinary.confirmations.isEmpty
+                    && ordinary.panel.selected?.id == 2 && ordinary.search.isEnabled,
+                    "a normal menu opening remains persistent through global and direct-window cycling"))
+
+    let loading = opened(load: false)
+    loading.panel.shortcutPressed(1)
+    loading.panel.shortcutPressed(1)
+    loading.panel.window.onFlagsChanged?([])
+    results.append((loading.confirmations.isEmpty && !loading.search.isEnabled,
+                    "cycling release waits while the initial history request is loading"))
+    loading.panel.receive(clips, total: clips.count, offset: 0)
+    results.append((loading.confirmations == [3],
+                    "the loaded history applies pending moves before confirming the chosen record"))
+
+    let escaped = opened(load: false)
+    escaped.panel.shortcutPressed(1)
+    escaped.panel.window.onFlagsChanged?([])
+    key(escaped, code: 53, characters: "\u{1b}")
+    escaped.panel.receive(clips, total: clips.count, offset: 0)
+    results.append((!escaped.panel.window.isVisible && escaped.confirmations.isEmpty,
+                    "Escape cancels deferred shortcut confirmation before history arrives"))
+    escaped.panel.open(fromShortcut: true)
+    escaped.panel.receive(clips, total: clips.count, offset: 0)
+    escaped.panel.window.onFlagsChanged?([])
+    results.append((escaped.panel.window.isVisible && escaped.confirmations.isEmpty && escaped.search.isEnabled,
+                    "reopening after Escape starts a fresh persistent single-tap gesture"))
+
+    let failedCopy = opened()
+    failedCopy.panel.shortcutPressed(1)
+    failedCopy.panel.window.onFlagsChanged?([])
+    failedCopy.panel.failed(HistoryError.database("Fixture copy failure"))
+    failedCopy.panel.window.onFlagsChanged?([])
+    failedCopy.panel.shortcutPressed(1)
+    failedCopy.panel.window.onFlagsChanged?([])
+    results.append((failedCopy.confirmations == [2] && failedCopy.search.isEnabled
+                    && failedCopy.panel.selected?.id == 3,
+                    "copy failure restores interaction without retrying on release or the next single tap"))
+
+    let failedGesture = opened()
+    failedGesture.panel.shortcutPressed(1)
+    failedGesture.panel.failed(HistoryError.database("Fixture interaction failure"))
+    failedGesture.panel.window.onFlagsChanged?([])
+    results.append((failedGesture.confirmations.isEmpty && failedGesture.search.isEnabled,
+                    "failure while cycling cancels the armed gesture before modifier release"))
+
+    let failedInitial = opened(load: false)
+    failedInitial.panel.searchFailed(HistoryError.database("Fixture initial request failure"))
+    failedInitial.search.stringValue = "retry"
+    failedInitial.panel.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification,
+                                                         object: failedInitial.search))
+    failedInitial.panel.receive(clips, total: clips.count, offset: 0)
+    failedInitial.panel.shortcutPressed(1)
+    failedInitial.panel.shortcutPressed(1)
+    failedInitial.panel.window.onFlagsChanged?([])
+    results.append((failedInitial.panel.window.isVisible && failedInitial.confirmations.isEmpty
+                    && failedInitial.panel.selected?.id == 3 && failedInitial.search.isEnabled,
+                    "an initial query failure cancels release confirmation for the remaining presentation"))
+
+    if NSEvent.modifierFlags.intersection(held).isEmpty {
+        let polled = PanelHarness(rows: clips)
+        harnesses.append(polled)
+        var ended = 0
+        polled.panel.onShortcutGestureEnd = { ended += 1 }
+        polled.panel.open(fromShortcut: true)
+        polled.panel.receive(clips, total: clips.count, offset: 0)
+        let deadline = Date(timeIntervalSinceNow: 0.25)
+        while ended == 0, Date() < deadline {
+            _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
+        results.append((ended == 1 && polled.panel.window.isVisible && polled.confirmations.isEmpty,
+                        "modifier polling ends a quick first tap when its flagsChanged event was missed"))
+        polled.panel.shortcutPressed(1)
+        polled.panel.shortcutPressed(1)
+        polled.panel.window.onFlagsChanged?([])
+        results.append((ended == 1 && polled.panel.window.isVisible && polled.confirmations.isEmpty
+                        && polled.panel.selected?.id == 3 && polled.search.isEnabled,
+                        "a polling-ended opening hold stays persistent through later cycling"))
+    } else {
+        print("SKIP modifier polling check while shortcut modifiers are physically held")
+    }
+    return results
+}
+for (passed, message) in shortcutChecks() { check(passed, message) }
 
 print("\(checkCount) history panel checks passed")

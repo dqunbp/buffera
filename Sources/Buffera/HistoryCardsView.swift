@@ -196,6 +196,9 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         guard let frame = collectionView.layoutAttributesForItem(at: indexPath(selectedIndex))?.frame else { return }
         collectionView.scrollToVisible(frame)
         scrollView.reflectScrolledClipView(scrollView.contentView)
+        // Scrolling changes which reusable items AppKit must realize. Finish
+        // that pass now so a reopened panel never exposes the old viewport.
+        collectionView.layoutSubtreeIfNeeded()
     }
 
     var isNearEnd: Bool {
