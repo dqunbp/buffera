@@ -429,7 +429,8 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         } else {
             date = Self.dateFormatter.string(from: clip.date)
         }
-        return clip.source.isEmpty ? date : "\(clip.source)   \(date)"
+        let source = clip.isRemote ? "С другого устройства" : clip.source
+        return source.isEmpty ? date : "\(source)   \(date)"
     }
 
     private func updateAppearance() {

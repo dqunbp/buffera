@@ -48,6 +48,121 @@ final class HistoryStoreTests {
         try checkEqual(try store.search(SearchFilter()).map(\.title), ["один", "два"])
     }
 
+    func testMarkUsedPromotesWithoutChangingCapturedMetadata() throws {
+        let original = imagePayload("used-image")
+        let id = try store.insert(payload: original, kind: .image, title: "Original image", text: "Original metadata",
+                                  source: "Original App", isRemote: true, date: Date(timeIntervalSince1970: 10))
+        try store.setFavorite(id: id, isFavorite: true)
+        try store.completeImageText(id: id, text: "recognized fixture")
+        let secret = try store.insert(payload: payload("concealed-use"), kind: .text, title: "Secret", text: "Secret",
+                                      source: "Password App", isConcealed: true, isRemote: true,
+                                      date: Date(timeIntervalSince1970: 15))
+        let newest = try insert("newer", time: 20)
+        let before = try store.search(SearchFilter()).first { $0.id == id }!
+        try store.markUsed(id: id, date: Date(timeIntervalSince1970: 30))
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [id, newest, secret])
+        try checkEqual(try store.count(), 3)
+        let after = try store.search(SearchFilter())[0]
+        try checkEqual(after.date, before.date); try checkEqual(after.source, before.source)
+        try checkEqual(after.kind, before.kind); try checkEqual(after.byteCount, before.byteCount)
+        try checkEqual(after.title, before.title); try checkEqual(after.text, before.text)
+        try checkEqual(after.isRemote, before.isRemote); try checkEqual(after.isFavorite, before.isFavorite)
+        try checkEqual(after.isConcealed, before.isConcealed)
+        try checkEqual(try store.payload(id: id), original)
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(complete: 1))
+        var filter = SearchFilter(); filter.query = "recognized fixture"; filter.remoteOnly = true; filter.favoritesOnly = true
+        try checkEqual(try store.search(filter).map(\.id), [id])
+        try store.markUsed(id: secret, date: Date(timeIntervalSince1970: 40))
+        let hidden = try store.search(SearchFilter())[0]
+        try checkEqual(hidden.id, secret); try checkEqual(hidden.date, Date(timeIntervalSince1970: 15))
+        try check(hidden.isConcealed && hidden.isRemote && !hidden.isFavorite)
+        try checkEqual(hidden.source, "Password App"); try checkEqual(hidden.title, "Скрытая запись")
+        try checkEqual(hidden.text, ""); try checkEqual(try store.payload(id: secret), payload("concealed-use"))
+    }
+
+    func testMarkUsedPreservesDateFiltersAndPersistsAfterReopen() throws {
+        let old = try insert("old capture", time: 10)
+        let new = try insert("new capture", time: 20)
+        try store.markUsed(id: old, date: Date(timeIntervalSince1970: 30))
+        store = nil; store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [old, new])
+        var filter = SearchFilter()
+        filter.from = Date(timeIntervalSince1970: 10); filter.until = Date(timeIntervalSince1970: 20)
+        try checkEqual(try store.search(filter).map(\.id), [old])
+        try checkEqual(try store.count(filter), 1)
+        filter.from = Date(timeIntervalSince1970: 20); filter.until = Date(timeIntervalSince1970: 30)
+        try checkEqual(try store.search(filter).map(\.id), [new])
+        filter.from = Date(timeIntervalSince1970: 30); filter.until = nil
+        try checkEqual(try store.count(filter), 0)
+    }
+
+    func testUseRecencyPaginationHasStableTies() throws {
+        var ids: [Int64] = []
+        for index in 1...5 { ids.append(try insert("page \(index)", time: Double(index))) }
+        for id in ids.prefix(2) { try store.markUsed(id: id, date: Date(timeIntervalSince1970: 10)) }
+        let expected = [ids[1], ids[0], ids[4], ids[3], ids[2]]
+        try checkEqual(try store.search(SearchFilter()).map(\.id), expected)
+        var pages: [Int64] = []
+        for offset in stride(from: 0, to: 6, by: 2) {
+            pages += try store.search(SearchFilter(), limit: 2, offset: offset).map(\.id)
+        }
+        try checkEqual(pages, expected)
+        try checkEqual(Set(pages).count, expected.count)
+    }
+
+    func testPruningKeepsRecentlyUsedRecordsAndCascadesUnusedPayloads() throws {
+        let reused = try insertImage("old reused image", time: 1)
+        let unused = try insertImage("newer unused image", time: 2)
+        let favorite = try insertImage("favorite image", time: 0)
+        try store.setFavorite(id: favorite, isFavorite: true)
+        try store.completeImageText(id: reused, text: "retained OCR")
+        try store.completeImageText(id: unused, text: "removed OCR")
+        try store.markUsed(id: reused, date: Date(timeIntervalSince1970: 3))
+        let latest = try insert("latest capture", time: 4, maxCount: 2)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [latest, reused, favorite])
+        try checkThrows(try store.payload(id: unused))
+        try checkEqual(try store.payload(id: reused), imagePayload("old reused image"))
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1))
+        var filter = SearchFilter(); filter.query = "removed OCR"
+        try checkEqual(try store.count(filter), 0)
+    }
+
+    func testBytePruningKeepsRecentlyUsedRecords() throws {
+        let reused = try insert("old reused", time: 1)
+        let unused = try insert(String(repeating: "x", count: 5000), time: 2)
+        try store.markUsed(id: reused, date: Date(timeIntervalSince1970: 3))
+        let latest = try insert("latest", time: 4, maxBytes: 1000)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [latest, reused])
+        try checkThrows(try store.payload(id: unused))
+    }
+
+    func testRepeatCaptureAfterUseUpdatesRecencyAndSource() throws {
+        let id = try insert("same payload", time: 10, source: "First App")
+        let other = try insert("other payload", time: 20)
+        try store.markUsed(id: id, date: Date(timeIntervalSince1970: 30))
+        try store.markUsed(id: other, date: Date(timeIntervalSince1970: 40))
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [other, id])
+        try checkEqual(try insert("same payload", time: 50, source: "Last App"), id)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [id, other])
+        let updated = try store.search(SearchFilter())[0]
+        try checkEqual(updated.date, Date(timeIntervalSince1970: 50)); try checkEqual(updated.source, "Last App")
+        try checkEqual(try store.count(), 2)
+        // Explicit capture dates remain authoritative, including when they predate a prior use.
+        try checkEqual(try insert("same payload", time: 35, source: "Earlier App"), id)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [other, id])
+    }
+
+    func testMissingMarkUsedThrowsMissingAndLeavesStoreUsable() throws {
+        do {
+            try store.markUsed(id: 9999)
+            throw CheckFailure(description: "Expected HistoryError.missing")
+        } catch HistoryError.missing { }
+        let id = try insert("usable after failed use", time: 1)
+        try store.markUsed(id: id)
+        try checkEqual(try store.count(), 1)
+        try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 1))
+    }
+
     func testDateTypeAndCaseInsensitiveWordsCombine() throws {
         try insert("Проект ССЫЛКА", time: 100, kind: .link)
         try insert("проект ссылка", time: 200)
@@ -148,13 +263,13 @@ final class HistoryStoreTests {
         try checkEqual(try store.count(), 8)
         let records = try store.search(SearchFilter())
         try checkEqual(records.map(\.title), (1...8).reversed().map { "legacy \($0)" })
-        try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite })
+        try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite && !$0.isRemote })
         for index in 1...8 { try checkEqual(try store.payload(id: Int64(index)), payload("legacy \(index)")) }
-        try checkEqual(try rawSchemaVersion(at: url), 4)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         store = nil; store = try HistoryStore(url: url)
         try checkEqual(try store.count(), 8)
-        try checkEqual(try rawSchemaVersion(at: url), 4)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
     }
 
     func testVersionTwoMigrationPreservesConcealmentAndPayloads() throws {
@@ -184,9 +299,9 @@ final class HistoryStoreTests {
         try checkEqual(record.id, 42); try checkEqual(record.date, Date(timeIntervalSince1970: 123))
         try checkEqual(record.title, "Скрытая запись"); try checkEqual(record.text, "")
         try checkEqual(record.source, "Old App"); try checkEqual(record.byteCount, encoded.count)
-        try check(record.isConcealed && !record.isFavorite)
+        try check(record.isConcealed && !record.isFavorite && !record.isRemote)
         try checkEqual(try store.payload(id: 42), original)
-        try checkEqual(try rawSchemaVersion(at: url), 4)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         try store.setFavorite(id: 42, isFavorite: true)
         store = nil; store = try HistoryStore(url: url)
@@ -197,7 +312,7 @@ final class HistoryStoreTests {
     func testFavoriteSurvivesRepeatSetReopenDeduplicationAndConcealment() throws {
         let id = try insert("favorite-fixture", time: 100)
         try check(!store.search(SearchFilter())[0].isFavorite)
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 4)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 6)
         try store.setFavorite(id: id, isFavorite: true)
         try store.setFavorite(id: id, isFavorite: true)
         try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 100))
@@ -329,10 +444,10 @@ final class HistoryStoreTests {
     func testNewerSchemaIsNotDowngraded() throws {
         let url = directory.appendingPathComponent("future.sqlite")
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=5", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=7", nil, nil, nil), SQLITE_OK)
         }
         try checkThrows(try HistoryStore(url: url))
-        try checkEqual(try rawSchemaVersion(at: url), 5)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
     }
 
     func testVersionThreeMigrationBackfillsOnlyVisibleImagesWithoutChangingHistory() throws {
@@ -365,7 +480,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try HistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 4)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
         try checkEqual(try store.count(), 4)
         let records = try store.search(SearchFilter())
         for entry in entries {
@@ -408,6 +523,233 @@ final class HistoryStoreTests {
         try check(try store.completeImageText(id: old, text: "old result"))
         try checkEqual(try store.nextPendingImageTextID(), first)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
+    }
+
+    func testVersionFourMigrationPreservesUnknownOriginsPayloadsAndOCR() throws {
+        let url = directory.appendingPathComponent("version-four.sqlite")
+        let entries: [(id: Int64, concealed: Bool, favorite: Bool, status: String?)] = [
+            (21, false, true, "complete"), (22, false, false, "pending"),
+            (23, false, false, "failed"), (24, true, true, nil)
+        ]
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, """
+                CREATE TABLE clips (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL UNIQUE,
+                    date REAL NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+                    text TEXT NOT NULL, source TEXT NOT NULL, search TEXT NOT NULL, bytes INTEGER NOT NULL,
+                    is_concealed INTEGER NOT NULL DEFAULT 0, is_favorite INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE payloads (clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE, data BLOB NOT NULL);
+                CREATE INDEX clips_date ON clips(date DESC,id DESC);
+                CREATE TABLE clip_ocr (
+                    clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE,
+                    status TEXT NOT NULL CHECK(status IN ('pending','complete','failed')),
+                    text TEXT NOT NULL DEFAULT '', search TEXT NOT NULL DEFAULT ''
+                );
+                CREATE INDEX clip_ocr_pending ON clip_ocr(clip_id) WHERE status='pending';
+                PRAGMA user_version=4;
+                """, nil, nil, nil), SQLITE_OK)
+            for entry in entries {
+                let original = imagePayload("v4-\(entry.id)")
+                let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
+                let encoded = try encoder.encode(original)
+                let hex = encoded.map { String(format: "%02x", $0) }.joined()
+                let title = entry.concealed ? "Скрытая запись" : "legacy \(entry.id)"
+                try checkEqual(sqlite3_exec(db, """
+                    INSERT INTO clips VALUES(\(entry.id),'\(original.fingerprint)',\(entry.id),'image','\(title)','','loginwindow','\(SearchFilter.normalize(title)) loginwindow',\(encoded.count),\(entry.concealed ? 1 : 0),\(entry.favorite ? 1 : 0));
+                    INSERT INTO payloads VALUES(\(entry.id),X'\(hex)');
+                    """, nil, nil, nil), SQLITE_OK)
+                if let status = entry.status {
+                    let recognized = status == "complete" ? "сохранившийся текст" : ""
+                    try checkEqual(sqlite3_exec(db, "INSERT INTO clip_ocr VALUES(\(entry.id),'\(status)','\(recognized)','\(SearchFilter.normalize(recognized))')", nil, nil, nil), SQLITE_OK)
+                }
+            }
+        }
+        store = nil; store = try HistoryStore(url: url)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
+        let records = try store.search(SearchFilter())
+        try checkEqual(records.count, entries.count)
+        for entry in entries {
+            let record = records.first { $0.id == entry.id }!
+            try check(!record.isRemote)
+            try checkEqual(record.source, "loginwindow")
+            try checkEqual(record.date, Date(timeIntervalSince1970: Double(entry.id)))
+            try checkEqual(record.isConcealed, entry.concealed); try checkEqual(record.isFavorite, entry.favorite)
+            try checkEqual(try store.payload(id: entry.id), imagePayload("v4-\(entry.id)"))
+        }
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
+        try checkEqual(try store.nextPendingImageTextID(), 22)
+        var filter = SearchFilter(); filter.query = "сохранившийся текст"
+        try checkEqual(try store.search(filter).map(\.id), [21])
+        filter.remoteOnly = true
+        try checkEqual(try store.count(filter), 0)
+        filter.query = ""
+        try checkEqual(try store.count(filter), 0)
+        store = nil; store = try HistoryStore(url: url)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, "UPDATE clips SET is_remote=2 WHERE id=21", nil, nil, nil), SQLITE_CONSTRAINT)
+        }
+        try check(try store.search(SearchFilter()).allSatisfy { !$0.isRemote })
+    }
+
+    func testVersionFiveMigrationPreservesOrderingMetadataPayloadsAndOCR() throws {
+        let url = directory.appendingPathComponent("version-five.sqlite")
+        let entries: [(id: Int64, date: Double, remote: Bool, concealed: Bool, favorite: Bool, status: String?)] = [
+            (31, 0, true, false, true, "complete"), (32, -20, false, false, false, "pending"),
+            (33, 20, true, false, false, "failed"), (34, 20, true, true, true, nil)
+        ]
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, """
+                CREATE TABLE clips (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL UNIQUE,
+                    date REAL NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+                    text TEXT NOT NULL, source TEXT NOT NULL, search TEXT NOT NULL, bytes INTEGER NOT NULL,
+                    is_concealed INTEGER NOT NULL DEFAULT 0, is_favorite INTEGER NOT NULL DEFAULT 0,
+                    is_remote INTEGER NOT NULL DEFAULT 0 CHECK(is_remote IN (0,1))
+                );
+                CREATE TABLE payloads (clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE, data BLOB NOT NULL);
+                CREATE INDEX clips_date ON clips(date DESC,id DESC);
+                CREATE TABLE clip_ocr (
+                    clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE,
+                    status TEXT NOT NULL CHECK(status IN ('pending','complete','failed')),
+                    text TEXT NOT NULL DEFAULT '', search TEXT NOT NULL DEFAULT ''
+                );
+                CREATE INDEX clip_ocr_pending ON clip_ocr(clip_id) WHERE status='pending';
+                PRAGMA user_version=5;
+                """, nil, nil, nil), SQLITE_OK)
+            for entry in entries {
+                let original = imagePayload("v5-\(entry.id)")
+                let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
+                let encoded = try encoder.encode(original)
+                let hex = encoded.map { String(format: "%02x", $0) }.joined()
+                let title = entry.concealed ? "Скрытая запись" : "legacy \(entry.id)"
+                try checkEqual(sqlite3_exec(db, """
+                    INSERT INTO clips VALUES(\(entry.id),'\(original.fingerprint)',\(entry.date),'image','\(title)','','Old App','\(SearchFilter.normalize(title)) old app',\(encoded.count),\(entry.concealed ? 1 : 0),\(entry.favorite ? 1 : 0),\(entry.remote ? 1 : 0));
+                    INSERT INTO payloads VALUES(\(entry.id),X'\(hex)');
+                    """, nil, nil, nil), SQLITE_OK)
+                if let status = entry.status {
+                    let recognized = status == "complete" ? "migration OCR fixture" : ""
+                    try checkEqual(sqlite3_exec(db, "INSERT INTO clip_ocr VALUES(\(entry.id),'\(status)','\(recognized)','\(SearchFilter.normalize(recognized))')", nil, nil, nil), SQLITE_OK)
+                }
+            }
+        }
+        store = nil; store = try HistoryStore(url: url)
+        try checkEqual(try rawSchemaVersion(at: url), 6)
+        let records = try store.search(SearchFilter())
+        try checkEqual(records.map(\.id), [34, 33, 31, 32])
+        for entry in entries {
+            let record = records.first { $0.id == entry.id }!
+            try checkEqual(record.date, Date(timeIntervalSince1970: entry.date))
+            try checkEqual(record.kind, .image); try checkEqual(record.source, "Old App")
+            try checkEqual(record.title, entry.concealed ? "Скрытая запись" : "legacy \(entry.id)")
+            try checkEqual(record.text, ""); try checkEqual(record.isRemote, entry.remote)
+            try checkEqual(record.isConcealed, entry.concealed); try checkEqual(record.isFavorite, entry.favorite)
+            try checkEqual(try store.payload(id: entry.id), imagePayload("v5-\(entry.id)"))
+        }
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
+        var filter = SearchFilter(); filter.query = "migration OCR fixture"
+        try checkEqual(try store.search(filter).map(\.id), [31])
+        try store.markUsed(id: 31, date: Date(timeIntervalSince1970: 100))
+        store = nil; store = try HistoryStore(url: url)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [31, 34, 33, 32])
+        try checkEqual(try store.search(filter)[0].date, Date(timeIntervalSince1970: 0))
+        try checkEqual(try store.count(), entries.count)
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
+    }
+
+    func testRemoteAndConcealedFiltersCombineWithPaginationAndExistingFilters() throws {
+        @discardableResult func add(_ value: String, remote: Bool = true, concealed: Bool = true, favorite: Bool = true,
+                 kind: ClipKind = .text, source: String = "Safari", time: Double = 100) throws -> Int64 {
+            let id = try store.insert(payload: payload(value), kind: kind, title: "Скрытая запись", text: value,
+                                      source: source, isConcealed: concealed, isRemote: remote,
+                                      date: Date(timeIntervalSince1970: time))
+            if favorite { try store.setFavorite(id: id, isFavorite: true) }
+            return id
+        }
+        let first = try add("first-secret-fixture")
+        let second = try add("second-secret-fixture")
+        let local = try add("local-secret-fixture", remote: false)
+        let visible = try add("visible-fixture", concealed: false)
+        try add("not-favorite-fixture", favorite: false)
+        try add("other-kind-fixture", kind: .link)
+        try add("other-source-fixture", source: "Safari Other")
+        try add("early-fixture", time: 99)
+        try add("late-fixture", time: 200)
+        var filter = SearchFilter()
+        filter.remoteOnly = true; filter.concealedOnly = true; filter.favoritesOnly = true
+        filter.kind = .text; filter.source = "Safari"; filter.query = "скрытая SAFARI"
+        filter.from = Date(timeIntervalSince1970: 100); filter.until = Date(timeIntervalSince1970: 200)
+        try checkEqual(try store.count(filter), 2)
+        try checkEqual(try store.search(filter).map(\.id), [second, first])
+        try checkEqual(try store.search(filter, limit: 1).map(\.id), [second])
+        try checkEqual(try store.search(filter, limit: 1, offset: 1).map(\.id), [first])
+        try checkEqual(try store.search(filter, limit: 1, offset: 2).count, 0)
+        filter.remoteOnly = false
+        try checkEqual(try store.search(filter).map(\.id), [local, second, first])
+        filter.remoteOnly = true; filter.concealedOnly = false
+        try checkEqual(try store.search(filter).map(\.id), [visible, second, first])
+        filter.concealedOnly = true; filter.query = "secret-fixture"
+        try checkEqual(try store.count(filter), 0)
+        try checkEqual(try store.search(filter).count, 0)
+        filter = SearchFilter(); filter.concealedOnly = true
+        try checkEqual(try store.count(filter), 8)
+        try checkEqual(try store.count(), 9)
+    }
+
+    func testOriginFollowsLatestCaptureWhileConcealmentFavoriteAndOCRPersist() throws {
+        let original = imagePayload("origin-switch-pixels")
+        func capture(remote: Bool, source: String, concealed: Bool = false, time: Double) throws -> Int64 {
+            try store.insert(payload: original, kind: .image, title: "Картинка", text: "", source: source,
+                             isConcealed: concealed, isRemote: remote, date: Date(timeIntervalSince1970: time))
+        }
+        let id = try capture(remote: false, source: "Safari", time: 1)
+        try store.setFavorite(id: id, isFavorite: true)
+        try check(try store.completeImageText(id: id, text: "recognized origin fixture"))
+        try checkEqual(try capture(remote: true, source: "Device source", time: 2), id)
+        var filter = SearchFilter(); filter.remoteOnly = true; filter.query = "recognized origin fixture"
+        try checkEqual(try store.search(filter).map(\.id), [id]); try checkEqual(try store.count(filter), 1)
+        try checkEqual(try store.sources(), [])
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(complete: 1))
+        try checkEqual(try capture(remote: false, source: "Notes", time: 3), id)
+        try checkEqual(try store.count(filter), 0)
+        filter.remoteOnly = false
+        let local = try store.search(filter)[0]
+        try check(!local.isRemote && local.isFavorite && !local.isConcealed)
+        try checkEqual(local.source, "Notes"); try checkEqual(local.date, Date(timeIntervalSince1970: 3))
+        try checkEqual(try store.sources(), ["Notes"])
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress(complete: 1))
+        try checkEqual(try capture(remote: true, source: "", concealed: true, time: 4), id)
+        try checkEqual(try capture(remote: false, source: "Notes", time: 5), id)
+        try checkEqual(try capture(remote: true, source: "", time: 6), id)
+        store = nil; store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        let hidden = try store.search(SearchFilter())[0]
+        try check(hidden.isRemote && hidden.isConcealed && hidden.isFavorite)
+        try checkEqual(hidden.id, id); try checkEqual(hidden.source, "")
+        try checkEqual(hidden.title, "Скрытая запись"); try checkEqual(hidden.text, "")
+        try checkEqual(try store.imageTextProgress(), ImageTextProgress())
+        try checkEqual(try store.count(filter), 0)
+        filter = SearchFilter(); filter.remoteOnly = true; filter.concealedOnly = true; filter.favoritesOnly = true
+        try checkEqual(try store.search(filter).map(\.id), [id])
+        try checkEqual(try store.payload(id: id), original)
+        try checkEqual(try store.count(), 1)
+    }
+
+    func testSourcesExcludeRemoteRowsWithoutHidingSharedLocalApps() throws {
+        let remote = try store.insert(payload: payload("remote-row"), kind: .text, title: "remote", text: "",
+                                      source: "Remote Only", isRemote: true)
+        try store.insert(payload: payload("remote-shared-row"), kind: .text, title: "remote", text: "",
+                         source: "Shared", isRemote: true)
+        let local = try insert("local-shared-row", source: "Shared")
+        try insert("unknown-row", source: "")
+        try checkEqual(try store.sources(), ["Shared"])
+        try store.delete(id: local)
+        try checkEqual(try store.sources(), [])
+        try checkEqual(try insert("remote-row", source: "Now Local"), remote)
+        try checkEqual(try store.sources(), ["Now Local"])
+        var filter = SearchFilter(); filter.remoteOnly = true
+        try checkEqual(try store.count(filter), 1)
     }
 
     func testImageTextSearchCombinesBaseWordsFiltersAndLiteralWildcards() throws {

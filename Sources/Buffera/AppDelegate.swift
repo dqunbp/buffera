@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: HistoryStore!
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
     private let clipboard = ClipboardService()
+    private let clipboardSession = ClipboardSessionMonitor()
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
     private var settings: SettingsWindow?
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var generation = 0
     private var searchGeneration = 0
     private var confirmationToken = 0
+    private var captureSelectionToken = 0
     private let logger = Logger(subsystem: "local.buffera.app", category: "confirmation")
     private let temporaryImageExports = TemporaryImageExports()
     private var exportCleanupTimer: Timer?
@@ -67,16 +69,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         exportCleanupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.cleanupExports() }
         clipboard.onCapture = { [weak self] clip in
             guard let self else { return }
+            self.captureSelectionToken += 1
+            let selectionToken = self.captureSelectionToken
             let date = Date(); let count = self.countLimit; let bytes = self.byteLimit
             self.work.async {
                 do {
-                    try self.store.insert(payload: clip.payload, kind: clip.kind, title: clip.title, text: clip.text,
-                                          source: clip.source, isConcealed: clip.isConcealed, date: date, maxCount: count, maxBytes: bytes)
+                    let id = try self.store.insert(payload: clip.payload, kind: clip.kind, title: clip.title, text: clip.text,
+                                          source: clip.source, isConcealed: clip.isConcealed, isRemote: clip.isRemote,
+                                          date: date, maxCount: count, maxBytes: bytes)
+                    DispatchQueue.main.async {
+                        guard selectionToken == self.captureSelectionToken else { return }
+                        self.panel.clipboardDidCapture(id: id)
+                    }
                     self.imageTextIndexer?.schedule()
                 } catch { DispatchQueue.main.async { self.showError(error) } }
             }
         }
         clipboard.onError = { [weak self] error in self?.showError(error) }
+        clipboard.captureIsAllowed = { [weak self] in self?.clipboardSession.allowsCapture ?? false }
+        clipboardSession.onTransition = { [weak self] in self?.clipboard.discardPendingChanges() }
+        clipboardSession.start()
+        clipboard.discardPendingChanges()
         clipboard.start()
         hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
@@ -99,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         clipboard.paused = true
+        clipboardSession.stop()
         imageTextIndexer?.stop()
     }
 
@@ -142,8 +156,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     do {
                         try self.clipboard.restore(result.get())
+                        // A capture queued before this restore may finish later.
+                        // It remains in history but must not reclaim selection.
+                        self.captureSelectionToken += 1
+                        // Only a completed clipboard write changes recency. Queue it
+                        // before closing so even an immediate reopen sees the new order.
+                        self.work.async {
+                            do { try self.store.markUsed(id: id) }
+                            catch { DispatchQueue.main.async { self.showError(error) } }
+                        }
                         self.logger.notice("Confirm completed")
-                        self.panel.close()
+                        self.panel.closeAfterConfirmation()
                     } catch {
                         self.logger.error("Confirm failed")
                         self.panel.failed(error); self.showError(error)
@@ -330,7 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Текст на новых и ранее сохранённых картинках распознаётся на Mac в фоне и участвует в обычном поиске. Поддерживаются русский и английский. Прогресс и повтор неудачных попыток доступны через значок \(BrandIdentity.name) в строке меню. Скрытые записи не распознаются.
 
-        Enter копирует запись и закрывает окно. Вставку выполняете сами (на Mac обычно ⌘V).
+        Enter копирует запись, поднимает её наверх и закрывает окно. Дата копирования сохраняется. Escape и переход в другое приложение закрывают без выбора. Вставку выполняете сами (на Mac обычно ⌘V).
 
         «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
 

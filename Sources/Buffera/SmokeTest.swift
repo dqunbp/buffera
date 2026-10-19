@@ -71,7 +71,80 @@ func runSmokeTest() throws {
           !sourced.payload.items.joined().contains(where: { $0.type == "org.nspasteboard.source" }) else {
         throw HistoryError.database("Clipboard source bookkeeping leaked into the restored payload")
     }
+    try runCaptureOriginAndSessionChecks()
     try runPreviewSmokeChecks()
+}
+
+private func runCaptureOriginAndSessionChecks() throws {
+    let pasteboard = NSPasteboard.withUniqueName()
+    defer { pasteboard.releaseGlobally() }
+    let service = ClipboardService(pasteboard: pasteboard, frontmostApplicationName: { "Foreground Fixture" })
+    func write(_ text: String, markers: [String: String] = [:]) throws {
+        let item = NSPasteboardItem(); item.setString(text, forType: .string)
+        for (type, value) in markers { item.setString(value, forType: .init(type)) }
+        pasteboard.clearContents()
+        guard pasteboard.writeObjects([item]) else { throw ClipboardFailure.writeFailed }
+    }
+    try write("Local fixture")
+    guard let local = try service.capture(), !local.isRemote, local.source == "Foreground Fixture" else {
+        throw HistoryError.database("Ordinary capture lost its foreground source fallback")
+    }
+    for source in ["", "invalid source", "local.nonexistent-fixture"] {
+        try write("Unknown source", markers: ["org.nspasteboard.source": source])
+        guard try service.capture()?.source == "" else {
+            throw HistoryError.database("Explicit unknown source was attributed to the foreground app")
+        }
+    }
+    for concealed in [false, true] {
+        var markers = ["com.apple.is-remote-clipboard": "", "org.nspasteboard.source": "com.apple.finder"]
+        if concealed { markers["org.nspasteboard.ConcealedType"] = "" }
+        try write("Remote fixture", markers: markers)
+        guard let clip = try service.capture(), clip.isRemote, clip.source.isEmpty,
+              clip.isConcealed == concealed,
+              !clip.payload.items.joined().contains(where: { markers.keys.contains($0.type) && $0.type != "org.nspasteboard.ConcealedType" }) else {
+            throw HistoryError.database("Remote origin or concealed metadata was lost or attributed to a Mac app")
+        }
+        try service.restore(clip.payload)
+        guard let restored = try service.capture(), !restored.isRemote, restored.isConcealed == concealed else {
+            throw HistoryError.database("Restored payload incorrectly retained its remote transport marker")
+        }
+    }
+    let systemService = ClipboardService(pasteboard: pasteboard, frontmostApplicationName: { "loginwindow" })
+    try write("System source fixture")
+    guard try systemService.capture()?.source == "" else { throw HistoryError.database("System process was used as a clipboard app") }
+
+    var allowed = true
+    var captures = 0
+    service.captureIsAllowed = { allowed }
+    service.onCapture = { _ in captures += 1 }
+    service.discardPendingChanges()
+    allowed = false
+    try write("During lock")
+    service.poll()
+    allowed = true
+    service.poll()
+    guard captures == 0 else { throw HistoryError.database("Locked clipboard was captured after polling resumed") }
+    try write("New copy after unlock")
+    service.poll()
+    guard captures == 1 else { throw HistoryError.database("New copy after unlock was not captured") }
+    allowed = false; service.discardPendingChanges()
+    try write("Lock interval without poll")
+    allowed = true; service.discardPendingChanges()
+    service.poll()
+    guard captures == 1 else { throw HistoryError.database("A lock/unlock between polls replayed pending data") }
+    service.paused = true
+    try write("Manual pause during unlock")
+    allowed = false; service.discardPendingChanges()
+    allowed = true; service.discardPendingChanges()
+    service.poll()
+    guard captures == 1, service.paused else { throw HistoryError.database("Unlock bypassed manual pause") }
+    service.paused = false
+    var permissionChecks = 0
+    service.captureIsAllowed = { permissionChecks += 1; return permissionChecks == 1 }
+    try write("Session locks during read")
+    service.poll()
+    guard captures == 1 else { throw HistoryError.database("Session was not rechecked after reading clipboard contents") }
+    print("Capture origin and session checks passed")
 }
 
 private func runPreviewSmokeChecks() throws {

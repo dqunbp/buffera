@@ -49,6 +49,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var cardMenuTracking = false
     private var pendingSelectionID: Int64?
     private var retainedSelectionID: Int64?
+    private var retainedRowCount = 150
+    private var recentCaptureID: Int64?
     private var pendingFavorites: Set<Int64> = []
     private var revealed: (id: Int64, text: String)?
     private var revealToken = 0
@@ -210,20 +212,46 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receive(_ result: [ClipSummary], total: Int, offset: Int) {
+        guard isAvailableForShortcut else { return }
         if offset == 0, silentSearchRefresh {
             receiveSearchIndexResult(result, total: total)
             return
         }
+        if offset == 0, let id = pendingSelectionID,
+           !result.contains(where: { $0.id == id || $0.id == recentCaptureID }),
+           result.count < total, let request {
+            // A retained choice may be beyond the first page, or displaced by
+            // new matches. Resolve it before replacing the list or applying keys.
+            request(filter(), 0, min(total, max(result.count + 150, result.count * 2)))
+            return
+        }
         loading = false; self.total = total
         if offset == 0 { rows = result } else { rows += result }
-        let retainedIndex = pendingSelectionID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
+        let capturedIndex = recentCaptureID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
+        let retainedIndex = capturedIndex ?? pendingSelectionID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
         let restoredIndex = rows.isEmpty ? -1 : max(0, min(rows.count - 1, (retainedIndex ?? 0) + pendingMoveDelta))
         let index = offset == 0 ? restoredIndex : cards.selectedIndex
-        if offset == 0 { pendingSelectionID = nil; pendingMoveDelta = 0 }
+        if offset == 0 { pendingSelectionID = nil; pendingMoveDelta = 0; recentCaptureID = nil }
         cards.reload(count: rows.count, selectedIndex: index, scrollToSelection: offset == 0)
         updateSelection()
         updateCount()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
+    }
+
+    /// Called only after an external copy has committed to history. A filtered
+    /// view keeps its previous choice when the new record does not match it.
+    func clipboardDidCapture(id: Int64) {
+        recentCaptureID = id
+        guard isAvailableForShortcut, !confirming, !commitWhenLoaded else { return }
+        let moves = pendingMoveDelta
+        refresh(preservingSelection: true)
+        pendingMoveDelta = moves
+    }
+
+    func closeAfterConfirmation() {
+        // Confirmation supersedes copies received while its payload was loading.
+        recentCaptureID = nil
+        close()
     }
 
     /// OCR updates the search index without changing a card's displayed content.
@@ -260,14 +288,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func refresh(preservingSelection: Bool = false) {
         guard !isClosing, !confirming, !commitWhenLoaded else { return }
         cancelSearchIndexRefresh()
-        pendingSelectionID = preservingSelection ? (selected?.id ?? retainedSelectionID) : nil
+        pendingSelectionID = preservingSelection ? (selected?.id ?? pendingSelectionID ?? retainedSelectionID) : nil
+        let limit = preservingSelection ? max(150, rows.count, retainedRowCount) : 150
         dismissPreview()
         invalidateReveal()
         loading = true
         pendingMoveDelta = 0; rows = []; cards.reload(count: 0, selectedIndex: -1, scrollToSelection: false); updateSelection()
         status.stringValue = "Загружаем историю…"
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
-        request?(filter(), 0, 150)
+        request?(filter(), 0, limit)
     }
 
     func close(restoreFocus: Bool = true) {
@@ -275,7 +304,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard !isClosing else { return }
         cancelSearchIndexRefresh()
         logger.notice("Panel closed: restoreFocus=\(restoreFocus)")
-        retainedSelectionID = selected?.id
+        retainedSelectionID = selected?.id ?? pendingSelectionID ?? retainedSelectionID
+        if !rows.isEmpty { retainedRowCount = rows.count }
         presentationToken += 1; let token = presentationToken; isClosing = true
         dismissPreview(); commandHeld = false
         commitWhenLoaded = false; confirming = false; invalidateReveal()
@@ -314,8 +344,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func closeIfUnfocused() {
         // Filter menus, calendar popovers and save sheets can own keyboard input.
+        if !window.isKeyWindow, window.attachedSheet == nil, !filters.isPresenting,
+           !cardMenuTracking, !preview.isShown { cancelShortcutGesture() }
+        let token = presentationToken
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
+            guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
                   !self.cardMenuTracking, !self.preview.isShown else { return }
             self.close(restoreFocus: false)
@@ -494,7 +527,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             let clip = rows[row]
             let updated = ClipSummary(id: clip.id, date: clip.date, kind: clip.kind, title: clip.title,
                                       text: clip.text, source: clip.source, byteCount: clip.byteCount,
-                                      isConcealed: clip.isConcealed, isFavorite: isFavorite)
+                                      isConcealed: clip.isConcealed, isFavorite: isFavorite, isRemote: clip.isRemote)
             rows[row] = updated
             cards.card(at: row)?.updateFavorite(updated)
             updateVisibleCards()
@@ -646,7 +679,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             current.id == updated.id && current.date == updated.date && current.kind == updated.kind
                 && current.title == updated.title && current.text == updated.text && current.source == updated.source
                 && current.byteCount == updated.byteCount && current.isConcealed == updated.isConcealed
-                && current.isFavorite == updated.isFavorite
+                && current.isFavorite == updated.isFavorite && current.isRemote == updated.isRemote
         }
     }
 

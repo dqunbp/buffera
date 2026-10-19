@@ -34,7 +34,7 @@ func fixture(_ id: Int) -> ClipSummary {
 }
 
 final class PanelHarness {
-    struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool }
+    struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool; let filter: SearchFilter }
     let panel = HistoryPanel()
     let search: NSSearchField
     let cards: HistoryCardsView
@@ -56,7 +56,7 @@ final class PanelHarness {
         panel.request = { [weak self] filter, offset, limit in
             guard let self else { return }
             self.requests.append(Request(query: filter.query, offset: offset, limit: limit,
-                                         silent: self.panel.isRefreshingSearchIndex))
+                                         silent: self.panel.isRefreshingSearchIndex, filter: filter))
         }
         panel.onConfirm = { [weak self] in self?.confirmations.append($0) }
         search.stringValue = "fixture"
@@ -414,5 +414,181 @@ func shortcutChecks() -> [(Bool, String)] {
     return results
 }
 for (passed, message) in shortcutChecks() { check(passed, message) }
+
+func selectionLifecycleChecks() -> [(Bool, String)] {
+    let defaults = UserDefaults.standard
+    let keys = ["historyAppearance.mode", "historyAppearance.columns", "historyAppearance.visibleRows",
+                "historyAppearance.sidebarVisible", "NSWindow Frame BufferaHistory"]
+    let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+    var harnesses: [PanelHarness] = []
+    defer {
+        for harness in harnesses { harness.panel.close(restoreFocus: false); harness.finish() }
+        for (key, value) in saved {
+            if let value { defaults.set(value, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+    }
+    HistoryAppearance(mode: .floating, columns: 1, visibleRows: 6, sidebarVisible: true).save()
+    let clips = (1...20).map(fixture)
+    var results: [(Bool, String)] = []
+    func harness(_ rows: [ClipSummary] = (1...20).map(fixture)) -> PanelHarness {
+        let value = PanelHarness(rows: rows)
+        harnesses.append(value)
+        return value
+    }
+    func escape(_ value: PanelHarness) {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                    windowNumber: value.panel.window.windowNumber, context: nil,
+                                    characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                    isARepeat: false, keyCode: 53)!
+        value.panel.window.sendEvent(event)
+    }
+    func flushMainQueue() {
+        var completed = false
+        DispatchQueue.main.async { completed = true }
+        waitUntil("queued panel callbacks") { completed }
+    }
+
+    let confirmed = harness()
+    confirmed.panel.move(5)
+    confirmed.enter()
+    results.append((confirmed.confirmations == [6], "Enter confirms the selected record rather than the first row"))
+    confirmed.panel.clipboardDidCapture(id: 999)
+    confirmed.panel.closeAfterConfirmation()
+    confirmed.panel.open()
+    let reordered = [clips[5], fixture(999)] + clips.filter { $0.id != 6 }
+    confirmed.panel.receive(reordered, total: reordered.count, offset: 0)
+    results.append((confirmed.panel.selected?.id == 6 && confirmed.cards.selectedIndex == 0,
+                    "successful confirmation reopens with the promoted record first and selected"))
+    results.append((confirmed.requests.last?.query == "fixture" && confirmed.confirmations == [6],
+                    "reopening after confirmation preserves search without confirming again"))
+
+    let deepRows = (1...320).map(fixture)
+    let escaped = harness(deepRows)
+    escaped.panel.move(190)
+    escape(escaped)
+    results.append((!escaped.panel.window.isVisible && escaped.confirmations.isEmpty,
+                    "Escape closes a deeply selected history without confirming"))
+    escaped.panel.open()
+    results.append((escaped.requests.last!.limit >= deepRows.count,
+                    "reopening requests enough rows to retain a selection beyond the first page"))
+    let requestsBeforePartial = escaped.requests.count
+    escaped.panel.receive(Array(deepRows.prefix(150)), total: deepRows.count, offset: 0)
+    results.append((escaped.requests.count == requestsBeforePartial + 1 && escaped.requests.last!.limit > 150,
+                    "a missing retained record widens the query before falling back to the first row"))
+    escaped.panel.receive(Array(deepRows.prefix(300)), total: deepRows.count, offset: 0)
+    results.append((escaped.panel.selected?.id == 191 && escaped.confirmations.isEmpty,
+                    "Escape preserves a selected record when widened history results arrive"))
+    escape(escaped)
+    escaped.panel.open()
+    escape(escaped)
+    escaped.panel.receive(deepRows, total: deepRows.count, offset: 0)
+    results.append((!escaped.panel.window.isVisible && escaped.confirmations.isEmpty,
+                    "a late history result cannot revive an Escape-cancelled presentation"))
+    escaped.panel.open()
+    escaped.panel.receive(deepRows, total: deepRows.count, offset: 0)
+    results.append((escaped.panel.selected?.id == 191,
+                    "Escape while reopening history retains the still-pending choice"))
+
+    let captured = harness()
+    captured.panel.move(4)
+    escape(captured)
+    let hiddenRequests = captured.requests.count
+    captured.panel.clipboardDidCapture(id: 1000)
+    results.append((!captured.panel.window.isVisible && captured.requests.count == hiddenRequests,
+                    "an external copy while hidden does not open or query the panel"))
+    captured.panel.open()
+    let withNew = [fixture(1000)] + clips
+    captured.panel.receive(withNew, total: withNew.count, offset: 0)
+    results.append((captured.panel.selected?.id == 1000 && captured.cards.selectedIndex == 0,
+                    "the next opening selects the new copy instead of the retained old choice"))
+    captured.panel.move(6)
+    captured.panel.clipboardDidCapture(id: 8)
+    let repeated = [clips[7]] + withNew.filter { $0.id != 8 }
+    captured.panel.receive(repeated, total: repeated.count, offset: 0)
+    results.append((captured.panel.selected?.id == 8 && captured.cards.selectedIndex == 0,
+                    "copying an existing record while visible selects its promoted identity"))
+
+    let excluded = harness()
+    excluded.panel.move(7)
+    excluded.panel.clipboardDidCapture(id: 5000)
+    excluded.panel.receive(clips, total: clips.count, offset: 0)
+    results.append((excluded.panel.selected?.id == 8 && excluded.requests.last?.query == "fixture",
+                    "a new copy excluded by the current query preserves the prior choice and query"))
+    escape(excluded)
+    excluded.panel.clipboardDidCapture(id: 5001)
+    excluded.panel.open()
+    excluded.panel.receive(clips, total: clips.count, offset: 0)
+    results.append((excluded.panel.selected?.id == 8,
+                    "an excluded copy received while hidden also preserves the matching prior choice"))
+
+    let pending = harness()
+    pending.panel.open()
+    pending.panel.move(1)
+    pending.panel.move(1)
+    pending.panel.clipboardDidCapture(id: 1000)
+    pending.panel.receive(withNew, total: withNew.count, offset: 0)
+    results.append((pending.panel.selected?.id == 2 && pending.confirmations.isEmpty,
+                    "capture-triggered refresh preserves moves queued while history was loading"))
+
+    let filtered = harness()
+    let views = descendants(of: filtered.panel.window.contentView!)
+    let filters = views.compactMap { $0 as? HistoryFilters }.first!
+    filtered.panel.setSources(["Checks", "Other"])
+    let filterRows = descendants(of: filters.sidebar).compactMap { $0 as? NSButton }
+    filterRows.first { $0.title == "Текст" }!.performClick(nil)
+    filterRows.first { $0.title == "Checks" }!.performClick(nil)
+    let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
+    scope.selectedSegment = 1
+    _ = NSApp.sendAction(scope.action!, to: scope.target, from: scope)
+    filtered.panel.receive(clips, total: clips.count, offset: 0)
+    filtered.panel.move(2)
+    filtered.enter()
+    filtered.panel.closeAfterConfirmation()
+    filtered.panel.open()
+    let retainedFilters = filtered.requests.last!.filter
+    results.append((retainedFilters.query == "fixture" && retainedFilters.kind == .text
+                    && retainedFilters.source == "Checks" && retainedFilters.favoritesOnly,
+                    "confirmation and reopening retain the query, type, app, and favorites filters"))
+    filtered.panel.receive(clips, total: clips.count, offset: 0)
+    filtered.panel.clipboardDidCapture(id: 1000)
+    let afterCaptureFilters = filtered.requests.last!.filter
+    results.append((afterCaptureFilters.query == retainedFilters.query && afterCaptureFilters.kind == retainedFilters.kind
+                    && afterCaptureFilters.source == retainedFilters.source && afterCaptureFilters.favoritesOnly,
+                    "external-copy refresh leaves active search and independent filters intact"))
+
+    let blurred = harness()
+    blurred.panel.open(fromShortcut: true)
+    blurred.panel.receive(clips, total: clips.count, offset: 0)
+    blurred.panel.shortcutPressed(1)
+    blurred.panel.window.resignKey()
+    blurred.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: blurred.panel.window))
+    blurred.panel.window.onFlagsChanged?([])
+    results.append((blurred.confirmations.isEmpty,
+                    "outside blur cancels an armed quick gesture before modifier release can confirm"))
+    flushMainQueue()
+    results.append((!blurred.panel.window.isVisible && blurred.confirmations.isEmpty,
+                    "outside blur closes history without copying the highlighted record"))
+    blurred.panel.open()
+    blurred.panel.receive(clips, total: clips.count, offset: 0)
+    results.append((blurred.panel.selected?.id == 2,
+                    "reopening after outside blur retains the unconfirmed selection"))
+
+    let reopened = harness()
+    reopened.panel.open()
+    reopened.panel.receive(clips, total: clips.count, offset: 0)
+    flushMainQueue()
+    reopened.panel.window.resignKey()
+    reopened.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: reopened.panel.window))
+    reopened.panel.close(restoreFocus: false)
+    reopened.panel.open()
+    reopened.panel.receive(clips, total: clips.count, offset: 0)
+    reopened.panel.window.resignKey()
+    flushMainQueue()
+    results.append((reopened.panel.window.isVisible && reopened.confirmations.isEmpty,
+                    "a queued blur from an older presentation cannot close a newly reopened panel"))
+    return results
+}
+for (passed, message) in selectionLifecycleChecks() { check(passed, message) }
 
 print("\(checkCount) history panel checks passed")

@@ -67,6 +67,48 @@ private final class SidebarSourceList: NSStackView {
     override var isFlipped: Bool { true }
 }
 
+private final class SidebarDocument: NSView {
+    override var isFlipped: Bool { true }
+}
+
+private enum HistoryContentType: Equatable {
+    case kind(ClipKind), remote, concealed
+
+    static var choices: [Self] { ClipKind.allCases.map(Self.kind) + [.remote, .concealed] }
+    init?(value: String?) {
+        guard let value else { return nil }
+        if let kind = ClipKind(rawValue: value) { self = .kind(kind) }
+        else if value == "remote" { self = .remote }
+        else if value == "concealed" { self = .concealed }
+        else { return nil }
+    }
+    var value: String {
+        switch self {
+        case .kind(let kind): return kind.rawValue
+        case .remote: return "remote"
+        case .concealed: return "concealed"
+        }
+    }
+    var title: String {
+        switch self {
+        case .kind(let kind): return kind.label
+        case .remote: return "С устройств"
+        case .concealed: return "Скрытые"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .kind(let kind): return kind.symbol
+        case .remote: return "iphone"
+        case .concealed: return "lock"
+        }
+    }
+    var kind: ClipKind? {
+        if case .kind(let kind) = self { return kind }
+        return nil
+    }
+}
+
 final class HistoryFilters: NSView, NSPopoverDelegate {
     let sidebar: NSView = NSVisualEffectView()
     private let toolbarButton = NSButton(image: NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Фильтры")!, target: nil, action: nil)
@@ -79,14 +121,14 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     private weak var dateAnchor: NSView?
     private var trackingMenu: NSMenu?
     private var pendingDatePresentation = false
-    private var kind: ClipKind?
+    private var contentType: HistoryContentType?
     private var source: String?
     private var date: HistoryDateFilter = .all
     private var sources: [String] = []
     var onChange: (() -> Void)?
     var onPopoverClosed: (() -> Void)?
     var isPresenting: Bool { datePopover.isShown || trackingMenu != nil || pendingDatePresentation }
-    var hasActiveFilters: Bool { kind != nil || source != nil || date.isActive }
+    var hasActiveFilters: Bool { contentType != nil || source != nil || date.isActive }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -107,7 +149,7 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func reset() { kind = nil; source = nil; date = .all; dismiss(); updateTitles() }
+    func reset() { contentType = nil; source = nil; date = .all; dismiss(); updateTitles() }
     func setInteractionEnabled(_ enabled: Bool) {
         interactionEnabled = enabled
         toolbarButton.isEnabled = enabled; sidebarDateButton.isEnabled = enabled
@@ -119,7 +161,8 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
             Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
             Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
         ].compactMap { $0 }.map { $0.lowercased() })
-        let visibleSources = values.filter { !$0.isEmpty && !ownNames.contains($0.lowercased()) }
+        let systemNames: Set<String> = ["loginwindow", "windowserver"]
+        let visibleSources = values.filter { !$0.isEmpty && !ownNames.contains($0.lowercased()) && !systemNames.contains($0.lowercased()) }
         if sources != visibleSources { sources = visibleSources; rebuildSourceRows() }
         updateTitles()
     }
@@ -127,19 +170,23 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         if !visible, dateAnchor === sidebarDateButton { datePopover.close() }
     }
     func dismiss() { pendingDatePresentation = false; datePopover.close(); trackingMenu?.cancelTracking() }
-    func apply(to filter: inout SearchFilter) { filter.kind = kind; filter.source = source; date.apply(to: &filter) }
+    func apply(to filter: inout SearchFilter) {
+        filter.kind = contentType?.kind; filter.source = source
+        filter.remoteOnly = contentType == .remote; filter.concealedOnly = contentType == .concealed
+        date.apply(to: &filter)
+    }
     func popoverDidClose(_ notification: Notification) { dateAnchor = nil; onPopoverClosed?() }
     @objc private func resetClicked() { reset(); onChange?() }
 
     private func updateTitles() {
-        let summary = [kind?.label, date.isActive ? date.title : nil, source].compactMap { $0 }.joined(separator: ", ")
+        let summary = [contentType?.title, date.isActive ? date.title : nil, source].compactMap { $0 }.joined(separator: ", ")
         toolbarButton.toolTip = summary.isEmpty ? "Фильтры" : "Фильтры: \(summary)"
         toolbarButton.setAccessibilityLabel(toolbarButton.toolTip)
         toolbarButton.contentTintColor = hasActiveFilters ? .controlAccentColor : .secondaryLabelColor
         sidebarDateButton.title = date.isActive ? date.title : "Всё время"
         sidebarDateButton.toolTip = "Период: \(sidebarDateButton.title)"
         sidebarDateButton.selected = date.isActive
-        for row in kindRows { row.selected = row.value == kind?.rawValue }
+        for row in kindRows { row.selected = row.value == contentType?.value }
         for row in sourceRows { row.selected = row.value == source }
     }
 
@@ -151,8 +198,8 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         let typeHeading = heading("Тип содержимого")
         let types = NSStackView(); types.orientation = .vertical; types.alignment = .leading; types.spacing = 1
         let allTypes = sidebarRow("Все типы", symbol: "square.grid.2x2", value: nil, action: #selector(sidebarKindClicked))
-        kindRows = [allTypes] + ClipKind.allCases.map {
-            sidebarRow($0.label, symbol: $0.symbol, value: $0.rawValue, action: #selector(sidebarKindClicked))
+        kindRows = [allTypes] + HistoryContentType.choices.map {
+            sidebarRow($0.title, symbol: $0.symbol, value: $0.value, action: #selector(sidebarKindClicked))
         }
         for row in kindRows {
             types.addArrangedSubview(row)
@@ -160,22 +207,33 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         }
         let dateHeading = heading("Период")
         let appHeading = heading("Приложения")
-        let appsScroll = NSScrollView()
-        appsScroll.drawsBackground = false; appsScroll.hasVerticalScroller = true; appsScroll.autohidesScrollers = true
-        appsScroll.borderType = .noBorder
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        let document = SidebarDocument()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        scroll.documentView = document
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        sidebar.addSubview(scroll)
         sourceRowsContainer.orientation = .vertical; sourceRowsContainer.alignment = .leading; sourceRowsContainer.spacing = 1
         sourceRowsContainer.translatesAutoresizingMaskIntoConstraints = false
-        appsScroll.documentView = sourceRowsContainer
-        for view in [typeHeading, types, dateHeading, sidebarDateButton, appHeading, appsScroll] {
+        for view in [typeHeading, types, dateHeading, sidebarDateButton, appHeading, sourceRowsContainer] {
             view.translatesAutoresizingMaskIntoConstraints = false
-            sidebar.addSubview(view)
+            document.addSubview(view)
         }
         NSLayoutConstraint.activate([
-            typeHeading.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 10),
-            typeHeading.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -10),
-            typeHeading.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 10),
-            types.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
-            types.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -8),
+            scroll.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: sidebar.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor),
+            document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            typeHeading.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 10),
+            typeHeading.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -10),
+            typeHeading.topAnchor.constraint(equalTo: document.topAnchor, constant: 10),
+            types.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 8),
+            types.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -8),
             types.topAnchor.constraint(equalTo: typeHeading.bottomAnchor, constant: 5),
             dateHeading.leadingAnchor.constraint(equalTo: typeHeading.leadingAnchor),
             dateHeading.trailingAnchor.constraint(equalTo: typeHeading.trailingAnchor),
@@ -186,14 +244,10 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
             appHeading.leadingAnchor.constraint(equalTo: typeHeading.leadingAnchor),
             appHeading.trailingAnchor.constraint(equalTo: typeHeading.trailingAnchor),
             appHeading.topAnchor.constraint(equalTo: sidebarDateButton.bottomAnchor, constant: 12),
-            appsScroll.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
-            appsScroll.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -8),
-            appsScroll.topAnchor.constraint(equalTo: appHeading.bottomAnchor, constant: 5),
-            appsScroll.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -8),
-            appsScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 26),
-            sourceRowsContainer.topAnchor.constraint(equalTo: appsScroll.contentView.topAnchor),
-            sourceRowsContainer.leadingAnchor.constraint(equalTo: appsScroll.contentView.leadingAnchor),
-            sourceRowsContainer.widthAnchor.constraint(equalTo: appsScroll.contentView.widthAnchor)
+            sourceRowsContainer.leadingAnchor.constraint(equalTo: types.leadingAnchor),
+            sourceRowsContainer.trailingAnchor.constraint(equalTo: types.trailingAnchor),
+            sourceRowsContainer.topAnchor.constraint(equalTo: appHeading.bottomAnchor, constant: 5),
+            sourceRowsContainer.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -8)
         ])
         rebuildSourceRows()
     }
@@ -235,7 +289,7 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
 
     private func chooseKind(_ value: String?) {
         guard interactionEnabled else { return }
-        kind = value.flatMap(ClipKind.init(rawValue:)); updateTitles(); onChange?()
+        contentType = HistoryContentType(value: value); updateTitles(); onChange?()
     }
     private func chooseSource(_ value: String?) {
         guard interactionEnabled else { return }
@@ -243,7 +297,6 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
     @objc private func sidebarKindClicked(_ sender: SidebarFilterRow) { chooseKind(sender.value) }
     @objc private func sidebarSourceClicked(_ sender: SidebarFilterRow) { chooseSource(sender.value) }
-
     private func item(_ title: String, symbol: String?, selected: Bool, action: Selector, value: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self
         item.representedObject = value; item.state = selected ? .on : .off
@@ -274,8 +327,11 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
     }
     @objc private func showFilterMenu() {
+        presentMenu(makeFilterMenu(), from: toolbarButton)
+    }
+    func makeFilterMenu() -> NSMenu {
         let menu = NSMenu(); menu.autoenablesItems = false
-        let typeItem = NSMenuItem(title: kind.map { "Тип: \($0.label)" } ?? "Тип", action: nil, keyEquivalent: "")
+        let typeItem = NSMenuItem(title: contentType.map { "Тип: \($0.title)" } ?? "Тип", action: nil, keyEquivalent: "")
         typeItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
         typeItem.submenu = kindsMenu(); menu.addItem(typeItem)
         menu.addItem(item(date.isActive ? "Дата: \(date.title)…" : "Дата…", symbol: "calendar", selected: date.isActive,
@@ -286,14 +342,14 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         menu.addItem(.separator())
         let reset = item("Сбросить фильтры", symbol: "arrow.counterclockwise", selected: false, action: #selector(resetClicked))
         reset.isEnabled = hasActiveFilters; menu.addItem(reset)
-        presentMenu(menu, from: toolbarButton)
+        return menu
     }
     private func kindsMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Все типы", symbol: "square.grid.2x2", selected: kind == nil, action: #selector(selectKind)))
+        menu.addItem(item("Все типы", symbol: "square.grid.2x2", selected: contentType == nil, action: #selector(selectKind)))
         menu.addItem(.separator())
-        for type in ClipKind.allCases {
-            menu.addItem(item(type.label, symbol: type.symbol, selected: kind == type, action: #selector(selectKind), value: type.rawValue))
+        for type in HistoryContentType.choices {
+            menu.addItem(item(type.title, symbol: type.symbol, selected: contentType == type, action: #selector(selectKind), value: type.value))
         }
         return menu
     }
