@@ -39,7 +39,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
     private let scope = NSSegmentedControl(labels: ["История", "Избранное"], trackingMode: .selectOne, target: nil, action: nil)
-    private let nearbyBack = NSButton(title: "Назад к результатам", target: nil, action: nil)
+    private let nearbyBack = NSButton(title: "Назад в историю", target: nil, action: nil)
     private var nearbyState: NearbyHistoryState?
     private var nearbyToken = 0
     private var pendingViewport: NSPoint?
@@ -353,9 +353,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
-        search.toolTip = isShowingNearby ? "Показаны соседние копирования из всей истории. Esc — вернуться к поиску." : nil
+        search.toolTip = isShowingNearby ? "Показаны соседние копирования из всей истории. Esc — вернуться в историю." : nil
         hint.stringValue = isShowingNearby
-            ? "Esc к результатам   ↑↓ выбор   ↩ в буфер   Пробел просмотр"
+            ? "Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр"
             : "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
     }
 
@@ -1015,8 +1015,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.bezelStyle = .rounded
         nearbyBack.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
         nearbyBack.imagePosition = .imageLeading
-        nearbyBack.toolTip = "Назад к результатам · Esc"
-        nearbyBack.setAccessibilityLabel("Назад к результатам")
+        nearbyBack.toolTip = "Назад в историю · Esc"
+        nearbyBack.setAccessibilityLabel("Назад в историю")
         nearbyBack.isHidden = true
         let scopeRow = NSStackView(views: [scope, nearbyBack, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
         scope.widthAnchor.constraint(equalToConstant: 210).isActive = true

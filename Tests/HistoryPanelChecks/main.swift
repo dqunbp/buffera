@@ -627,7 +627,7 @@ func nearbyChecks() -> [(Bool, String)] {
     }
     func backButton(_ value: PanelHarness) -> NSButton? {
         descendants(of: value.panel.window.contentView!).compactMap { $0 as? NSButton }
-            .first { $0.title == "Назад к результатам" || $0.accessibilityLabel() == "Назад к результатам" }
+            .first { $0.title == "Назад в историю" || $0.accessibilityLabel() == "Назад в историю" }
     }
     func complete(_ value: PanelHarness, rows: [ClipSummary]) {
         guard let request = value.nearbyRequests.last else {
