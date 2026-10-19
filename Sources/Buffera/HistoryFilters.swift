@@ -1,5 +1,5 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 
 enum HistoryDateFilter {
     case all, today, yesterday, week, month, range(Date, Date)
@@ -115,7 +115,7 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
     func setSources(_ values: [String]) {
         let ownNames = Set([
-            "Bufera", NSRunningApplication.current.localizedName,
+            LegacyMigration.previousAppName, BrandIdentity.name, NSRunningApplication.current.localizedName,
             Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
             Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
         ].compactMap { $0 }.map { $0.lowercased() })

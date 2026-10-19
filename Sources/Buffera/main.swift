@@ -1,6 +1,13 @@
 import AppKit
 
-if CommandLine.arguments.contains("--smoke-test") {
+if CommandLine.arguments.contains("--ocr-smoke-test") {
+    do {
+        try runImageTextSmokeTest()
+        try runImageTextIndexerChecks()
+        print("PASS: local Vision OCR and background image-text indexing")
+    }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--smoke-test") {
     do { try runSmokeTest(); print("PASS: pasteboard round trip, capture suppression, image export, concealed metadata and reveal, transient policy, source bookkeeping, preview decoding") }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else {

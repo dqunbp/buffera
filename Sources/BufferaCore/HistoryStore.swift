@@ -30,7 +30,7 @@ public final class HistoryStore {
         try execute("BEGIN IMMEDIATE")
         do {
             let version = try schemaVersion()
-            guard version <= 3 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
+            guard version <= 4 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
             if version < 2 {
                 try execute("""
                 CREATE TABLE IF NOT EXISTS clips (
@@ -50,7 +50,19 @@ public final class HistoryStore {
             if version < 3 {
                 try execute("""
                 ALTER TABLE clips ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
-                PRAGMA user_version=3;
+                """)
+            }
+            if version < 4 {
+                try execute("""
+                CREATE TABLE clip_ocr (
+                    clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE,
+                    status TEXT NOT NULL CHECK(status IN ('pending','complete','failed')),
+                    text TEXT NOT NULL DEFAULT '', search TEXT NOT NULL DEFAULT ''
+                );
+                CREATE INDEX clip_ocr_pending ON clip_ocr(clip_id) WHERE status='pending';
+                INSERT INTO clip_ocr(clip_id,status)
+                    SELECT id,'pending' FROM clips WHERE kind='image' AND is_concealed=0;
+                PRAGMA user_version=4;
                 """)
             }
             try execute("COMMIT")
@@ -98,6 +110,7 @@ public final class HistoryStore {
             defer { sqlite3_finalize(blob) }
             try bind([.integer(id), .blob(encoded)], to: blob)
             guard sqlite3_step(blob) == SQLITE_DONE else { throw failure() }
+            try syncImageTextJob(id: id)
             try prune(maxCount: maxCount, maxBytes: maxBytes)
             try execute("COMMIT")
             return id
@@ -194,8 +207,104 @@ public final class HistoryStore {
             defer { sqlite3_finalize(statement) }
             try bind([.text(Self.concealedTitle), .text(Self.concealedSearch(source: source)), .integer(id)], to: statement)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            try deleteImageText(id: id)
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
+    }
+
+    public func nextPendingImageTextID() throws -> Int64? {
+        let statement = try prepare("""
+            SELECT clips.id FROM clip_ocr JOIN clips ON clips.id=clip_ocr.clip_id
+            WHERE clip_ocr.status='pending' AND clips.kind='image' AND clips.is_concealed=0
+            ORDER BY clips.date DESC,clips.id DESC LIMIT 1
+            """)
+        defer { sqlite3_finalize(statement) }
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { return nil }
+        guard status == SQLITE_ROW else { throw failure() }
+        return sqlite3_column_int64(statement, 0)
+    }
+
+    /// Obsolete results cannot restore a deleted, concealed, or already-finished job.
+    @discardableResult
+    public func completeImageText(id: Int64, text: String) throws -> Bool {
+        let bounded = String(text.prefix(200_000))
+        return try finishImageText(id: id, status: "complete", text: bounded,
+                                   search: String(SearchFilter.normalize(bounded).prefix(200_000)))
+    }
+
+    @discardableResult
+    public func failImageText(id: Int64) throws -> Bool {
+        try finishImageText(id: id, status: "failed", text: "", search: "")
+    }
+
+    public func retryFailedImageText() throws {
+        try execute("""
+            UPDATE clip_ocr SET status='pending',text='',search=''
+            WHERE status='failed' AND EXISTS (
+                SELECT 1 FROM clips WHERE clips.id=clip_ocr.clip_id AND clips.kind='image' AND clips.is_concealed=0
+            )
+            """)
+    }
+
+    public func imageTextProgress() throws -> ImageTextProgress {
+        let statement = try prepare("SELECT status,COUNT(*) FROM clip_ocr GROUP BY status")
+        defer { sqlite3_finalize(statement) }
+        var pending = 0, complete = 0, failed = 0
+        var status = sqlite3_step(statement)
+        while status == SQLITE_ROW {
+            let count = Int(sqlite3_column_int64(statement, 1))
+            switch string(statement, 0) {
+            case "pending": pending = count
+            case "complete": complete = count
+            case "failed": failed = count
+            default: throw HistoryError.database("Неизвестное состояние распознавания текста.")
+            }
+            status = sqlite3_step(statement)
+        }
+        guard status == SQLITE_DONE else { throw failure() }
+        return ImageTextProgress(pending: pending, complete: complete, failed: failed)
+    }
+
+    private func finishImageText(id: Int64, status: String, text: String, search: String) throws -> Bool {
+        let statement = try prepare("""
+            UPDATE clip_ocr SET status=?,text=?,search=?
+            WHERE clip_id=? AND status='pending' AND EXISTS (
+                SELECT 1 FROM clips WHERE clips.id=clip_ocr.clip_id AND clips.kind='image' AND clips.is_concealed=0
+            ) RETURNING clip_id
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bind([.text(status), .text(text), .text(search), .integer(id)], to: statement)
+        let result = sqlite3_step(statement)
+        if result == SQLITE_DONE { return false }
+        guard result == SQLITE_ROW else { throw failure() }
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+        return true
+    }
+
+    private func syncImageTextJob(id: Int64) throws {
+        let cleanup = try prepare("""
+            DELETE FROM clip_ocr WHERE clip_id=? AND NOT EXISTS (
+                SELECT 1 FROM clips WHERE clips.id=clip_ocr.clip_id AND clips.kind='image' AND clips.is_concealed=0
+            )
+            """)
+        defer { sqlite3_finalize(cleanup) }
+        try bind([.integer(id)], to: cleanup)
+        guard sqlite3_step(cleanup) == SQLITE_DONE else { throw failure() }
+        let enqueue = try prepare("""
+            INSERT OR IGNORE INTO clip_ocr(clip_id,status)
+            SELECT id,'pending' FROM clips WHERE id=? AND kind='image' AND is_concealed=0
+            """)
+        defer { sqlite3_finalize(enqueue) }
+        try bind([.integer(id)], to: enqueue)
+        guard sqlite3_step(enqueue) == SQLITE_DONE else { throw failure() }
+    }
+
+    private func deleteImageText(id: Int64) throws {
+        let statement = try prepare("DELETE FROM clip_ocr WHERE clip_id=?")
+        defer { sqlite3_finalize(statement) }
+        try bind([.integer(id)], to: statement)
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
     }
 
     private func prune(maxCount: Int, maxBytes: Int) throws {
@@ -219,7 +328,13 @@ public final class HistoryStore {
         for token in SearchFilter.normalize(filter.query).split(whereSeparator: { $0.isWhitespace }) {
             let escaped = token.replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
-            clauses.append("search LIKE ? ESCAPE '\\'"); bindings.append(.text("%\(escaped)%"))
+            clauses.append("""
+                (clips.search LIKE ? ESCAPE '\\' OR (clips.is_concealed=0 AND EXISTS (
+                    SELECT 1 FROM clip_ocr WHERE clip_ocr.clip_id=clips.id AND clip_ocr.status='complete'
+                        AND clip_ocr.search LIKE ? ESCAPE '\\'
+                )))
+                """)
+            bindings += [.text("%\(escaped)%"), .text("%\(escaped)%")]
         }
         if let kind = filter.kind { clauses.append("kind=?"); bindings.append(.text(kind.rawValue)) }
         if let source = filter.source { clauses.append("source=?"); bindings.append(.text(source)) }

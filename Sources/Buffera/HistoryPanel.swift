@@ -1,5 +1,5 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 import os
 
 final class PickerWindow: NSPanel {
@@ -19,17 +19,16 @@ final class PickerWindow: NSPanel {
 }
 
 final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
-    private static let frameName = NSWindow.FrameAutosaveName("BuferaHistory")
+    private static let frameName = NSWindow.FrameAutosaveName("BufferaHistory")
     let window = PickerWindow(contentRect: NSRect(x: 0, y: 0, width: 580, height: 590),
                               styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-    private let logger = Logger(subsystem: "local.bufera.app", category: "panel")
+    private let logger = Logger(subsystem: "local.buffera.app", category: "panel")
     private let search = NSSearchField()
     private let filters = HistoryFilters(frame: .zero)
     private let cards = HistoryCardsView()
     private var appearance = HistoryAppearance.load()
-    private let appearanceSettings = AppearanceSettings()
     private let sidebarButton = NSButton(image: NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Боковое меню")!, target: nil, action: nil)
-    private let settingsButton = NSButton(image: NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Внешний вид")!, target: nil, action: nil)
+    private let settingsButton = NSButton(image: NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Настройки")!, target: nil, action: nil)
     private let contentRow = NSStackView()
     private var sidebarWidth: NSLayoutConstraint!
     private var bodyMinimumHeight: NSLayoutConstraint!
@@ -43,6 +42,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let resetSearch = NSButton(image: NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: "Вся история")!, target: nil, action: nil)
     private let preview = ClipPreview()
     private var previewToken = 0
+    private var previewRequestPending = false
     private var commandHeld = false
     private var cardMenuTracking = false
     private var pendingSelectionID: Int64?
@@ -56,10 +56,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var rows: [ClipSummary] = []
     private var total = 0
     private var loading = false
+    private var searchIndexDirty = false
+    private var searchIndexTimer: Timer?
+    private var silentSearchRefresh = false
     private var commitWhenLoaded = false
     private var pendingMoveDelta = 0
     private var previousApp: NSRunningApplication?
-    var request: ((SearchFilter, Int) -> Void)?
+    var request: ((SearchFilter, Int, Int) -> Void)?
     var onConfirm: ((Int64) -> Void)?
     var onReveal: ((Int64, Int) -> Void)?
     var onConceal: ((Int64) -> Void)?
@@ -69,8 +72,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onFavorite: ((Int64, Bool) -> Void)?
     var onPreview: ((ClipSummary, Int) -> Void)?
     var onClose: (() -> Void)?
+    var onShowSettings: (() -> Void)?
+    var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
-    var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || appearanceSettings.isShown || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
+    var isRefreshingSearchIndex: Bool { silentSearchRefresh }
+    var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
 
     override init() {
         super.init()
@@ -80,7 +86,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.delegate = self
         window.onKeyDown = { [weak self] event in
             guard let self, self.window.isVisible, self.window.attachedSheet == nil,
-                  !self.isClosing, !self.filters.isPresenting, !self.appearanceSettings.isShown, !self.cardMenuTracking else { return false }
+                  !self.isClosing, !self.filters.isPresenting, !self.cardMenuTracking else { return false }
             return self.handle(event) == nil
         }
         window.onFlagsChanged = { [weak self] flags in
@@ -94,9 +100,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         preview.onConfirm = { [weak self] in self?.confirm() }
         preview.onMove = { [weak self] delta in self?.move(delta) }
-        appearanceSettings.onChange = { [weak self] value in self?.applyAppearance(value) }
-        appearanceSettings.onClose = { [weak self] in self?.closeIfUnfocused() }
         cards.makeCard = { [unowned self] index in self.makeCard(at: index) }
+        cards.heightForCard = { [weak self] index, width, maximumHeight in
+            guard let self, self.rows.indices.contains(index) else { return maximumHeight }
+            let clip = self.rows[index]
+            return ClipCardView.preferredHeight(for: clip,
+                revealedText: self.revealed?.id == clip.id ? self.revealed?.text : nil,
+                width: width, maximumHeight: maximumHeight)
+        }
         cards.onSelect = { [weak self] _ in self?.updateSelection() }
         cards.onActivate = { [weak self] _ in self?.confirm() }
         cards.onNeedMore = { [weak self] in self?.loadMore() }
@@ -141,7 +152,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func move(_ delta: Int) {
-        guard !isClosing, !confirming, !commitWhenLoaded, !filters.isPresenting, !appearanceSettings.isShown, !cardMenuTracking, window.attachedSheet == nil else { return }
+        guard !isClosing, !confirming, !commitWhenLoaded, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if preview.isShown { dismissPreview(); window.makeKey() }
         window.makeFirstResponder(cards)
         guard !rows.isEmpty else { pendingMoveDelta += delta; return }
@@ -152,6 +163,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receive(_ result: [ClipSummary], total: Int, offset: Int) {
+        if offset == 0, silentSearchRefresh {
+            receiveSearchIndexResult(result, total: total)
+            return
+        }
         loading = false; self.total = total
         if offset == 0 { rows = result } else { rows += result }
         let retainedIndex = pendingSelectionID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
@@ -162,6 +177,25 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         updateSelection()
         updateCount()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
+    }
+
+    /// OCR updates the search index without changing a card's displayed content.
+    func searchIndexDidChange() {
+        guard canRefreshSearchIndex else { return }
+        searchIndexDirty = true
+        // Coalesce a burst without postponing its first refresh indefinitely
+        // when a backlog keeps producing OCR completions.
+        scheduleSearchIndexRefresh(after: 0.6)
+    }
+
+    func searchFailed(_ error: Error) {
+        guard silentSearchRefresh else { failed(error); return }
+        silentSearchRefresh = false
+        loading = false
+        if commitWhenLoaded && rows.isEmpty { failed(error) }
+        // A background refresh must not reset an interaction started while the
+        // query was running. The application still reports the storage error.
+        if searchIndexDirty { scheduleSearchIndexRefresh(after: 0.8) }
     }
 
     func failed(_ error: Error) {
@@ -177,6 +211,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     func refresh(preservingSelection: Bool = false) {
         guard !isClosing, !confirming, !commitWhenLoaded else { return }
+        cancelSearchIndexRefresh()
         pendingSelectionID = preservingSelection ? (selected?.id ?? retainedSelectionID) : nil
         dismissPreview()
         invalidateReveal()
@@ -184,15 +219,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         pendingMoveDelta = 0; rows = []; cards.reload(count: 0, selectedIndex: -1, scrollToSelection: false); updateSelection()
         status.stringValue = "Загружаем историю…"
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
-        request?(filter(), 0)
+        request?(filter(), 0, 150)
     }
 
     func close(restoreFocus: Bool = true) {
         guard !isClosing else { return }
+        cancelSearchIndexRefresh()
         logger.notice("Panel closed: restoreFocus=\(restoreFocus)")
         retainedSelectionID = selected?.id
         presentationToken += 1; let token = presentationToken; isClosing = true
-        dismissPreview(); appearanceSettings.close(); commandHeld = false
+        dismissPreview(); commandHeld = false
         commitWhenLoaded = false; confirming = false; invalidateReveal()
         filters.dismiss(); saveFloatingFrame()
         onClose?()
@@ -232,7 +268,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
-                  !self.appearanceSettings.isShown, !self.cardMenuTracking, !self.preview.isShown else { return }
+                  !self.cardMenuTracking, !self.preview.isShown else { return }
             self.close(restoreFocus: false)
         }
     }
@@ -279,7 +315,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if event.keyCode == 126 { move(-cards.effectiveColumns); return nil }
         if !editingSearch, event.keyCode == 124 { move(1); return nil }
         if !editingSearch, event.keyCode == 123 { move(-1); return nil }
-        if flags.contains(.command), event.keyCode == 43 { showAppearanceSettings(); return nil }
+        if flags.contains(.command), event.keyCode == 43 { showSettings(); return nil }
         if flags.contains([.command, .option]), event.keyCode == 1 { toggleSidebar(); return nil }
         if event.keyCode == 48 {
             window.makeFirstResponder(editingSearch ? cards : search); return nil
@@ -331,7 +367,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func confirm() {
-        guard !isClosing, !confirming, !filters.isPresenting, !appearanceSettings.isShown, !cardMenuTracking, window.attachedSheet == nil else { return }
+        guard !isClosing, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if loading && rows.isEmpty {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
             scope.isEnabled = false; updateVisibleCards()
@@ -347,7 +383,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        guard control === search, !filters.isPresenting, !appearanceSettings.isShown, !cardMenuTracking, window.attachedSheet == nil else { return false }
+        guard control === search, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return false }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) || commandSelector == #selector(NSResponder.insertLineBreak(_:)) {
             confirm(); return true
         }
@@ -436,20 +472,23 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             guard revealed?.id == clip.id else { status.stringValue = "Сначала нажмите «Показать» на скрытой записи."; return }
             showPreview(.text(revealed!.text), id: clip.id, token: previewToken)
         } else {
+            previewRequestPending = onPreview != nil
             onPreview?(clip, previewToken)
         }
     }
 
     func showPreview(_ content: ClipPreviewContent, id: Int64, token: Int) {
-        guard window.isVisible, token == previewToken, selected?.id == id,
-              !filters.isPresenting, !appearanceSettings.isShown, !cardMenuTracking, window.attachedSheet == nil,
+        guard token == previewToken else { return }
+        previewRequestPending = false
+        guard window.isVisible, selected?.id == id,
+              !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil,
               !confirming, !commitWhenLoaded,
               let row = rows.firstIndex(where: { $0.id == id }),
               let card = cards.card(at: row) else { return }
         preview.show(content, title: selected?.isConcealed == true ? "Скрытая запись" : (selected?.kind.label ?? "Просмотр"), relativeTo: card)
     }
 
-    private func dismissPreview() { previewToken += 1; preview.close() }
+    private func dismissPreview() { previewToken += 1; previewRequestPending = false; preview.close() }
     @objc private func revealSelected() {
         guard let selected else { return }
         if !selected.isConcealed { onConceal?(selected.id); return }
@@ -464,11 +503,101 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
     private func scrolled() { if cards.isNearEnd { loadMore() } }
     private func loadMore() {
-        guard window.isVisible, !isClosing, !loading, rows.count < total else { return }
+        guard window.isVisible, !isClosing, !loading, !silentSearchRefresh, rows.count < total else { return }
         // Removing a favorite changes subsequent offsets. Wait until the local
         // rows reflect committed removals before requesting another page.
         guard scope.selectedSegment != 1 || pendingFavorites.isEmpty else { return }
-        loading = true; request?(filter(), rows.count)
+        loading = true; request?(filter(), rows.count, 150)
+    }
+
+    private var canRefreshSearchIndex: Bool {
+        window.isVisible && !isClosing && !search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var searchIndexInteractionIsIdle: Bool {
+        !confirming && !commitWhenLoaded && !preview.isShown && !previewRequestPending && !revealing
+            && !cardMenuTracking && !filters.isPresenting
+            && window.attachedSheet == nil && pendingFavorites.isEmpty
+    }
+
+    private func scheduleSearchIndexRefresh(after delay: TimeInterval) {
+        guard searchIndexTimer == nil else { return }
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.searchIndexTimer = nil
+            self.refreshSearchIndexIfReady()
+        }
+        searchIndexTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func cancelSearchIndexRefresh() {
+        searchIndexTimer?.invalidate(); searchIndexTimer = nil
+        searchIndexDirty = false; silentSearchRefresh = false
+    }
+
+    private func refreshSearchIndexIfReady() {
+        guard searchIndexDirty else { return }
+        guard canRefreshSearchIndex else { cancelSearchIndexRefresh(); return }
+        guard searchIndexInteractionIsIdle, !loading, !silentSearchRefresh else {
+            scheduleSearchIndexRefresh(after: 0.8)
+            return
+        }
+        guard let request else { return }
+        searchIndexDirty = false
+        silentSearchRefresh = true; loading = true
+        request(filter(), 0, max(150, rows.count + 150))
+    }
+
+    private func receiveSearchIndexResult(_ result: [ClipSummary], total: Int) {
+        silentSearchRefresh = false; loading = false
+        guard canRefreshSearchIndex else { cancelSearchIndexRefresh(); return }
+        if commitWhenLoaded && rows.isEmpty {
+            // Enter while waiting for the first OCR match owns this result just
+            // like Enter during an ordinary search; it cannot wait for itself.
+            receive(result, total: total, offset: 0)
+            return
+        }
+        // The user can start a preview, confirmation or menu while SQL is still
+        // running. Requery when that interaction finishes rather than replacing it.
+        guard searchIndexInteractionIsIdle else {
+            searchIndexDirty = true
+            scheduleSearchIndexRefresh(after: 0.8)
+            return
+        }
+        self.total = total
+        if let selectedID = selected?.id, !result.contains(where: { $0.id == selectedID }),
+           result.count < total, let request {
+            // OCR can insert many newer matches ahead of the current choice.
+            // Fetch far enough to keep it before changing the visible records.
+            silentSearchRefresh = true; loading = true
+            request(filter(), 0, min(total, max(result.count + 150, result.count * 2)))
+            return
+        }
+        if !displayedRowsAreUnchanged(in: result) {
+            let selectedID = selected?.id
+            let previousIndex = cards.selectedIndex
+            rows = result
+            let index = selectedID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
+                ?? (rows.isEmpty ? -1 : max(0, min(previousIndex, rows.count - 1)))
+            cards.replace(count: rows.count, selectedIndex: index)
+            updateSelection()
+        }
+        updateCount()
+        scrolled()
+        if searchIndexDirty { scheduleSearchIndexRefresh(after: 0.8) }
+    }
+
+    private func displayedRowsAreUnchanged(in result: [ClipSummary]) -> Bool {
+        guard result.count >= rows.count, !rows.isEmpty || result.isEmpty else { return false }
+        // The wider query may include an extra page. An unchanged visible prefix
+        // needs only its count updated; regular pagination will fetch the rest.
+        return zip(rows, result).allSatisfy { current, updated in
+            current.id == updated.id && current.date == updated.date && current.kind == updated.kind
+                && current.title == updated.title && current.text == updated.text && current.source == updated.source
+                && current.byteCount == updated.byteCount && current.isConcealed == updated.isConcealed
+                && current.isFavorite == updated.isFavorite
+        }
     }
 
     private func filter() -> SearchFilter {
@@ -526,10 +655,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         updateVisibleCards()
     }
 
-    @objc func showAppearanceSettings() {
+    @objc func showSettings() {
         guard !isClosing, !confirming, !commitWhenLoaded else { return }
         dismissPreview(); filters.dismiss()
-        appearanceSettings.show(appearance, relativeTo: settingsButton)
+        onShowSettings?()
     }
 
     @objc private func toggleSidebar() {
@@ -540,6 +669,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private func configureAppearance() {
         cards.columns = appearance.columns
         cards.visibleRows = appearance.visibleRows
+        cards.sizesToContent = appearance.mode != .floating
         filters.setSidebarVisible(appearance.sidebarVisible)
         filters.sidebar.isHidden = !appearance.sidebarVisible
         sidebarWidth.isActive = appearance.sidebarVisible
@@ -552,15 +682,22 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                                 height: appearance.sidebarVisible ? 470 : 410)
     }
 
-    private func applyAppearance(_ value: HistoryAppearance) {
+    func applyAppearance(_ value: HistoryAppearance) {
         let previous = appearance
         guard previous != value else { return }
+        // Settings can change while the docked picker is still sliding out.
+        // Finish that close before replacing the animation's geometry/token.
+        if isClosing {
+            presentationToken += 1
+            window.orderOut(nil)
+            window.permitsOffscreenFrame = false
+            isClosing = false
+        }
         saveFloatingFrame()
         appearance = value; appearance.save()
         if previous.mode != value.mode {
             presentationToken += 1
             window.permitsOffscreenFrame = false
-            appearanceSettings.close()
         }
         configureAppearance()
         changingFrame = true
@@ -578,10 +715,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         saveFloatingFrame()
         window.contentView?.layoutSubtreeIfNeeded()
         cards.scrollToSelection()
-        if previous.mode != value.mode {
-            window.makeKeyAndOrderFront(nil)
-            window.makeFirstResponder(cards)
-        }
+        onAppearanceChange?(appearance)
     }
 
     private func saveFloatingFrame() {
@@ -625,7 +759,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func build() {
-        window.title = "Bufera"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
+        window.title = BrandIdentity.name; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false; window.level = .floating
         window.isMovableByWindowBackground = true; window.hidesOnDeactivate = false
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
@@ -645,8 +779,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         resetSearch.target = self; resetSearch.action = #selector(resetEverything)
         resetSearch.toolTip = "Вся история · ⌘0"
         sidebarButton.target = self; sidebarButton.action = #selector(toggleSidebar)
-        settingsButton.target = self; settingsButton.action = #selector(showAppearanceSettings)
-        settingsButton.toolTip = "Внешний вид · ⌘,"
+        settingsButton.target = self; settingsButton.action = #selector(showSettings)
+        settingsButton.toolTip = "Настройки · ⌘,"
         for button in [sidebarButton, resetSearch, settingsButton] {
             button.isBordered = false; button.widthAnchor.constraint(equalToConstant: 26).isActive = true
             button.contentTintColor = .secondaryLabelColor
@@ -658,6 +792,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         searchRow.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
         scope.selectedSegment = 0; scope.segmentStyle = .rounded
         scope.target = self; scope.action = #selector(scopeChanged)
+        scope.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil), forSegment: 0)
         scope.setImage(NSImage(systemSymbolName: "star", accessibilityDescription: nil), forSegment: 1)
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor; status.lineBreakMode = .byTruncatingTail
         status.alignment = .right

@@ -1,5 +1,5 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 import ImageIO
 
 func runSmokeTest() throws {
@@ -8,7 +8,7 @@ func runSmokeTest() throws {
     let service = ClipboardService(pasteboard: pasteboard)
     let payload = ClipPayload(items: [
         [Representation(type: NSPasteboard.PasteboardType.string.rawValue, data: Data("Проверка буфера".utf8)),
-         Representation(type: "app.bufera.custom", data: Data([0, 1, 2, 255]))],
+         Representation(type: "app.buffera.custom", data: Data([0, 1, 2, 255]))],
         [Representation(type: NSPasteboard.PasteboardType.fileURL.rawValue, data: Data("file:///tmp/example.txt".utf8))]
     ])
     try service.restore(payload)

@@ -6,7 +6,7 @@ func check(_ condition: @autoclosure () throws -> Bool, _ message: String) throw
 }
 
 let manager = FileManager.default
-let sandbox = manager.temporaryDirectory.appendingPathComponent("BuferaExportChecks-\(UUID().uuidString)", isDirectory: true)
+let sandbox = manager.temporaryDirectory.appendingPathComponent("BufferaExportChecks-\(UUID().uuidString)", isDirectory: true)
 try manager.createDirectory(at: sandbox, withIntermediateDirectories: false)
 defer { try? manager.removeItem(at: sandbox) }
 let directory = sandbox.appendingPathComponent("Images", isDirectory: true)
@@ -35,7 +35,7 @@ try Data([9]).write(to: foreign)
 try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: foreign.path)
 let outside = sandbox.appendingPathComponent("outside.png")
 try Data([10]).write(to: outside)
-let linked = directory.appendingPathComponent("Bufera-3.png")
+let linked = directory.appendingPathComponent("Buffera-3.png")
 try manager.createSymbolicLink(at: linked, withDestinationURL: outside)
 try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: second.path)
 try cache.cleanup()
@@ -68,4 +68,57 @@ do {
 } catch let error as CocoaError {
     try check(error.code == .fileWriteNoPermission, "A redirected cache directory must fail safely")
 }
-print("PASS: temporary image export reuse, expiry, capacity, permissions and path isolation")
+
+let legacyContainer = sandbox.appendingPathComponent("OldContainer", isDirectory: true)
+let legacyDirectory = legacyContainer.appendingPathComponent("ImageExports", isDirectory: true)
+let renamedDirectory = sandbox.appendingPathComponent("RenamedImages", isDirectory: true)
+let renamedCache = TemporaryImageExports(directory: renamedDirectory, legacyDirectory: legacyDirectory,
+                                         maximumBytes: 8)
+try renamedCache.cleanup()
+try check(!manager.fileExists(atPath: legacyContainer.path), "Cleanup must not create an absent legacy container")
+try manager.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+
+let expiredLegacy = legacyDirectory.appendingPathComponent("Bufera-10.png")
+let freshLegacy = legacyDirectory.appendingPathComponent("Bufera-11.png")
+let foreignLegacy = legacyDirectory.appendingPathComponent("keep.txt")
+let unrecognizedLegacy = legacyDirectory.appendingPathComponent("Bufera-not-an-id.png")
+let linkedLegacy = legacyDirectory.appendingPathComponent("Bufera-12.png")
+let hardLinkedLegacy = legacyDirectory.appendingPathComponent("Bufera-13.png")
+for url in [expiredLegacy, foreignLegacy, unrecognizedLegacy] {
+    try Data([8]).write(to: url)
+    try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: url.path)
+}
+try Data([1, 2, 3, 4]).write(to: freshLegacy)
+try manager.setAttributes([.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: freshLegacy.path)
+try manager.createSymbolicLink(at: linkedLegacy, withDestinationURL: outside)
+try manager.linkItem(at: outside, to: hardLinkedLegacy)
+try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: outside.path)
+try renamedCache.cleanup()
+try check(!manager.fileExists(atPath: expiredLegacy.path), "Exports from before the rename must expire")
+try check(manager.fileExists(atPath: freshLegacy.path), "A fresh legacy export should keep its normal lifetime")
+try check(manager.fileExists(atPath: legacyDirectory.path), "Cleanup must not remove the legacy directory")
+try check(try Data(contentsOf: foreignLegacy) == Data([8]), "Unrelated legacy files must survive cleanup")
+try check(try Data(contentsOf: unrecognizedLegacy) == Data([8]), "Only exact legacy export filenames may be removed")
+try check(try manager.attributesOfItem(atPath: linkedLegacy.path)[.type] as? FileAttributeType == .typeSymbolicLink,
+          "Legacy symlinks must not be removed")
+try check(try Data(contentsOf: hardLinkedLegacy) == Data([10]), "Legacy hard links must not be removed")
+try check(try Data(contentsOf: outside) == Data([10]), "Legacy link targets must not be changed")
+
+let renamedFile = try renamedCache.file(data: Data([1, 2, 3, 4, 5]), id: 14, fileExtension: "png")
+try check(renamedFile.lastPathComponent == "Buffera-14.png", "New exports must use the new app name")
+try check(!manager.fileExists(atPath: freshLegacy.path), "The combined cache size limit must include old exports")
+try check(manager.fileExists(atPath: renamedFile.path), "Newly requested exports must survive combined eviction")
+
+let redirectedLegacyFile = legacyDirectory.appendingPathComponent("Bufera-15.png")
+try Data([15]).write(to: redirectedLegacyFile)
+try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: redirectedLegacyFile.path)
+let redirectedLegacyContainer = sandbox.appendingPathComponent("RedirectLegacyContainer", isDirectory: true)
+try manager.createSymbolicLink(at: redirectedLegacyContainer, withDestinationURL: legacyContainer)
+try TemporaryImageExports(directory: renamedDirectory,
+                          legacyDirectory: redirectedLegacyContainer.appendingPathComponent("ImageExports")).cleanup()
+try check(manager.fileExists(atPath: redirectedLegacyFile.path), "A linked legacy parent must not be traversed")
+let redirectedLegacyDirectory = sandbox.appendingPathComponent("RedirectLegacyImages", isDirectory: true)
+try manager.createSymbolicLink(at: redirectedLegacyDirectory, withDestinationURL: legacyDirectory)
+try TemporaryImageExports(directory: renamedDirectory, legacyDirectory: redirectedLegacyDirectory).cleanup()
+try check(manager.fileExists(atPath: redirectedLegacyFile.path), "A linked legacy cache must not be traversed")
+print("PASS: temporary image export reuse, expiry, shared legacy capacity, permissions and path isolation")

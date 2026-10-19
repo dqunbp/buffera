@@ -7,7 +7,7 @@ final class HotKeys {
     private var previousRef: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private static let signature: OSType = 0x42554652
-    private let logger = Logger(subsystem: "local.bufera.app", category: "hotkeys")
+    private let logger = Logger(subsystem: "local.buffera.app", category: "hotkeys")
     var isRegistered: Bool { nextRef != nil }
     var onPress: ((Int) -> Void)?
 
@@ -55,5 +55,5 @@ final class HotKeys {
 
 struct HotKeyError: LocalizedError {
     let status: OSStatus
-    var errorDescription: String? { "Не удалось включить горячую клавишу (\(status)). Закройте Pasta или другой менеджер с этим сочетанием и перезапустите Bufera. История доступна через значок в строке меню." }
+    var errorDescription: String? { "Не удалось включить горячую клавишу (\(status)). Закройте Pasta или другой менеджер с этим сочетанием и перезапустите \(BrandIdentity.name). История доступна через значок в строке меню." }
 }

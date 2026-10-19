@@ -3,18 +3,23 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache"
-swift build -c release --product Bufera --cache-path "$PWD/.build/cache" "$@"
-APP="$PWD/dist/Bufera.app"
-mkdir -p "$APP/Contents/MacOS"
-cp .build/release/Bufera "$APP/Contents/MacOS/Bufera"
+swift build -c release --product Buffera --cache-path "$PWD/.build/cache" "$@"
+APP="$PWD/dist/Buffera.app"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp .build/release/Buffera "$APP/Contents/MacOS/Buffera"
+swiftc Sources/Buffera/BrandIdentity.swift scripts/generate-app-icon.swift \
+  -o .build/generate-app-icon
+.build/generate-app-icon "$PWD/.build/Buffera.iconset"
+iconutil -c icns "$PWD/.build/Buffera.iconset" -o "$APP/Contents/Resources/Buffera.icns"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>local.bufera.app</string>
-<key>CFBundleName</key><string>Bufera</string>
-<key>CFBundleDisplayName</key><string>Bufera</string>
-<key>CFBundleExecutable</key><string>Bufera</string>
+<key>CFBundleIdentifier</key><string>local.buffera.app</string>
+<key>CFBundleName</key><string>Buffera</string>
+<key>CFBundleDisplayName</key><string>Buffera</string>
+<key>CFBundleIconFile</key><string>Buffera.icns</string>
+<key>CFBundleExecutable</key><string>Buffera</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>

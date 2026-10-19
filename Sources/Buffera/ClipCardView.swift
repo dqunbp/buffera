@@ -1,5 +1,5 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 
 enum ClipCardAction: Int, CaseIterable {
     case copy, preview, favorite, reveal, finder, save, delete
@@ -88,6 +88,7 @@ enum ClipCardAction: Int, CaseIterable {
 
 /// A card contains presentation and callbacks only; the panel owns selection and mutations.
 final class ClipCardView: NSTableCellView, NSMenuDelegate {
+    private static let maximumPreviewLines = 12
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
@@ -106,7 +107,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private let isRevealed: Bool
     private let onAction: (ClipCardAction) -> Void
     private let thumbnailView = NSImageView()
-    private let contentText = NSTextField(wrappingLabelWithString: "")
+    private let contentText = ClipCardView.makeContentText()
     private var thumbnailWidth: NSLayoutConstraint?
     private var thumbnailHeight: NSLayoutConstraint?
     private let quickShortcut = NSTextField(labelWithString: "")
@@ -153,8 +154,24 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         if event.clickCount == 2 { onActivate?() }
     }
 
-    static func rowHeight(for clip: ClipSummary) -> CGFloat {
-        clip.kind == .image && !clip.isConcealed ? 112 : 96
+    /// The docked history sizes records using exactly the text the card exposes.
+    /// In particular, a concealed record never leaks its length through layout.
+    static func preferredHeight(for clip: ClipSummary, revealedText: String?,
+                                width: CGFloat, maximumHeight: CGFloat) -> CGFloat {
+        let width = width.isFinite ? max(1, width) : 1
+        let maximumHeight = maximumHeight.isFinite ? max(74, maximumHeight) : 74
+        if clip.kind == .image && !clip.isConcealed {
+            return 50 + thumbnailSize(contentHeight: maximumHeight - 50, width: width)
+        }
+        let text = makeContentText()
+        text.stringValue = shownText(for: clip, revealedText: revealedText)
+        text.maximumNumberOfLines = 0
+        let textWidth = contentTextWidth(cardWidth: width, iconWidth: 24)
+        text.preferredMaxLayoutWidth = textWidth
+        let measured = text.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth,
+                                                           height: .greatestFiniteMagnitude)).height ?? 24
+        let visibleTextHeight = min(ceil(measured), CGFloat(maximumPreviewLines) * lineHeight(for: text.font))
+        return min(maximumHeight, 50 + max(24, visibleTextHeight))
     }
 
     init(clip: ClipSummary, revealedText: String?, thumbnail: NSImage?,
@@ -257,25 +274,9 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         thumbnailView.layer?.masksToBounds = true
         content.addSubview(thumbnailView)
 
-        let shownText: String
-        if clip.isConcealed {
-            shownText = revealedText.map { String($0.prefix(4_000)) } ?? "••••••••"
-        } else if clip.kind == .text || clip.kind == .link, !clip.text.isEmpty {
-            shownText = String(clip.text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4_000))
-        } else {
-            shownText = clip.title
-        }
         let text = contentText
-        text.stringValue = shownText
+        text.stringValue = Self.shownText(for: clip, revealedText: revealedText)
         text.translatesAutoresizingMaskIntoConstraints = false
-        text.isEditable = false
-        text.isSelectable = false
-        text.font = .systemFont(ofSize: 13)
-        text.textColor = .labelColor
-        text.maximumNumberOfLines = 2
-        text.lineBreakMode = .byWordWrapping
-        text.cell?.truncatesLastVisibleLine = true
-        text.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         if clip.isConcealed && !isRevealed { text.setAccessibilityLabel("Скрытая запись") }
         // Full content is opened by an explicit preview, never an incidental hover.
         text.toolTip = nil
@@ -323,7 +324,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
             content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             content.topAnchor.constraint(equalTo: topAnchor, constant: 10),
             content.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -6),
-            content.heightAnchor.constraint(greaterThanOrEqualToConstant: 32),
+            content.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
             thumbnailView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             thumbnailView.centerYAnchor.constraint(equalTo: content.centerYAnchor),
             thumbnailWidth!, thumbnailHeight!,
@@ -344,18 +345,56 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
 
     private func updateContentSizing(for size: NSSize) {
         // The action footer remains fixed while extra height goes to the preview.
-        let contentHeight = max(32, size.height - 50)
-        let font = contentText.font ?? .systemFont(ofSize: 13)
-        let lineHeight = max(1, ceil(font.ascender - font.descender + font.leading))
-        let lines = max(2, min(12, Int(floor(contentHeight / lineHeight))))
+        let contentHeight = max(24, size.height - 50)
+        let lineHeight = Self.lineHeight(for: contentText.font)
+        let lines = max(1, min(Self.maximumPreviewLines, Int(floor(contentHeight / lineHeight))))
         if contentText.maximumNumberOfLines != lines { contentText.maximumNumberOfLines = lines }
+        var iconWidth: CGFloat = 24
         if clip.kind == .image, !clip.isConcealed {
             // Reserve room for the image label and quick-selection badge in a
             // narrow column; wider/taller cards can show up to a 144 pt preview.
-            let thumbnailSize = max(56, min(144, min(contentHeight, size.width - 147)))
+            let thumbnailSize = Self.thumbnailSize(contentHeight: contentHeight, width: size.width)
+            iconWidth = thumbnailSize
             if thumbnailWidth?.constant != thumbnailSize { thumbnailWidth?.constant = thumbnailSize }
             if thumbnailHeight?.constant != thumbnailSize { thumbnailHeight?.constant = thumbnailSize }
         }
+        let textWidth = Self.contentTextWidth(cardWidth: size.width, iconWidth: iconWidth)
+        if contentText.preferredMaxLayoutWidth != textWidth { contentText.preferredMaxLayoutWidth = textWidth }
+    }
+
+    private static func shownText(for clip: ClipSummary, revealedText: String?) -> String {
+        if clip.isConcealed { return revealedText.map { String($0.prefix(4_000)) } ?? "••••••••" }
+        if (clip.kind == .text || clip.kind == .link), !clip.text.isEmpty {
+            return String(clip.text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4_000))
+        }
+        return clip.title
+    }
+
+    private static func makeContentText() -> NSTextField {
+        let text = NSTextField(wrappingLabelWithString: "")
+        text.isEditable = false
+        text.isSelectable = false
+        text.font = .systemFont(ofSize: 13)
+        text.textColor = .labelColor
+        text.maximumNumberOfLines = 2
+        text.lineBreakMode = .byWordWrapping
+        text.cell?.truncatesLastVisibleLine = true
+        text.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return text
+    }
+
+    private static func contentTextWidth(cardWidth: CGFloat, iconWidth: CGFloat) -> CGFloat {
+        // Side padding, icon, text gap, quick-selection badge and its gap.
+        max(1, cardWidth - 24 - iconWidth - 10 - 27 - 6)
+    }
+
+    private static func lineHeight(for font: NSFont?) -> CGFloat {
+        let font = font ?? .systemFont(ofSize: 13)
+        return max(1, ceil(font.ascender - font.descender + font.leading))
+    }
+
+    private static func thumbnailSize(contentHeight: CGFloat, width: CGFloat) -> CGFloat {
+        max(56, min(144, min(contentHeight, width - 147)))
     }
 
     private func makeButton(_ action: ClipCardAction) -> NSButton {

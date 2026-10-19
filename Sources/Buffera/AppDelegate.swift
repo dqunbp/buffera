@@ -1,39 +1,68 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 import UniformTypeIdentifiers
 import os
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var store: HistoryStore!
-    private let work = DispatchQueue(label: "app.bufera.history", qos: .userInitiated)
+    private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
     private let clipboard = ClipboardService()
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
+    private var settings: SettingsWindow?
+    private var imageTextIndexer: ImageTextIndexer?
     private var generation = 0
+    private var searchGeneration = 0
     private var confirmationToken = 0
-    private let logger = Logger(subsystem: "local.bufera.app", category: "confirmation")
+    private let logger = Logger(subsystem: "local.buffera.app", category: "confirmation")
     private let temporaryImageExports = TemporaryImageExports()
     private var exportCleanupTimer: Timer?
     private var lastError: Error?
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
     private var shortcutItem: NSMenuItem!
+    private var imageTextItem: NSMenuItem!
+    private var retryImageTextItem: NSMenuItem!
     private var applicationExitObserver: NSObjectProtocol?
-    private var countLimit: Int { UserDefaults.standard.object(forKey: "maxCount") as? Int ?? 50_000 }
-    private var byteLimit: Int { UserDefaults.standard.object(forKey: "maxBytes") as? Int ?? 5_000_000_000 }
-    private let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Bufera", isDirectory: true)
+    private var countLimit: Int { HistoryLimits.load().maxCount }
+    private var byteLimit: Int { HistoryLimits.load().maxBytes }
+    private var folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Buffera", isDirectory: true)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Both identities must be stopped before the legacy SQLite directory moves.
+        if !NSRunningApplication.runningApplications(withBundleIdentifier: LegacyMigration.previousBundleIdentifier).isEmpty {
+            let alert = NSAlert()
+            alert.messageText = "Сначала завершите предыдущую версию"
+            alert.informativeText = "Предыдущая версия ещё использует историю. Закройте её через значок в строке меню и откройте Buffera снова — история и настройки перенесутся автоматически."
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         // One instance owns the hotkeys and the history observer.
-        if NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "local.bufera.app")
+        if NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "local.buffera.app")
             .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) { NSApp.terminate(nil); return }
+        do {
+            folder = try LegacyMigration.prepareHistory(in: folder.deletingLastPathComponent())
+            try LegacyMigration.migratePreferences()
+        } catch {
+            let alert = NSAlert(error: error)
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         buildMenu()
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }
         panel = HistoryPanel()
         connectPanel()
+        imageTextIndexer = ImageTextIndexer(store: store, storageQueue: work,
+            onProgress: { [weak self] in self?.showImageTextProgress($0) },
+            onIndexed: { [weak self] in self?.panel.searchIndexDidChange() },
+            onError: { [weak self] in self?.showError($0) })
         cleanupExports()
         exportCleanupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.cleanupExports() }
         clipboard.onCapture = { [weak self] clip in
@@ -43,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 do {
                     try self.store.insert(payload: clip.payload, kind: clip.kind, title: clip.title, text: clip.text,
                                           source: clip.source, isConcealed: clip.isConcealed, date: date, maxCount: count, maxBytes: bytes)
+                    self.imageTextIndexer?.schedule()
                 } catch { DispatchQueue.main.async { self.showError(error) } }
             }
         }
@@ -60,27 +90,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.registerShortcuts()
         }
         open()
+        imageTextIndexer?.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         open(); return true
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        clipboard.paused = true
+        imageTextIndexer?.stop()
+    }
+
     private func connectPanel() {
-        panel.request = { [weak self] filter, offset in
+        panel.onShowSettings = { [weak self] in self?.showSettings() }
+        panel.onAppearanceChange = { [weak self] value in self?.settings?.updateAppearance(value) }
+        panel.request = { [weak self] filter, offset, limit in
             guard let self else { return }
-            if offset == 0 { self.generation += 1 }
-            let generation = self.generation
+            let refreshSources = offset == 0 && !self.panel.isRefreshingSearchIndex
+            if offset == 0 {
+                self.searchGeneration += 1
+                // OCR refreshes the same view: its existing thumbnail/action requests remain valid.
+                if !self.panel.isRefreshingSearchIndex { self.generation += 1 }
+            }
+            let searchGeneration = self.searchGeneration
             self.work.async {
-                let result = Result { (try self.store.search(filter, offset: offset), try self.store.count(filter),
-                                       offset == 0 ? try self.store.sources() : nil) }
+                let result = Result { (try self.store.search(filter, limit: limit, offset: offset), try self.store.count(filter),
+                                       refreshSources ? try self.store.sources() : nil) }
                 DispatchQueue.main.async {
-                    guard generation == self.generation, self.panel.window.isVisible else { return }
+                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
                     switch result {
                     case .success(let (rows, count, sources)):
                         if let sources { self.panel.setSources(sources) }
                         self.panel.receive(rows, total: count, offset: offset)
-                    case .failure(let error): self.panel.failed(error); self.showError(error)
+                    case .failure(let error): self.panel.searchFailed(error); self.showError(error)
                     }
                 }
             }
@@ -128,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onConceal = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.conceal(id: id); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do { try self.store.conceal(id: id); self.imageTextIndexer?.schedule(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
             }
         }
@@ -162,12 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onDelete = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.delete(id: id); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do { try self.store.delete(id: id); self.imageTextIndexer?.schedule(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
         panel.onClose = { [weak self] in
             self?.generation += 1
+            self?.searchGeneration += 1
             self?.confirmationToken += 1
             try? self?.hotKeys.setPreviousEnabled(false)
         }
@@ -189,7 +233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func exportImage(_ payload: ClipPayload, id: Int64, chooseDestination: Bool) {
         guard let (data, ext) = ClipboardService.imageData(payload) else { panel.failed(ClipboardFailure.noImage); return }
-        let name = "Bufera-\(id).\(ext)"
+        let name = "\(BrandIdentity.name)-\(id).\(ext)"
         if chooseDestination {
             let dialog = NSSavePanel(); dialog.nameFieldStringValue = name; dialog.allowedContentTypes = [.png]
             dialog.beginSheetModal(for: panel.window) { [weak self] response in
@@ -218,9 +262,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do { try hotKeys.setPreviousEnabled(true) } catch { panel.failed(error); showError(error) }
     }
     @objc private func showHistory() { open() }
-    @objc private func showAppearance() {
-        if panel?.isInteracting != true { open() }
-        DispatchQueue.main.async { [weak self] in self?.panel?.showAppearanceSettings() }
+    @objc private func showSettings() {
+        // A save sheet must finish before its parent can be hidden.
+        if let window = panel?.window, window.attachedSheet != nil {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        if settings == nil {
+            let controller = SettingsWindow()
+            controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
+            controller.onRevealData = { [weak self] in self?.revealData() }
+            settings = controller
+        }
+        if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
+        settings?.show()
     }
     private func cleanupExports() {
         do { try temporaryImageExports.cleanup() } catch { showError(error) }
@@ -240,20 +295,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func revealData() { NSWorkspace.shared.open(folder) }
     @objc private func quit() { work.sync {}; NSApp.terminate(nil) }
-    @objc private func showLastError() { if let lastError { showError(lastError, alert: true) } }
-    @objc private func setLimit(_ sender: NSMenuItem) {
-        UserDefaults.standard.set(sender.tag, forKey: sender.representedObject as! String)
-        for item in sender.menu?.items ?? [] { item.state = item === sender ? .on : .off }
+    @objc private func retryImageText() { imageTextIndexer?.retryFailed() }
+    private func showImageTextProgress(_ progress: ImageTextProgress) {
+        if progress.pending > 0 {
+            imageTextItem.title = "Распознавание картинок: осталось \(progress.pending)"
+        } else if progress.failed > 0 {
+            imageTextItem.title = "Не удалось распознать: \(progress.failed)"
+        } else {
+            imageTextItem.title = "Поиск по картинкам: готово"
+        }
+        retryImageTextItem.isHidden = progress.failed == 0
     }
+    @objc private func showLastError() { if let lastError { showError(lastError, alert: true) } }
     @objc private func help() {
-        let alert = NSAlert(); alert.messageText = "Bufera — клавиши и история"
+        let alert = NSAlert(); alert.messageText = "\(BrandIdentity.name) — клавиши и история"
         let actions = ClipCardAction.allCases.map { "\($0.shortcut) — \($0.title)" }.joined(separator: "\n")
         alert.informativeText = """
         ⌘⌥V — открыть / следующий элемент
         ⌘⌥C — предыдущий в открытом окне
         Стрелки — выбрать запись
         ⌘⌥S — скрыть или показать боковое меню
-        ⌘, — настроить вид окна
+        ⌘, — настройки
         ⌘1–9 — выбрать одну из первых девяти записей
         ⌘F — перейти к поиску, ⌘0 — вся история
         Escape — закрыть просмотр или окно
@@ -262,7 +324,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Действия находятся внутри карточек и в их контекстном меню. Подсказки кнопок показывают сочетания. Пробел открывает просмотр при выборе записи; в поле поиска он вводит пробел. ⌘Y открывает просмотр и из поиска.
 
-        Запрос, фильтры и раздел сохраняются между открытиями окна до перезапуска Bufera. Избранное хранится постоянно и не удаляется автоматически при достижении лимитов обычной истории.
+        Запрос, фильтры и раздел сохраняются между открытиями окна до перезапуска \(BrandIdentity.name). Избранное хранится постоянно и не удаляется автоматически при достижении лимитов обычной истории.
+
+        Текст на новых и ранее сохранённых картинках распознаётся на Mac в фоне и участвует в обычном поиске. Поддерживаются русский и английский. Прогресс и повтор неудачных попыток доступны через значок \(BrandIdentity.name) в строке меню. Скрытые записи не распознаются.
 
         Enter копирует запись и закрывает окно. Вставку выполняете сами (на Mac обычно ⌘V).
 
@@ -282,51 +346,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.autosaveName = "BuferaClipboard"
+        statusItem.autosaveName = "BufferaClipboard"
         statusItem.isVisible = true
-        let icon = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Bufera — буфер обмена")
-        icon?.size = NSSize(width: 17, height: 17)
-        icon?.isTemplate = true
-        statusItem.button?.image = icon
-        if icon == nil { statusItem.button?.title = "B" }
-        statusItem.button?.setAccessibilityLabel("Bufera — буфер обмена")
-        statusItem.button?.toolTip = "Bufera — история буфера обмена"
+        statusItem.button?.image = BrandIdentity.menuBarIcon()
+        statusItem.button?.setAccessibilityLabel("\(BrandIdentity.name) — буфер обмена")
+        statusItem.button?.toolTip = "\(BrandIdentity.name) — история буфера обмена"
         let menu = NSMenu()
         func add(_ title: String, _ action: Selector) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
         _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
-        _ = add("Внешний вид…    ⌘,", #selector(showAppearance))
+        let settingsItem = add("Настройки…", #selector(showSettings))
+        settingsItem.keyEquivalent = ","
         shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
         pauseItem = add("Приостановить запись", #selector(togglePause))
         menu.addItem(.separator())
-        for (title, key, values, labels) in [
-            ("Количество записей", "maxCount", [10_000, 50_000, 100_000], ["10 000", "50 000", "100 000"]),
-            ("Объём истории", "maxBytes", [1_000_000_000, 5_000_000_000, 20_000_000_000], ["1 ГБ", "5 ГБ", "20 ГБ"])
-        ] {
-            let submenu = NSMenu(); let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            parent.submenu = submenu; menu.addItem(parent)
-            for (value, label) in zip(values, labels) {
-                let item = NSMenuItem(title: label, action: #selector(setLimit), keyEquivalent: "")
-                item.target = self; item.tag = value; item.representedObject = key
-                item.state = value == (key == "maxCount" ? countLimit : byteLimit) ? .on : .off
-                submenu.addItem(item)
-            }
-        }
+        imageTextItem = NSMenuItem(title: "Подготовка поиска по картинкам…", action: nil, keyEquivalent: "")
+        menu.addItem(imageTextItem)
+        retryImageTextItem = add("Повторить распознавание", #selector(retryImageText))
+        retryImageTextItem.isHidden = true
+        menu.addItem(.separator())
         _ = add("Папка данных…", #selector(revealData))
         _ = add("Клавиши и справка…", #selector(help))
         errorItem = add("Последняя ошибка…", #selector(showLastError)); errorItem.isHidden = true
-        menu.addItem(.separator()); _ = add("Завершить Bufera", #selector(quit))
+        menu.addItem(.separator()); _ = add("Завершить \(BrandIdentity.name)", #selector(quit))
         statusItem.menu = menu
         // Standard editing commands are needed for the search field in an accessory app.
         let mainMenu = NSMenu()
-        let appItem = NSMenuItem(); let appMenu = NSMenu(title: "Bufera")
-        let appearanceItem = NSMenuItem(title: "Внешний вид…", action: #selector(showAppearance), keyEquivalent: ",")
+        let appItem = NSMenuItem(); let appMenu = NSMenu(title: BrandIdentity.name)
+        let appearanceItem = NSMenuItem(title: "Настройки…", action: #selector(showSettings), keyEquivalent: ",")
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())
         let helpItem = NSMenuItem(title: "Клавиши и справка…", action: #selector(help), keyEquivalent: "")
         helpItem.target = self; appMenu.addItem(helpItem); appMenu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "Завершить Bufera", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Завершить \(BrandIdentity.name)", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self; appMenu.addItem(quitItem); appItem.submenu = appMenu; mainMenu.addItem(appItem)
+        let windowItem = NSMenuItem(); let windowMenu = NSMenu(title: "Окно")
+        windowMenu.addItem(withTitle: "Закрыть окно", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowItem.submenu = windowMenu; mainMenu.addItem(windowItem)
         let edit = NSMenuItem(); let editMenu = NSMenu(title: "Правка")
         for (title, selector, key) in [("Вырезать", #selector(NSText.cut(_:)), "x"), ("Копировать", #selector(NSText.copy(_:)), "c"), ("Вставить", #selector(NSText.paste(_:)), "v"), ("Выделить всё", #selector(NSText.selectAll(_:)), "a")] {
             editMenu.addItem(withTitle: title, action: selector, keyEquivalent: key)

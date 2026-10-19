@@ -24,20 +24,22 @@ struct HistoryCardsMetrics: Equatable {
 }
 
 /// The panel owns records; this view owns reusable items, layout and scrolling.
-final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionViewDelegate {
+final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionViewDelegateFlowLayout {
     let scrollView = NSScrollView()
     var onSelect: ((Int) -> Void)?
     var onActivate: ((Int) -> Void)?
     var onNeedMore: (() -> Void)?
     var makeCard: ((Int) -> ClipCardView)?
+    var heightForCard: ((Int, CGFloat, CGFloat) -> CGFloat)? { didSet { updateLayout(force: true) } }
     private(set) var selectedIndex = -1
     var columns = 1 { didSet { if oldValue != columns { updateLayout() } } }
     var visibleRows = 6 { didSet { if oldValue != visibleRows { updateLayout() } } }
+    var sizesToContent = false { didSet { if oldValue != sizesToContent { updateLayout(force: true) } } }
     var effectiveColumns: Int { metrics.columns }
 
     private static let itemIdentifier = NSUserInterfaceItemIdentifier("HistoryCard")
     private let collectionView = CardsCollectionView()
-    private let flow = NSCollectionViewFlowLayout()
+    private let flow = CardsFlowLayout()
     private var itemCount = 0
     private var hasLoaded = false
     private var changingItems = false
@@ -45,6 +47,8 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
     private var updatingLayout = false
     private var needMoreScheduled = false
     private var lastMetrics: HistoryCardsMetrics?
+    private var measuredHeights: [Int: CGFloat] = [:]
+    private var measuredMetrics: HistoryCardsMetrics?
 
     override var acceptsFirstResponder: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -66,7 +70,9 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         collectionView.allowsEmptySelection = true
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.autoresizingMask = [.width]
+        // updateLayout coordinates document width with flow sizes; automatic
+        // resizing would temporarily validate cached cards against a narrower view.
+        collectionView.autoresizingMask = []
         collectionView.register(HistoryCardItem.self, forItemWithIdentifier: Self.itemIdentifier)
         collectionView.setAccessibilityLabel("История копирований")
         scrollView.hasVerticalScroller = true
@@ -100,24 +106,34 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
     func reload(count: Int, selectedIndex: Int, scrollToSelection: Bool) {
         let origin = scrollView.contentView.bounds.origin
         let oldCount = itemCount
+        let isAppend = hasLoaded && count > oldCount && !scrollToSelection
+        if !isAppend { measuredHeights.removeAll(keepingCapacity: true) }
         changingItems = true
         suppressSelection = true
         itemCount = max(0, count)
         self.selectedIndex = HistoryCardsMetrics.selection(selectedIndex, count: itemCount)
         withoutAnimation {
-            if hasLoaded, itemCount > oldCount, !scrollToSelection {
+            if isAppend {
                 collectionView.insertItems(at: Set((oldCount..<itemCount).map(indexPath)))
             } else {
                 collectionView.reloadData()
             }
         }
         hasLoaded = true
+        flow.invalidateLayout()
         applyCollectionSelection()
         collectionView.layoutSubtreeIfNeeded()
         suppressSelection = false
         changingItems = false
         if scrollToSelection { self.scrollToSelection() } else { restoreViewport(origin) }
         scheduleNeedMore()
+    }
+
+    /// Replace a search result without treating a larger result as pagination.
+    /// Existing scroll position is retained, and rows are never cleared first.
+    func replace(count: Int, selectedIndex: Int) {
+        hasLoaded = false
+        reload(count: count, selectedIndex: selectedIndex, scrollToSelection: false)
     }
 
     func select(_ index: Int, scrollIntoView: Bool) {
@@ -148,7 +164,9 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
     func reloadCard(at index: Int) {
         guard (0..<itemCount).contains(index) else { return }
         let origin = scrollView.contentView.bounds.origin
+        measuredHeights.removeValue(forKey: index)
         withoutAnimation { collectionView.reloadItems(at: [indexPath(index)]) }
+        flow.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()
         restoreViewport(origin)
     }
@@ -160,8 +178,10 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         changingItems = true
         suppressSelection = true
         itemCount -= 1
+        measuredHeights.removeAll(keepingCapacity: true)
         self.selectedIndex = HistoryCardsMetrics.selection(selectedIndex, count: itemCount)
         withoutAnimation { collectionView.deleteItems(at: [indexPath(index)]) }
+        flow.invalidateLayout()
         applyCollectionSelection()
         collectionView.layoutSubtreeIfNeeded()
         suppressSelection = false
@@ -185,6 +205,34 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
 
     func numberOfSections(in collectionView: NSCollectionView) -> Int { 1 }
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int { itemCount }
+
+    func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> NSSize {
+        // AppKit may query sizes between resizing the clip view and its document.
+        // Stay inside both widths during that transition and remeasure when it settles.
+        guard collectionView.bounds.width > 0 else { return .zero }
+        var viewport = scrollView.contentView.bounds.size
+        viewport.width = min(viewport.width, collectionView.bounds.width)
+        let layout = HistoryCardsMetrics(viewport: viewport, requestedColumns: columns, visibleRows: visibleRows)
+        if measuredMetrics != layout {
+            measuredHeights.removeAll(keepingCapacity: true)
+            measuredMetrics = layout
+        }
+        guard sizesToContent, let heightForCard, (0..<itemCount).contains(indexPath.item) else {
+            return layout.itemSize
+        }
+        // Align cards within a grid row, while a single-column panel follows each record's height.
+        let first = indexPath.item / layout.columns * layout.columns
+        let end = min(itemCount, first + layout.columns)
+        let height = (first..<end).map { index -> CGFloat in
+            if let cached = measuredHeights[index] { return cached }
+            let measured = heightForCard(index, layout.itemSize.width, layout.itemSize.height)
+            let result = measured.isFinite && measured > 0 ? ceil(measured) : layout.itemSize.height
+            measuredHeights[index] = result
+            return result
+        }.max() ?? layout.itemSize.height
+        return NSSize(width: layout.itemSize.width, height: height)
+    }
 
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt path: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: Self.itemIdentifier, for: path) as! HistoryCardItem
@@ -219,14 +267,16 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         suppressSelection = wasSuppressed
     }
 
-    private func updateLayout() {
+    private func updateLayout(force: Bool = false) {
         guard !updatingLayout else { return }
         let next = metrics
-        guard next != lastMetrics else { return }
+        guard force || next != lastMetrics else { return }
         updatingLayout = true
         let origin = scrollView.contentView.bounds.origin
         lastMetrics = next
+        measuredHeights.removeAll(keepingCapacity: true)
         flow.itemSize = next.itemSize
+        flow.invalidateLayout()
         collectionView.setFrameSize(NSSize(width: max(1, scrollView.contentView.bounds.width),
                                            height: max(collectionView.frame.height, scrollView.contentView.bounds.height)))
         flow.invalidateLayout()
@@ -265,6 +315,21 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
             context.allowsImplicitAnimation = false
             changes()
         }
+    }
+}
+
+private final class CardsFlowLayout: NSCollectionViewFlowLayout {
+    override func shouldInvalidateLayout(forBoundsChange newBounds: NSRect) -> Bool {
+        newBounds.width != collectionView?.bounds.width || super.shouldInvalidateLayout(forBoundsChange: newBounds)
+    }
+
+    override func invalidationContext(forBoundsChange newBounds: NSRect) -> NSCollectionViewLayoutInvalidationContext {
+        let context = super.invalidationContext(forBoundsChange: newBounds)
+        if newBounds.width != collectionView?.bounds.width {
+            // The flow layout otherwise keeps delegate widths from before a resize.
+            (context as? NSCollectionViewFlowLayoutInvalidationContext)?.invalidateFlowLayoutDelegateMetrics = true
+        }
+        return context
     }
 }
 

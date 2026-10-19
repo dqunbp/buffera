@@ -5,11 +5,12 @@ final class TemporaryImageExports {
     private let fileManager: FileManager
     private let directories: [URL]
     private let directory: URL
+    private let legacyDirectory: URL?
     private let maximumAge: TimeInterval
     private let maximumBytes: Int64
     private let lock = NSLock()
 
-    init(fileManager: FileManager = .default, directory: URL? = nil,
+    init(fileManager: FileManager = .default, directory: URL? = nil, legacyDirectory: URL? = nil,
          maximumAge: TimeInterval = 24 * 60 * 60, maximumBytes: Int64 = 256 * 1_024 * 1_024) {
         precondition(maximumAge > 0 && maximumBytes > 0)
         self.fileManager = fileManager
@@ -18,10 +19,15 @@ final class TemporaryImageExports {
         if let directory {
             self.directory = directory
             directories = [directory]
+            self.legacyDirectory = legacyDirectory
         } else {
-            let container = fileManager.temporaryDirectory.appendingPathComponent("local.bufera.app", isDirectory: true)
+            let container = fileManager.temporaryDirectory.appendingPathComponent("local.buffera.app", isDirectory: true)
             self.directory = container.appendingPathComponent("ImageExports", isDirectory: true)
             directories = [container, self.directory]
+            // Compatibility only: exports created before the Buffera rename expire normally.
+            self.legacyDirectory = legacyDirectory ?? fileManager.temporaryDirectory
+                .appendingPathComponent("local.bufera.app", isDirectory: true)
+                .appendingPathComponent("ImageExports", isDirectory: true)
         }
     }
 
@@ -32,7 +38,7 @@ final class TemporaryImageExports {
         }
         lock.lock(); defer { lock.unlock() }
         try prepareDirectory()
-        let url = directory.appendingPathComponent("Bufera-\(id).\(fileExtension)")
+        let url = directory.appendingPathComponent("Buffera-\(id).\(fileExtension)")
         if let attributes = try attributesIfPresent(url), !isOwnedRegularFile(attributes) {
             throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
         }
@@ -72,22 +78,40 @@ final class TemporaryImageExports {
     private func prune(excluding protectedURL: URL? = nil) throws {
         let deadline = Date().addingTimeInterval(-maximumAge)
         var entries: [Entry] = []
-        for url in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
-            guard url.lastPathComponent.range(of: "^Bufera-[1-9][0-9]*\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil,
-                  let attributes = try attributesIfPresent(url), isOwnedRegularFile(attributes),
-                  let modified = attributes[.modificationDate] as? Date,
-                  let bytes = attributes[.size] as? NSNumber else { continue }
-            if modified < deadline && url != protectedURL {
-                try fileManager.removeItem(at: url)
-            } else {
-                entries.append(Entry(url: url, modified: modified, bytes: bytes.int64Value))
+        var caches = [(directory, "Buffera")]
+        if let legacyDirectory = try existingLegacyDirectory() {
+            // Never create or rename the old cache, and never write new files into it.
+            caches.append((legacyDirectory, "Bufera"))
+        }
+        for (cacheDirectory, prefix) in caches {
+            for url in try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil) {
+                guard url.lastPathComponent.range(of: "^\(prefix)-[1-9][0-9]*\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil,
+                      let attributes = try attributesIfPresent(url), isOwnedRegularFile(attributes),
+                      let modified = attributes[.modificationDate] as? Date,
+                      let bytes = attributes[.size] as? NSNumber else { continue }
+                if modified < deadline && url != protectedURL {
+                    try fileManager.removeItem(at: url)
+                } else {
+                    entries.append(Entry(url: url, modified: modified, bytes: bytes.int64Value))
+                }
             }
         }
+        // Both generations share one size budget until the old files have expired.
         var total = entries.reduce(Int64(0)) { $0 + $1.bytes }
         for entry in entries.sorted(by: { $0.modified < $1.modified }) where total > maximumBytes && entry.url != protectedURL {
             try fileManager.removeItem(at: entry.url)
             total -= entry.bytes
         }
+    }
+
+    private func existingLegacyDirectory() throws -> URL? {
+        guard let legacyDirectory, legacyDirectory != directory else { return nil }
+        // Reject a redirected container as well as a redirected ImageExports directory.
+        for url in [legacyDirectory.deletingLastPathComponent(), legacyDirectory] {
+            guard let attributes = try attributesIfPresent(url),
+                  attributes[.type] as? FileAttributeType == .typeDirectory else { return nil }
+        }
+        return legacyDirectory
     }
 
     private func isOwnedRegularFile(_ attributes: [FileAttributeKey: Any]) -> Bool {

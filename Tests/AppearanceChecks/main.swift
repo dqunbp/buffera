@@ -1,6 +1,6 @@
 import Foundation
 
-// swiftc -module-cache-path .build/ModuleCache Sources/Bufera/HistoryAppearance.swift \
+// swiftc -module-cache-path .build/ModuleCache Sources/Buffera/HistoryAppearance.swift \
 //   Tests/AppearanceChecks/main.swift -o .build/appearance-checks
 // .build/appearance-checks
 
@@ -10,7 +10,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String) throws {
     }
 }
 
-let suite = "local.bufera.appearance-checks.\(UUID().uuidString)"
+let suite = "local.buffera.appearance-checks.\(UUID().uuidString)"
 let defaults = UserDefaults(suiteName: suite)!
 defer { defaults.removePersistentDomain(forName: suite) }
 try check(HistoryAppearance.load(from: defaults) == HistoryAppearance(), "Missing settings must use the default list layout")

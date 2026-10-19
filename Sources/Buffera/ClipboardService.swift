@@ -1,5 +1,5 @@
 import AppKit
-import BuferaCore
+import BufferaCore
 import ImageIO
 
 struct CapturedClip {

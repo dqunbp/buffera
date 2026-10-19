@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "Bufera",
+    name: "Buffera",
     platforms: [.macOS(.v13)],
-    products: [.executable(name: "Bufera", targets: ["Bufera"])],
+    products: [.executable(name: "Buffera", targets: ["Buffera"])],
     targets: [
         .systemLibrary(name: "CSQLite"),
-        .target(name: "BuferaCore", dependencies: ["CSQLite"]),
-        .executableTarget(name: "Bufera", dependencies: ["BuferaCore"],
+        .target(name: "BufferaCore", dependencies: ["CSQLite"]),
+        .executableTarget(name: "Buffera", dependencies: ["BufferaCore"],
                           linkerSettings: [.linkedFramework("Carbon")]),
-        .executableTarget(name: "BuferaChecks", dependencies: ["BuferaCore"], path: "Tests/BuferaCoreTests")
+        .executableTarget(name: "BufferaChecks", dependencies: ["BufferaCore"], path: "Tests/BufferaCoreTests")
     ]
 )
