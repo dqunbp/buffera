@@ -21,6 +21,15 @@ func checkThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStrin
 }
 
 let checks: [(String, (HistoryStoreTests) -> () throws -> Void)] = [
+    ("Plain text retains complete content and transforms bound UTF-8 bytes", HistoryStoreTests.testPlainTextPreservesCompleteContentAndTransformByteLimit),
+    ("JSON formatting preserves number precision, duplicate keys and string lexemes", HistoryStoreTests.testJSONFormattingPreservesNumbersKeysAndStringLexemes),
+    ("JSON rejects invalid syntax and bounds nesting and expanded output", HistoryStoreTests.testJSONRejectsInvalidSyntaxAndBoundsDepthAndOutput),
+    ("Line unwrapping preserves paragraphs and normalizes newlines", HistoryStoreTests.testUnwrapPreservesParagraphsAndNormalizesLineEndings),
+    ("Duplicate lines compare exact content and preserve blank lines", HistoryStoreTests.testDuplicateLinesUseExactContentAndPreserveBlankLines),
+    ("Link cleanup preserves untouched raw values, order and fragments", HistoryStoreTests.testURLCleaningPreservesRawValuesOrderFragmentAndUntouchedNames),
+    ("Link cleanup rejects invalid and modified signed links", HistoryStoreTests.testURLCleaningRejectsInvalidOrModifiedSignedLinks),
+    ("Summary getter reads current metadata without loading payload", HistoryStoreTests.testSummaryGetterReflectsCurrentMetadataAndDoesNotLoadPayload),
+    ("OCR getter distinguishes complete empty, pending, failed and hidden records", HistoryStoreTests.testImageTextGetterDistinguishesCompletedEmptyPendingFailedAndHidden),
     ("All formats and items survive reopen", HistoryStoreTests.testAllFormatsAndItemsSurviveReopen),
     ("Duplicate moves to top", HistoryStoreTests.testDuplicateMovesToTopWithoutNewRecord),
     ("Using a clip promotes it without changing captured metadata", HistoryStoreTests.testMarkUsedPromotesWithoutChangingCapturedMetadata),

@@ -5,8 +5,8 @@ import BufferaCore
 // clipboard, database, or app activation are used. Appearance checks restore
 // every preference they touch before asserting their results.
 // mkdir -p .build/history-panel-checks
-// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
+// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/TextTransformation.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
+// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformSheet.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
 // .build/history-panel-checks/checks
 
 var checkCount = 0
@@ -30,7 +30,7 @@ func waitUntil(_ description: String, _ condition: () -> Bool) {
 
 func fixture(_ id: Int) -> ClipSummary {
     ClipSummary(id: Int64(id), date: Date(timeIntervalSince1970: 1_700_000_000), kind: .text,
-                title: "Fixture \(id)", text: "Search fixture \(id)", source: "Checks", byteCount: 10)
+                title: "Fixture \(id)", text: "Search fixture \(id)", source: "Panel Fixture App", byteCount: 10)
 }
 
 final class PanelHarness {
@@ -89,6 +89,7 @@ final class PanelHarness {
 
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
+NSApp.finishLaunching()
 
 let entering = PanelHarness()
 var completions = 0
@@ -539,10 +540,10 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     let filtered = harness()
     let views = descendants(of: filtered.panel.window.contentView!)
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
-    filtered.panel.setSources(["Checks", "Other"])
+    filtered.panel.setSources(["Panel Fixture App", "Other"])
     let filterRows = descendants(of: filters.sidebar).compactMap { $0 as? NSButton }
     filterRows.first { $0.title == "Текст" }!.performClick(nil)
-    filterRows.first { $0.title == "Checks" }!.performClick(nil)
+    filterRows.first { $0.title == "Panel Fixture App" }!.performClick(nil)
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
     scope.selectedSegment = 1
     _ = NSApp.sendAction(scope.action!, to: scope.target, from: scope)
@@ -553,7 +554,7 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     filtered.panel.open()
     let retainedFilters = filtered.requests.last!.filter
     results.append((retainedFilters.query == "fixture" && retainedFilters.kind == .text
-                    && retainedFilters.source == "Checks" && retainedFilters.favoritesOnly,
+                    && retainedFilters.source == "Panel Fixture App" && retainedFilters.favoritesOnly,
                     "confirmation and reopening retain the query, type, app, and favorites filters"))
     filtered.panel.receive(clips, total: clips.count, offset: 0)
     filtered.panel.clipboardDidCapture(id: 1000)
@@ -659,10 +660,10 @@ func nearbyChecks() -> [(Bool, String)] {
     let filtered = harness()
     let views = descendants(of: filtered.panel.window.contentView!)
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
-    filtered.panel.setSources(["Checks", "Other"])
+    filtered.panel.setSources(["Panel Fixture App", "Other"])
     let filterButtons = descendants(of: filters.sidebar).compactMap { $0 as? NSButton }
     filterButtons.first { $0.title == "Текст" }!.performClick(nil)
-    filterButtons.first { $0.title == "Checks" }!.performClick(nil)
+    filterButtons.first { $0.title == "Panel Fixture App" }!.performClick(nil)
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
     scope.selectedSegment = 1
     _ = NSApp.sendAction(scope.action!, to: scope.target, from: scope)
@@ -722,7 +723,7 @@ func nearbyChecks() -> [(Bool, String)] {
     filtered.panel.refresh(preservingSelection: true)
     let restoredFilter = filtered.requests.last!.filter
     results.append((restoredFilter.query == "fixture" && restoredFilter.kind == .text
-                    && restoredFilter.source == "Checks" && restoredFilter.favoritesOnly,
+                    && restoredFilter.source == "Panel Fixture App" && restoredFilter.favoritesOnly,
                     "back preserves type and source filters for the next ordinary query"))
 
     let stale = harness()
@@ -803,7 +804,7 @@ func nearbyChecks() -> [(Bool, String)] {
 
     let concealed = harness()
     let secret = ClipSummary(id: 1, date: Date(), kind: .text, title: "Secret fixture title",
-                             text: "Secret fixture body", source: "Checks", byteCount: 19, isConcealed: true)
+                             text: "Secret fixture body", source: "Panel Fixture App", byteCount: 19, isConcealed: true)
     concealed.panel.showNearby(id: 1)
     complete(concealed, rows: [secret])
     let concealedCard = concealed.cards.card(at: concealed.cards.selectedIndex)!
@@ -819,7 +820,7 @@ func nearbyChecks() -> [(Bool, String)] {
     _ = NSApp.sendAction(favoriteScope.action!, to: favoriteScope.target, from: favoriteScope)
     let favorites = (1...2).map { id in
         ClipSummary(id: Int64(id), date: Date(), kind: .text, title: "Favorite \(id)",
-                    text: "Favorite fixture \(id)", source: "Checks", byteCount: 10, isFavorite: true)
+                    text: "Favorite fixture \(id)", source: "Panel Fixture App", byteCount: 10, isFavorite: true)
     }
     favorite.panel.receive(favorites, total: favorites.count, offset: 0)
     favorite.panel.showNearby(id: 1)
@@ -843,9 +844,9 @@ func nearbyChecks() -> [(Bool, String)] {
 
     let newlyConcealed = harness()
     let visibleSecret = ClipSummary(id: 1, date: Date(), kind: .text, title: "Visible secret fixture",
-                                    text: "Newly concealed secret body", source: "Checks", byteCount: 27)
+                                    text: "Newly concealed secret body", source: "Panel Fixture App", byteCount: 27)
     let hiddenSecret = ClipSummary(id: visibleSecret.id, date: visibleSecret.date, kind: .text,
-                                   title: visibleSecret.title, text: visibleSecret.text, source: "Checks",
+                                   title: visibleSecret.title, text: visibleSecret.text, source: "Panel Fixture App",
                                    byteCount: visibleSecret.byteCount, isConcealed: true)
     newlyConcealed.panel.receive([visibleSecret], total: 1, offset: 0)
     newlyConcealed.panel.showNearby(id: 1)
@@ -887,5 +888,75 @@ func nearbyChecks() -> [(Bool, String)] {
     return results
 }
 for (passed, message) in nearbyChecks() { check(passed, message) }
+
+func copyTransformChecks() {
+    let rows = (1...3).map(fixture)
+    let value = PanelHarness(rows: rows)
+    defer { value.panel.close(restoreFocus: false); value.finish() }
+    var requests: [(Int64, CopyTransformOperation)] = []
+    var pendingResult: ((Result<String, Error>) -> Void)?
+    var copied: [(Int64, String)] = []
+    var pendingCopy: ((Error?) -> Void)?
+    var cancellations = 0
+    var navigations = 0
+    value.panel.requestCopyTransform = { id, operation, completion in
+        requests.append((id, operation)); pendingResult = completion
+    }
+    value.panel.onCopyTransformed = { id, text, completion in
+        copied.append((id, text)); pendingCopy = completion
+    }
+    value.panel.onCancelCopyTransformed = { cancellations += 1 }
+    value.panel.onNavigate = { navigations += 1 }
+    value.startSilentRefresh()
+    value.requests.removeAll()
+    let card = value.cards.card(at: 0)!
+    let transformButton = descendants(of: card).compactMap { $0 as? NSButton }
+        .first { $0.tag == ClipCardAction.copyDifferently.rawValue }!
+    transformButton.performClick(nil)
+    waitUntil("copy transform sheet") { value.panel.window.attachedSheet != nil }
+    check(requests.count == 1 && requests[0].0 == 1 && requests[0].1 == .text(.plainText) && navigations == 1,
+          "card action opens a transformation sheet for the full source by id")
+    value.panel.receive([fixture(99)], total: 1, offset: 0)
+    value.panel.searchFailed(HistoryError.database("Obsolete search failure"))
+    check(value.panel.selected?.id == 1,
+          "an in-flight search cannot replace the transformation source or display a stale error")
+    value.panel.clipboardDidCapture(id: 99)
+    value.panel.searchIndexDidChange()
+    value.panel.move(1)
+    check(value.requests.isEmpty && value.panel.selected?.id == 1 && copied.isEmpty,
+          "capture, OCR, and navigation cannot replace the source during transformation preview")
+    pendingResult?(.success("Exact preview\nvalue"))
+    let sheetViews = descendants(of: value.panel.window.attachedSheet!.contentView!)
+    let copy = sheetViews.compactMap { $0 as? NSButton }.first { $0.title == "В буфер" }!
+    let cancel = sheetViews.compactMap { $0 as? NSButton }.first { $0.title == "Отмена" }!
+    check(copy.isEnabled && copied.isEmpty,
+          "a prepared transformation does not write the clipboard before explicit confirmation")
+    cancel.performClick(nil)
+    check(cancellations == 1 && copied.isEmpty && value.requests.count == 1,
+          "cancelling invalidates pending writes and refreshes history changed behind the sheet")
+    value.panel.receive(rows, total: rows.count, offset: 0)
+    let shortcut = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
+        windowNumber: value.panel.window.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
+        isARepeat: false, keyCode: 8)!
+    check(value.panel.window.onKeyDown?(shortcut) == true && requests.count == 2,
+          "Command-Shift-C opens the same transformation flow")
+    pendingResult?(.success("Exact preview\nvalue"))
+    let confirm = descendants(of: value.panel.window.attachedSheet!.contentView!).compactMap { $0 as? NSButton }
+        .first { $0.title == "В буфер" }!
+    confirm.performClick(nil)
+    check(copied.count == 1 && copied[0].0 == 1 && copied[0].1 == "Exact preview\nvalue",
+          "confirmation passes the exact preview and original source id to the existing copy boundary")
+    value.panel.close(restoreFocus: false)
+    pendingCopy?(nil)
+    check(cancellations == 2 && value.panel.window.attachedSheet == nil,
+          "closing history cancels a pending transformed copy and ignores its late completion")
+
+    let hidden = ClipSummary(id: 7, date: Date(), kind: .text, title: "Hidden", text: "", source: "Panel Fixture App",
+                             byteCount: 20, isConcealed: true)
+    check(!ClipCardAction.copyDifferently.isAvailable(for: hidden)
+          && CopyTransformOperation.available(for: hidden).isEmpty,
+          "concealed records cannot expose their content through copy transformations")
+}
+copyTransformChecks()
 
 print("\(checkCount) history panel checks passed")

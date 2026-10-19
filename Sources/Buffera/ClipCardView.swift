@@ -2,7 +2,7 @@ import AppKit
 import BufferaCore
 
 enum ClipCardAction: Int, CaseIterable {
-    case copy, preview, favorite, reveal, finder, save, delete, nearby
+    case copy, preview, favorite, reveal, finder, save, delete, nearby, copyDifferently
 
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .save: return "Сохранить как…"
         case .delete: return "Удалить запись"
         case .nearby: return "Показать рядом"
+        case .copyDifferently: return "Скопировать иначе…"
         }
     }
 
@@ -27,6 +28,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .save: return "square.and.arrow.down"
         case .delete: return "trash"
         case .nearby: return "clock"
+        case .copyDifferently: return "text.badge.checkmark"
         }
     }
 
@@ -40,6 +42,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .save: return "⇧⌘S"
         case .delete: return "⌘⌫"
         case .nearby: return "⇧⌘N"
+        case .copyDifferently: return "⇧⌘C"
         }
     }
 
@@ -53,13 +56,14 @@ enum ClipCardAction: Int, CaseIterable {
         case .save: return "s"
         case .delete: return "\u{8}"
         case .nearby: return "n"
+        case .copyDifferently: return "c"
         }
     }
 
     var keyEquivalentModifierMask: NSEvent.ModifierFlags {
         switch self {
         case .copy: return []
-        case .reveal, .finder, .save, .nearby: return [.command, .shift]
+        case .reveal, .finder, .save, .nearby, .copyDifferently: return [.command, .shift]
         case .preview, .favorite, .delete: return .command
         }
     }
@@ -68,6 +72,7 @@ enum ClipCardAction: Int, CaseIterable {
         switch self {
         case .reveal: return clip.isConcealed || clip.kind == .text || clip.kind == .link
         case .finder, .save: return clip.kind == .image && !clip.isConcealed
+        case .copyDifferently: return !clip.isConcealed && [.text, .link, .image].contains(clip.kind)
         case .copy, .preview, .favorite, .delete, .nearby: return true
         }
     }
@@ -328,7 +333,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         footer.distribution = .fill
         footer.spacing = 3
         // Keep the most frequent final action at the right edge across all kinds.
-        let footerActions: [ClipCardAction] = [.favorite, .nearby, .reveal, .finder, .save, .preview, .copy]
+        let footerActions: [ClipCardAction] = [.favorite, .nearby, .reveal, .finder, .save, .preview, .copyDifferently, .copy]
         for action in footerActions where action.isAvailable(for: clip) {
             let button = makeButton(action)
             buttons[action] = button

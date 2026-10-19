@@ -158,15 +158,19 @@ final class ClipboardService {
 
     // Only an explicit reveal action should decode a concealed entry for display.
     static func revealedText(_ payload: ClipPayload) -> String? {
-        let parts = payload.items.compactMap { representations -> String? in
-            if let text = representations.first(where: { $0.type == NSPasteboard.PasteboardType.string.rawValue })
-                .flatMap({ String(data: $0.data, encoding: .utf8) }), !text.isEmpty { return text }
-            guard let rtf = representations.first(where: { $0.type == NSPasteboard.PasteboardType.rtf.rawValue }),
-                  let text = try? NSAttributedString(data: rtf.data, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil).string,
-                  !text.isEmpty else { return nil }
-            return text
-        }
+        let parts = payload.items.compactMap(text(in:))
         return parts.isEmpty ? nil : parts.joined(separator: "\n")
+    }
+
+    /// Plain text and RTF are alternative representations of one clipboard item.
+    static func text(in representations: [Representation]) -> String? {
+        if let text = representations.first(where: { $0.type == NSPasteboard.PasteboardType.string.rawValue })
+            .flatMap({ String(data: $0.data, encoding: .utf8) }), !text.isEmpty { return text }
+        guard let rtf = representations.first(where: { $0.type == NSPasteboard.PasteboardType.rtf.rawValue }),
+              let text = try? NSAttributedString(data: rtf.data,
+                  options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil).string,
+              !text.isEmpty else { return nil }
+        return text
     }
 
     func restore(_ payload: ClipPayload) throws {

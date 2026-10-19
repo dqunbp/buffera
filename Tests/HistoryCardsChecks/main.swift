@@ -135,13 +135,13 @@ imageCard.layoutSubtreeIfNeeded()
 let imageView = descendants(of: imageCard).compactMap { $0 as? NSImageView }.first!
 check(imageView.frame.height == 56, "compact image card retains its thumbnail size")
 let imageButtons = descendants(of: imageCard).compactMap { $0 as? NSButton }
-check(imageButtons.count == 6 && imageButtons.allSatisfy { button in
+check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions fit in a compact 230 pt card")
 previewHost.setFrameSize(NSSize(width: 444, height: 208))
 imageCard.layoutSubtreeIfNeeded()
 check(imageView.frame.height == 144, "tall image card expands its thumbnail")
-check(imageButtons.count == 6 && imageButtons.allSatisfy { button in
+check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions remain inside the card")
 

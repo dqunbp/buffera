@@ -40,6 +40,57 @@ final class HistoryStoreTests {
         try checkEqual(try store.payload(id: id), original)
     }
 
+    func testSummaryGetterReflectsCurrentMetadataAndDoesNotLoadPayload() throws {
+        let id = try insert("summary fixture", time: 12, source: "Original app")
+        try store.setFavorite(id: id, isFavorite: true)
+        try store.markUsed(id: id, date: Date(timeIntervalSince1970: 30))
+        let summary = try store.summary(id: id)
+        try checkEqual(summary.id, id); try checkEqual(summary.date, Date(timeIntervalSince1970: 12))
+        try checkEqual(summary.source, "Original app"); try checkEqual(summary.text, "summary fixture")
+        try check(summary.isFavorite && !summary.isConcealed)
+        try store.conceal(id: id)
+        let concealed = try store.summary(id: id)
+        try check(concealed.isConcealed); try checkEqual(concealed.title, "Скрытая запись"); try checkEqual(concealed.text, "")
+        try withRawDatabase(at: directory.appendingPathComponent("history.sqlite")) { db in
+            try checkEqual(sqlite3_exec(db, "DELETE FROM payloads WHERE clip_id=\(id)", nil, nil, nil), SQLITE_OK)
+        }
+        try checkEqual(try store.summary(id: id).id, id)
+        try checkThrows(try store.payload(id: id))
+        try store.delete(id: id)
+        do {
+            _ = try store.summary(id: id)
+            throw CheckFailure(description: "Expected missing summary")
+        } catch HistoryError.missing { }
+    }
+
+    func testImageTextGetterDistinguishesCompletedEmptyPendingFailedAndHidden() throws {
+        let pending = try insertImage("pending getter")
+        let failed = try insertImage("failed getter")
+        let complete = try insertImage("completed getter")
+        let empty = try insertImage("empty getter")
+        let hidden = try insertImage("hidden getter", concealed: true)
+        let text = try insert("not an image")
+        try store.failImageText(id: failed)
+        try store.completeImageText(id: complete, text: "Recognized full text\nSecond line")
+        try store.completeImageText(id: empty, text: "")
+        try checkEqual(try store.imageText(id: pending), nil)
+        try checkEqual(try store.imageText(id: failed), nil)
+        try checkEqual(try store.imageText(id: complete), "Recognized full text\nSecond line")
+        try checkEqual(try store.imageText(id: empty), "")
+        try checkEqual(try store.imageText(id: hidden), nil)
+        try checkEqual(try store.imageText(id: text), nil)
+        store = nil; store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        try checkEqual(try store.imageText(id: complete), "Recognized full text\nSecond line")
+        try store.conceal(id: complete)
+        try checkEqual(try store.imageText(id: complete), nil)
+        try store.delete(id: empty)
+        do {
+            _ = try store.imageText(id: empty)
+            throw CheckFailure(description: "Expected missing image text record")
+        } catch HistoryError.missing { }
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 6)
+    }
+
     func testDuplicateMovesToTopWithoutNewRecord() throws {
         let id = try insert("один", time: 1)
         try insert("два", time: 2)

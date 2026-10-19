@@ -140,6 +140,13 @@ public final class HistoryStore {
                              bindings: bindings + [.integer(Int64(limit)), .integer(Int64(offset))])
     }
 
+    /// Current metadata for a single record, without loading its clipboard payload.
+    public func summary(id: Int64) throws -> ClipSummary {
+        guard let result = try summaries("SELECT \(Self.summaryColumns) FROM clips WHERE id=?",
+                                         bindings: [.integer(id)]).first else { throw HistoryError.missing }
+        return result
+    }
+
     /// Nearest captures across the whole history, newest first. Counts on either side are clamped to 0...100.
     /// "Before" means older captures; "after" means newer captures. Equal dates are ordered by ID.
     public func nearby(anchorID: Int64, before: Int = 10, after: Int = 10) throws -> [ClipSummary] {
@@ -285,6 +292,24 @@ public final class HistoryStore {
         if status == SQLITE_DONE { return nil }
         guard status == SQLITE_ROW else { throw failure() }
         return sqlite3_column_int64(statement, 0)
+    }
+
+    /// Completed visible image text, including an empty successful result.
+    /// Pending, failed, concealed and non-image records return nil; missing records throw.
+    public func imageText(id: Int64) throws -> String? {
+        let statement = try prepare("""
+            SELECT clips.kind,clips.is_concealed,clip_ocr.status,clip_ocr.text
+            FROM clips LEFT JOIN clip_ocr ON clip_ocr.clip_id=clips.id WHERE clips.id=?
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bind([.integer(id)], to: statement)
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { throw HistoryError.missing }
+        guard status == SQLITE_ROW else { throw failure() }
+        let result = string(statement, 0) == ClipKind.image.rawValue && sqlite3_column_int(statement, 1) == 0 && string(statement, 2) == "complete"
+            ? string(statement, 3) : nil
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+        return result
     }
 
     /// Obsolete results cannot restore a deleted, concealed, or already-finished job.

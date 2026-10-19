@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: HistoryPanel!
     private var settings: SettingsWindow?
     private var imageTextIndexer: ImageTextIndexer?
+    private var copyTransformService: CopyTransformService?
     private var generation = 0
     private var searchGeneration = 0
     private var confirmationToken = 0
@@ -59,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenu()
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }
+        copyTransformService = CopyTransformService(store: store, storageQueue: work)
         panel = HistoryPanel()
         connectPanel()
         imageTextIndexer = ImageTextIndexer(store: store, storageQueue: work,
@@ -172,22 +174,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.logger.notice("Confirm cancelled"); return
                     }
                     do {
-                        try self.clipboard.restore(result.get())
-                        // A capture queued before this restore may finish later.
-                        // It remains in history but must not reclaim selection.
-                        self.captureSelectionToken += 1
-                        // Only a completed clipboard write changes recency. Queue it
-                        // before closing so even an immediate reopen sees the new order.
-                        self.work.async {
-                            do { try self.store.markUsed(id: id) }
-                            catch { DispatchQueue.main.async { self.showError(error) } }
-                        }
+                        try self.restoreClipboard(result.get(), id: id)
                         self.logger.notice("Confirm completed")
                         self.panel.closeAfterConfirmation()
                     } catch {
                         self.logger.error("Confirm failed")
                         self.panel.failed(error); self.showError(error)
                     }
+                }
+            }
+        }
+        panel.requestCopyTransform = { [weak self] id, operation, completion in
+            guard let service = self?.copyTransformService else {
+                completion(.failure(CopyTransformError.unavailable)); return
+            }
+            service.transform(id: id, operation: operation, completion: completion)
+        }
+        panel.onCancelCopyTransformed = { [weak self] in self?.confirmationToken += 1 }
+        panel.onCopyTransformed = { [weak self] id, text, completion in
+            guard let self else { completion(CopyTransformError.cancelled); return }
+            self.confirmationToken += 1
+            let token = self.confirmationToken
+            self.work.async {
+                let validation = Result {
+                    let clip = try self.store.summary(id: id)
+                    guard !CopyTransformOperation.available(for: clip).isEmpty else { throw CopyTransformError.unavailable }
+                    guard !text.isEmpty else { throw CopyTransformError.noText }
+                }
+                DispatchQueue.main.async {
+                    guard token == self.confirmationToken, self.panel.isAvailableForShortcut,
+                          self.panel.window.attachedSheet != nil else {
+                        completion(CopyTransformError.cancelled); return
+                    }
+                    do {
+                        try validation.get()
+                        let payload = ClipPayload(items: [[Representation(type: NSPasteboard.PasteboardType.string.rawValue,
+                                                                          data: Data(text.utf8))]])
+                        try self.restoreClipboard(payload, id: id)
+                        completion(nil)
+                    } catch { completion(error) }
                 }
             }
         }
@@ -256,6 +281,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.confirmationToken += 1
             self?.hotKeys.resetPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
+        }
+    }
+
+    /// Normal and transformed copies share suppression and usage ordering.
+    private func restoreClipboard(_ payload: ClipPayload, id: Int64) throws {
+        try clipboard.restore(payload)
+        // A capture queued before this restore remains in history, but cannot reclaim selection.
+        captureSelectionToken += 1
+        // Queue usage before closing so an immediate reopen observes the successful copy.
+        work.async {
+            do { try self.store.markUsed(id: id) }
+            catch { DispatchQueue.main.async { self.showError(error) } }
         }
     }
 
