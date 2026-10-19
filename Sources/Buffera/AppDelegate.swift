@@ -184,6 +184,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        panel.requestCopyTransformOperations = { [weak self] id, completion in
+            guard let service = self?.copyTransformService else {
+                completion(.failure(CopyTransformError.unavailable)); return
+            }
+            service.operations(id: id, completion: completion)
+        }
         panel.requestCopyTransform = { [weak self] id, operation, completion in
             guard let service = self?.copyTransformService else {
                 completion(.failure(CopyTransformError.unavailable)); return
@@ -203,7 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 DispatchQueue.main.async {
                     guard token == self.confirmationToken, self.panel.isAvailableForShortcut,
-                          self.panel.window.attachedSheet != nil else {
+                          self.panel.isConfirmingCopyTransform else {
                         completion(CopyTransformError.cancelled); return
                     }
                     do {

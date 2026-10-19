@@ -45,9 +45,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var pendingViewport: NSPoint?
     private let resetSearch = NSButton(image: NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: "Вся история")!, target: nil, action: nil)
     private let preview = ClipPreview()
-    private let copyTransform = CopyTransformSheet()
+    private var copyTransformSourceID: Int64?
+    private var copyTransformToken = 0
     private var copyTransformHistoryDirty = false
-    private var closingCopyTransform = false
+    private var copyOptionsID: Int64?
+    private var copyOptions: [CopyTransformOperation]?
+    private var copyOptionsToken = 0
     private var previewToken = 0
     private var previewRequestPending = false
     private var commandHeld = false
@@ -84,6 +87,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onDelete: ((Int64) -> Void)?
     var onFavorite: ((Int64, Bool) -> Void)?
     var onPreview: ((ClipSummary, Int) -> Void)?
+    var requestCopyTransformOperations: ((Int64, @escaping (Result<[CopyTransformOperation], Error>) -> Void) -> Void)?
     var requestCopyTransform: ((Int64, CopyTransformOperation, @escaping (Result<String, Error>) -> Void) -> Void)?
     var onCopyTransformed: ((Int64, String, @escaping (Error?) -> Void) -> Void)?
     var onCancelCopyTransformed: (() -> Void)?
@@ -92,6 +96,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onShowSettings: (() -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
+    var isConfirmingCopyTransform: Bool { copyTransformSourceID != nil && confirming }
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isShowingNearby: Bool { nearbyState != nil }
     var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
@@ -135,7 +140,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func open(fromShortcut: Bool = false) {
-        if copyTransform.isShown { window.makeKeyAndOrderFront(nil); return }
+        cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
         if let frontmost = NSWorkspace.shared.frontmostApplication,
            frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = frontmost }
@@ -227,7 +232,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receive(_ result: [ClipSummary], total: Int, offset: Int) {
-        if copyTransform.isShown { copyTransformHistoryDirty = true; return }
+        if isConfirmingCopyTransform { copyTransformHistoryDirty = true; return }
         guard isAvailableForShortcut, !isShowingNearby else { return }
         if offset == 0, silentSearchRefresh {
             receiveSearchIndexResult(result, total: total)
@@ -261,7 +266,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     /// Called only after an external copy has committed to history. A filtered
     /// view keeps its previous choice when the new record does not match it.
     func clipboardDidCapture(id: Int64) {
-        if copyTransform.isShown {
+        if isConfirmingCopyTransform {
             copyTransformHistoryDirty = true
             if isShowingNearby { nearbyState?.needsReload = true }
             return
@@ -375,7 +380,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     /// OCR updates the search index without changing a card's displayed content.
     func searchIndexDidChange() {
-        if copyTransform.isShown {
+        if selected?.kind == .image {
+            copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
+            updateVisibleCards()
+        }
+        if isConfirmingCopyTransform {
             copyTransformHistoryDirty = true
             if isShowingNearby { nearbyState?.needsReload = true }
             return
@@ -389,7 +398,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func searchFailed(_ error: Error) {
-        if copyTransform.isShown { copyTransformHistoryDirty = true; return }
+        if isConfirmingCopyTransform { copyTransformHistoryDirty = true; return }
         guard !isShowingNearby else { return }
         guard silentSearchRefresh else { failed(error); return }
         silentSearchRefresh = false
@@ -434,9 +443,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func close(restoreFocus: Bool = true) {
         cancelShortcutGesture()
         guard !isClosing else { return }
-        closingCopyTransform = true
-        copyTransform.close()
-        closingCopyTransform = false
+        cancelCopyTransform(refreshHistory: false)
+        copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
         restoreSearchFromNearby(reloadIfNeeded: false, render: false)
         cancelSearchIndexRefresh()
         logger.notice("Panel closed: restoreFocus=\(restoreFocus)")
@@ -523,6 +531,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private func handle(_ event: NSEvent) -> NSEvent? {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if event.keyCode == 53 {
+            if isConfirmingCopyTransform { cancelCopyTransform(); return nil }
             if preview.isShown { dismissPreview(); window.makeKey(); window.makeFirstResponder(cards) }
             else if isShowingNearby { returnFromNearby() }
             else { close() }
@@ -660,30 +669,82 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func showCopyTransform(_ clip: ClipSummary) {
-        guard ClipCardAction.copyDifferently.isAvailable(for: clip),
-              pendingFavorites.isEmpty, requestCopyTransform != nil, onCopyTransformed != nil else { return }
+        guard ClipCardAction.copyDifferently.isAvailable(for: clip), pendingFavorites.isEmpty,
+              let row = rows.firstIndex(where: { $0.id == clip.id }), let card = cards.card(at: row) else { return }
+        cancelShortcutGesture(); dismissPreview()
+        prepareCopyTransformOperations(for: clip, card: card)
+        card.showCopyTransformMenu()
+    }
+
+    private func prepareCopyTransformOperations(for clip: ClipSummary, card: ClipCardView) {
+        guard ClipCardAction.copyDifferently.isAvailable(for: clip), let requestCopyTransformOperations else { return }
+        if copyOptionsID == clip.id {
+            card.setCopyTransformOperations(copyOptions)
+            return
+        }
+        copyOptionsToken += 1
+        let token = copyOptionsToken
+        copyOptionsID = clip.id; copyOptions = nil
+        card.setCopyTransformOperations(nil)
+        requestCopyTransformOperations(clip.id) { [weak self, weak card] result in
+            guard let self, self.copyOptionsToken == token, self.copyOptionsID == clip.id,
+                  self.window.isVisible else { return }
+            let operations = (try? result.get()) ?? []
+            self.copyOptions = operations
+            card?.setCopyTransformOperations(operations)
+            for row in self.cards.visibleIndices() where self.rows.indices.contains(row) && self.rows[row].id == clip.id {
+                self.cards.card(at: row)?.setCopyTransformOperations(operations)
+            }
+        }
+    }
+
+    private func copyTransformed(_ operation: CopyTransformOperation, id: Int64) {
+        guard isAvailableForShortcut, !confirming, !commitWhenLoaded, pendingFavorites.isEmpty,
+              window.attachedSheet == nil, let clip = rows.first(where: { $0.id == id }),
+              ClipCardAction.copyDifferently.isAvailable(for: clip),
+              copyOptionsID == id, copyOptions?.contains(operation) == true,
+              let requestCopyTransform, let onCopyTransformed else { return }
+        select(id: id, scrollIntoView: false)
         copyTransformHistoryDirty = loading || silentSearchRefresh || searchIndexDirty
-        // A search already in flight must not replace the source behind its sheet,
-        // even if its response arrives after cancellation restores the history.
         onNavigate?()
         cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview(); invalidateReveal()
-        loading = false
-        copyTransform.onRequest = { [weak self] operation, completion in
-            self?.requestCopyTransform?(clip.id, operation, completion)
+        loading = false; confirming = true; copyTransformSourceID = id
+        copyTransformToken += 1
+        let token = copyTransformToken
+        updateNavigationControls(); updateVisibleCards()
+        status.stringValue = "Копируем: \(operation.title)…"
+        requestCopyTransform(id, operation) { [weak self] result in
+            guard let self, token == self.copyTransformToken, self.isConfirmingCopyTransform,
+                  self.isAvailableForShortcut else { return }
+            switch result {
+            case .failure(let error): self.copyTransformFailed(error)
+            case .success(let text):
+                onCopyTransformed(id, text) { [weak self] error in
+                    guard let self, token == self.copyTransformToken, self.isConfirmingCopyTransform,
+                          self.isAvailableForShortcut else { return }
+                    if let error { self.copyTransformFailed(error) }
+                    else { self.closeAfterConfirmation() }
+                }
+            }
         }
-        copyTransform.onCopy = { [weak self] text, completion in
-            self?.onCopyTransformed?(clip.id, text, completion)
+    }
+
+    private func cancelCopyTransform(refreshHistory: Bool = true) {
+        guard copyTransformSourceID != nil else { return }
+        copyTransformToken += 1; copyTransformSourceID = nil
+        let dirty = copyTransformHistoryDirty
+        copyTransformHistoryDirty = false; confirming = false
+        onCancelCopyTransformed?()
+        updateNavigationControls(); updateVisibleCards()
+        if refreshHistory {
+            if dirty { refresh(preservingSelection: true) }
+            else { updateCount() }
         }
-        copyTransform.onClose = { [weak self] copied in
-            guard let self else { return }
-            self.onCancelCopyTransformed?()
-            let refreshHistory = self.copyTransformHistoryDirty
-            self.copyTransformHistoryDirty = false
-            guard !self.closingCopyTransform else { return }
-            if copied { self.closeAfterConfirmation() }
-            else if refreshHistory { self.refresh(preservingSelection: true) }
-        }
-        copyTransform.show(for: clip, relativeTo: window)
+    }
+
+    private func copyTransformFailed(_ error: Error) {
+        cancelCopyTransform()
+        status.stringValue = error.localizedDescription
     }
 
     func favoriteFinished(id: Int64, isFavorite: Bool, error: Error?) {
@@ -878,6 +939,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             // path as buttons and keyboard actions.
             DispatchQueue.main.async { self?.perform(action, id: clip.id) }
         }
+        card.onRequestCopyTransformOperations = { [weak self, weak card] in
+            guard let self, let card else { return }
+            self.prepareCopyTransformOperations(for: clip, card: card)
+        }
+        card.onCopyTransform = { [weak self] operation in
+            DispatchQueue.main.async { self?.copyTransformed(operation, id: clip.id) }
+        }
         card.onMenuTracking = { [weak self] tracking in
             self?.cardMenuTracking = tracking
             if !tracking { self?.closeIfUnfocused() }
@@ -895,6 +963,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func configure(_ card: ClipCardView, row: Int) {
         card.setSelected(cards.selectedIndex == row)
+        card.setCopyTransformOperations(copyOptionsID == rows[row].id ? copyOptions : nil)
+        if cards.selectedIndex == row { prepareCopyTransformOperations(for: rows[row], card: card) }
         card.setNearbyAnchor(nearbyState?.anchorID == rows[row].id)
         card.setQuickShortcut(commandHeld && row < 9 ? row + 1 : nil)
         card.setActionsEnabled(!confirming && !commitWhenLoaded && !pendingFavorites.contains(rows[row].id)

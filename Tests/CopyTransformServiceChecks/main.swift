@@ -8,8 +8,10 @@ import BufferaCore
 // .build/copy-transform-service-checks/checks
 
 var checkCount = 0
-func check(_ condition: @autoclosure () -> Bool, _ message: String) {
-    if !condition() { fatalError(message) }
+func check(_ condition: @autoclosure () throws -> Bool, _ message: String) {
+    do {
+        if try !condition() { fatalError(message) }
+    } catch { fatalError("\(message): \(error)") }
     checkCount += 1
     print("PASS", message)
 }
@@ -52,7 +54,22 @@ func transform(_ id: Int64, _ operation: CopyTransformOperation = .text(.plainTe
     return value
 }
 
-func fails(_ result: Result<String, Error>) -> Bool {
+func operations(_ id: Int64, mode: RunLoop.Mode = .default) -> Result<[CopyTransformOperation], Error> {
+    var value: Result<[CopyTransformOperation], Error>?
+    service.operations(id: id) { result in
+        check(Thread.isMainThread, "operations completion uses the main thread")
+        check(value == nil, "operations completes once")
+        value = result
+    }
+    let deadline = Date(timeIntervalSinceNow: 5)
+    while value == nil, Date() < deadline {
+        _ = RunLoop.main.run(mode: mode, before: Date(timeIntervalSinceNow: 0.01))
+    }
+    guard let value else { fatalError("Operations callback did not arrive") }
+    return value
+}
+
+func fails<T>(_ result: Result<T, Error>) -> Bool {
     if case .failure = result { return true }
     return false
 }
@@ -90,9 +107,53 @@ let emptyTextID = try insert(plain(""))
 check(fails(transform(emptyTextID)), "empty input has an explicit error")
 let badJSON = try insert(plain("{not json}"))
 check(fails(transform(badJSON, .text(.formatJSON))), "transformation errors reach the caller")
+let ordinaryID = try insert(plain("Обычный текст"))
+check(try operations(ordinaryID).get() == [.text(.plainText)], "ordinary text only offers plain copy")
+check(try operations(badJSON).get() == [.text(.plainText)], "invalid JSON is omitted from the menu")
+let compactJSON = try insert(plain("{\"value\":1}"))
+check(try operations(compactJSON).get() == [.text(.plainText), .text(.formatJSON)], "valid compact JSON offers formatting")
+let formattedJSON = try insert(plain("{\n  \"value\": 1\n}"))
+check(!(try operations(formattedJSON).get()).contains(.text(.formatJSON)), "already formatted JSON does not offer an unchanged result")
+let linesID = try insert(plain("Первая строка\nВторая строка"))
+check(try operations(linesID).get() == [.text(.plainText), .text(.unwrapLines)], "different lines offer unwrapping without deduplication")
+let crlfLines = try insert(plain("Первая строка\r\nВторая строка"))
+check(try operations(crlfLines).get() == [.text(.plainText), .text(.unwrapLines)], "CRLF normalization without duplicates does not offer deduplication")
+let paragraphs = try insert(plain("  Первый абзац \r\n\r\n Второй абзац  "))
+check(try operations(paragraphs).get() == [.text(.plainText)], "paragraphs without adjacent text lines do not offer unwrapping")
+let paddedLine = try insert(plain("  Одна строка  "))
+check(try operations(paddedLine).get() == [.text(.plainText)], "trimming a single line does not offer unwrapping")
+let blankLines = try insert(plain(" \r\n \r\n\t\r\n\t"))
+check(try operations(blankLines).get() == [.text(.plainText)], "repeated blank lines do not offer deduplication or unwrapping")
+let duplicatesID = try insert(plain("Повтор\nПовтор"))
+check(try operations(duplicatesID).get() == [.text(.plainText), .text(.unwrapLines), .text(.removeDuplicateLines)], "duplicate lines offer both applicable operations")
+let unicodeID = try insert(plain("\u{00e9}\ne\u{0301}"))
+check(!(try operations(unicodeID).get()).contains(.text(.removeDuplicateLines)), "canonically equal but byte-distinct lines do not offer deduplication")
+let cleanURL = try insert(plain("https://example.com/?page=2"), kind: .link)
+check(try operations(cleanURL).get() == [.text(.plainText)], "clean URL omits tracking cleanup")
+let trackedURL = try insert(plain("https://example.com/?page=2&utm_source=checks"), kind: .link)
+check(try operations(trackedURL).get() == [.text(.plainText), .text(.removeTrackingParameters)], "URL with removable trackers offers cleanup")
+let signedURL = try insert(plain("https://example.com/?utm_source=checks&sig=fixture"), kind: .link)
+check(try operations(signedURL).get() == [.text(.plainText)], "signed URL omits unsafe tracking cleanup")
+let deepJSON = try insert(plain(String(repeating: "[", count: 129) + "0" + String(repeating: "]", count: 129)))
+check(try operations(deepJSON).get() == [.text(.plainText)], "JSON beyond supported depth omits formatting")
+let longDuplicate = try insert(plain(String(repeating: "x", count: 220_000) + "\ntail\ntail"))
+check((try operations(longDuplicate).get()).contains(.text(.removeDuplicateLines)), "applicability reads duplicate lines beyond the summary limit")
+let longJSON = try insert(plain("{\"text\":\"" + String(repeating: "x", count: 220_000) + "\"}"))
+check((try operations(longJSON).get()).contains(.text(.formatJSON)), "applicability parses full JSON beyond the summary limit")
+let hugeID = try insert(plain(String(repeating: "x", count: 2 * 1_024 * 1_024 + 1) + "\nrepeat\nrepeat"))
+check(try operations(hugeID).get() == [.text(.plainText)], "over-limit text keeps plain copy and omits bounded transformations")
+check((try operations(rtfID).get()).contains(.text(.plainText)), "RTF-only applicability uses the shared full text decoder")
+check(fails(operations(partialID)), "unreadable item prevents offering a partial text copy")
+check(fails(operations(emptyTextID)), "empty source does not advertise plain copy")
 let hiddenID = try insert(plain("hidden fixture"), concealed: true)
 check(fails(transform(hiddenID)), "fresh concealed source cannot be transformed")
 check(fails(transform(Int64.max)), "missing source completes with error")
+check(fails(operations(hiddenID)), "fresh concealed source has no applicable menu")
+check(fails(operations(Int64.max)), "missing source fails menu applicability")
+check(try operations(ordinaryID, mode: .eventTracking).get() == [.text(.plainText)], "menu availability arrives during native menu tracking")
+check(fails(operations(Int64.max, mode: .eventTracking)), "menu errors arrive during native menu tracking")
+let fileID = try insert(plain("fixture file"), kind: .file)
+check(try operations(fileID).get().isEmpty, "unsupported source has no transformations")
 
 func image(_ seed: UInt8) -> ClipPayload {
     ClipPayload(items: [[Representation(type: NSPasteboard.PasteboardType.png.rawValue, data: Data([seed]))]])
@@ -101,10 +162,17 @@ let cachedID = try insert(image(1), kind: .image)
 try storage.sync { _ = try store.completeImageText(id: cachedID, text: "Cached OCR") }
 let cachedResult = try transform(cachedID, .imageText).get()
 check(cachedResult == "Cached OCR" && recognized == 0, "completed OCR cache is reused without recognition")
+check(try operations(cachedID).get() == [.imageText], "complete OCR text is available in the menu")
 let emptyID = try insert(image(2), kind: .image)
 try storage.sync { _ = try store.completeImageText(id: emptyID, text: "") }
 check(fails(transform(emptyID, .imageText)) && recognized == 0, "complete empty OCR produces an error without redundant recognition")
+check(try operations(emptyID).get().isEmpty, "complete empty OCR omits image text")
+let whitespaceImageID = try insert(image(8), kind: .image)
+try storage.sync { _ = try store.completeImageText(id: whitespaceImageID, text: " \n\t") }
+check(try operations(whitespaceImageID).get().isEmpty, "complete whitespace OCR omits image text")
 let pendingID = try insert(image(3), kind: .image)
+check(try operations(pendingID).get() == [.imageText], "pending OCR offers image text without running recognition")
+check(recognized == 0, "opening image menus never starts OCR")
 let pendingResult = try transform(pendingID, .imageText).get()
 check(pendingResult == "OCR fixture" && recognized == 1, "pending image uses background OCR")
 let pendingProgress = try storage.sync { try store.imageTextProgress() }
@@ -113,6 +181,7 @@ check(pendingProgress.pending > 0, "preview recognition does not mutate the OCR 
 let capID = try insert(image(4), kind: .image)
 try storage.sync { _ = try store.completeImageText(id: capID, text: String(repeating: "x", count: 200_000)) }
 check(fails(transform(capID, .imageText)), "capped OCR is rejected instead of silently presenting an incomplete result")
+check(try operations(capID).get().isEmpty, "capped OCR is omitted from the menu")
 let lateHidden = try insert(image(5), kind: .image)
 recognition = { _ in try storage.sync { try store.conceal(id: lateHidden) }; return "must not display" }
 check(fails(transform(lateHidden, .imageText)), "concealment during recognition suppresses the result")
@@ -122,6 +191,35 @@ check(fails(transform(lateDeleted, .imageText)), "deletion during recognition su
 let failingID = try insert(image(7), kind: .image)
 recognition = { _ in throw ImageTextRecognitionError.recognitionFailed }
 check(fails(transform(failingID, .imageText)), "recognition failure always finishes the request")
+
+// Hold the shared worker after storage reads, so source mutations happen before applicability completes.
+let blockedImage = try insert(image(9), kind: .image)
+let menuHidden = try insert(plain("hide while menu loads"))
+let menuDeleted = try insert(plain("delete while menu loads"))
+let workerEntered = DispatchSemaphore(value: 0), releaseWorker = DispatchSemaphore(value: 0)
+recognition = { _ in workerEntered.signal(); releaseWorker.wait(); return "Held OCR" }
+var blockedFinished = false
+service.transform(id: blockedImage, operation: .imageText) { _ in blockedFinished = true }
+check(workerEntered.wait(timeout: .now() + 5) == .success, "worker gate starts for concurrent applicability checks")
+var hiddenMenu: Result<[CopyTransformOperation], Error>?, deletedMenu: Result<[CopyTransformOperation], Error>?
+service.operations(id: menuHidden) { result in
+    check(Thread.isMainThread && hiddenMenu == nil, "late concealed menu completes once on the main thread")
+    hiddenMenu = result
+}
+service.operations(id: menuDeleted) { result in
+    check(Thread.isMainThread && deletedMenu == nil, "late deleted menu completes once on the main thread")
+    deletedMenu = result
+}
+try storage.sync { try store.conceal(id: menuHidden); try store.delete(id: menuDeleted) }
+releaseWorker.signal()
+let menuDeadline = Date(timeIntervalSinceNow: 5)
+while (!blockedFinished || hiddenMenu == nil || deletedMenu == nil), Date() < menuDeadline {
+    _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+}
+check(blockedFinished, "held worker finishes after release")
+guard let hiddenMenu, let deletedMenu else { fatalError("Late applicability callbacks did not arrive") }
+check(fails(hiddenMenu), "concealment during applicability suppresses available actions")
+check(fails(deletedMenu), "deletion during applicability suppresses available actions")
 
 let pasteboard = NSPasteboard(name: .init("Buffera-copy-transform-checks-\(UUID().uuidString)"))
 defer { pasteboard.releaseGlobally() }

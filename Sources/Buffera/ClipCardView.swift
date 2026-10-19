@@ -14,7 +14,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .save: return "Сохранить как…"
         case .delete: return "Удалить запись"
         case .nearby: return "Показать рядом"
-        case .copyDifferently: return "Скопировать иначе…"
+        case .copyDifferently: return "Скопировать иначе"
         }
     }
 
@@ -125,9 +125,13 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private var nearbyAnchor = false
     private var quickNumber: Int?
     private var actionsEnabled = true
+    private var copyTransformOperations: [CopyTransformOperation]?
+    private weak var activeCopyTransformMenu: CopyTransformMenu?
     var onMenuTracking: ((Bool) -> Void)?
     var onSelect: (() -> Void)?
     var onActivate: (() -> Void)?
+    var onRequestCopyTransformOperations: (() -> Void)?
+    var onCopyTransform: ((CopyTransformOperation) -> Void)?
 
     override var mouseDownCanMoveWindow: Bool { false }
 
@@ -238,6 +242,39 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     func setActionsEnabled(_ enabled: Bool) {
         actionsEnabled = enabled
         buttons.values.forEach { $0.isEnabled = enabled }
+        activeCopyTransformMenu?.setActionsEnabled(enabled)
+    }
+
+    func setCopyTransformOperations(_ operations: [CopyTransformOperation]?) {
+        copyTransformOperations = operations
+        buttons[.copyDifferently]?.isHidden = operations?.isEmpty == true
+        activeCopyTransformMenu?.setOperations(operations)
+    }
+
+    func showCopyTransformMenu() {
+        guard actionsEnabled, ClipCardAction.copyDifferently.isAvailable(for: clip),
+              copyTransformOperations?.isEmpty != true else { return }
+        onSelect?()
+        let menu = makeCopyTransformMenu()
+        menu.delegate = self
+        let anchor = buttons[.copyDifferently]?.frame ?? bounds
+        let point = buttons[.copyDifferently].map {
+            $0.convert(NSPoint(x: 0, y: 0), to: self)
+        } ?? NSPoint(x: anchor.minX, y: anchor.minY)
+        menu.popUp(positioning: nil, at: point, in: self)
+    }
+
+    private func makeCopyTransformMenu() -> CopyTransformMenu {
+        if copyTransformOperations == nil { onRequestCopyTransformOperations?() }
+        let menu = CopyTransformMenu(operations: copyTransformOperations) { [weak self] operation in
+            guard let self, self.actionsEnabled,
+                  ClipCardAction.copyDifferently.isAvailable(for: self.clip),
+                  self.copyTransformOperations?.contains(operation) == true else { return }
+            self.onCopyTransform?(operation)
+        }
+        menu.setActionsEnabled(actionsEnabled)
+        activeCopyTransformMenu = menu
+        return menu
     }
 
     func updateFavorite(_ updatedClip: ClipSummary) {
@@ -257,6 +294,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
         for action in ClipCardAction.allCases where action.isAvailable(for: clip) {
+            if action == .copyDifferently && copyTransformOperations?.isEmpty == true { continue }
             if action == .delete { menu.addItem(.separator()) }
             let item = NSMenuItem(title: action.title(for: clip, isRevealed: isRevealed),
                                   action: #selector(menuAction(_:)), keyEquivalent: action.keyEquivalent)
@@ -265,6 +303,10 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
                                  accessibilityDescription: nil)
             item.tag = action.rawValue
             item.target = self
+            if action == .copyDifferently {
+                item.action = nil
+                item.submenu = makeCopyTransformMenu()
+            }
             menu.addItem(item)
         }
         return menu

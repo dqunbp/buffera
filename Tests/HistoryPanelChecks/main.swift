@@ -6,7 +6,7 @@ import BufferaCore
 // every preference they touch before asserting their results.
 // mkdir -p .build/history-panel-checks
 // swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/TextTransformation.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformSheet.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
+// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformMenu.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
 // .build/history-panel-checks/checks
 
 var checkCount = 0
@@ -899,6 +899,11 @@ func copyTransformChecks() {
     var pendingCopy: ((Error?) -> Void)?
     var cancellations = 0
     var navigations = 0
+    var availability: [(Int64, (Result<[CopyTransformOperation], Error>) -> Void)] = []
+    let offered: [CopyTransformOperation] = [.text(.plainText), .text(.unwrapLines)]
+    value.panel.requestCopyTransformOperations = { id, completion in
+        availability.append((id, completion))
+    }
     value.panel.requestCopyTransform = { id, operation, completion in
         requests.append((id, operation)); pendingResult = completion
     }
@@ -907,15 +912,54 @@ func copyTransformChecks() {
     }
     value.panel.onCancelCopyTransformed = { cancellations += 1 }
     value.panel.onNavigate = { navigations += 1 }
+
+    func menu(_ harness: PanelHarness, at index: Int = 0) -> NSMenu {
+        let card = harness.cards.card(at: index)!
+        // rightMouseDown selects the clicked card before presenting its menu.
+        // Reproduce that selection while avoiding AppKit's blocking menu popup.
+        card.onSelect?()
+        let event = NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: harness.panel.window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+        return card.menu(for: event)!.items.first { $0.tag == ClipCardAction.copyDifferently.rawValue }!.submenu!
+    }
+    func choose(_ menu: NSMenu, _ operation: CopyTransformOperation) {
+        guard let item = menu.items.first(where: { ($0.representedObject as? CopyTransformOperation) == operation }) else {
+            fatalError("Missing transformation \(operation.title) in menu: \(menu.items.map(\.title))")
+        }
+        check(item.isEnabled && item.action != nil && NSApp.sendAction(item.action!, to: item.target, from: item),
+              "the context submenu dispatches its chosen transformation through an enabled native menu item")
+    }
+    func escape(_ harness: PanelHarness) {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: harness.panel.window.windowNumber, context: nil, characters: "\u{1b}",
+            charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!
+        check(harness.panel.window.onKeyDown?(event) == true, "Escape is handled during a transformed copy")
+    }
+    func start(_ operation: CopyTransformOperation = .text(.unwrapLines)) {
+        let count = requests.count
+        choose(menu(value), operation)
+        waitUntil("direct transformation request") { requests.count == count + 1 }
+    }
+
     value.startSilentRefresh()
     value.requests.removeAll()
-    let card = value.cards.card(at: 0)!
-    let transformButton = descendants(of: card).compactMap { $0 as? NSButton }
-        .first { $0.tag == ClipCardAction.copyDifferently.rawValue }!
-    transformButton.performClick(nil)
-    waitUntil("copy transform sheet") { value.panel.window.attachedSheet != nil }
-    check(requests.count == 1 && requests[0].0 == 1 && requests[0].1 == .text(.plainText) && navigations == 1,
-          "card action opens a transformation sheet for the full source by id")
+    let initialMenu = menu(value)
+    waitUntil("available transformations") { !availability.isEmpty }
+    check(availability.first!.0 == 1 && requests.isEmpty && copied.isEmpty
+          && initialMenu.items.allSatisfy { !$0.isEnabled },
+          "opening the submenu inspects the full source and waits without transforming or copying")
+    availability.first!.1(.success(offered))
+    waitUntil("filtered transformation menu") { initialMenu.items.contains { $0.representedObject is CopyTransformOperation } }
+    check(initialMenu.items.compactMap { $0.representedObject as? CopyTransformOperation } == offered,
+          "the context submenu offers only operations applicable to its source")
+    // Availability is already cached for this source. Future uncached cards use
+    // the same fixture response; operation execution remains asynchronous.
+    value.panel.requestCopyTransformOperations = { _, completion in completion(.success(offered)) }
+    choose(initialMenu, .text(.unwrapLines))
+    waitUntil("context menu starts transformation") { requests.count == 1 }
+    check(requests[0].0 == 1 && requests[0].1 == .text(.unwrapLines) && navigations == 1
+          && value.panel.isConfirmingCopyTransform && value.panel.window.attachedSheet == nil,
+          "one context-menu choice starts the chosen operation without a preview sheet")
     value.panel.receive([fixture(99)], total: 1, offset: 0)
     value.panel.searchFailed(HistoryError.database("Obsolete search failure"))
     check(value.panel.selected?.id == 1,
@@ -924,32 +968,111 @@ func copyTransformChecks() {
     value.panel.searchIndexDidChange()
     value.panel.move(1)
     check(value.requests.isEmpty && value.panel.selected?.id == 1 && copied.isEmpty,
-          "capture, OCR, and navigation cannot replace the source during transformation preview")
-    pendingResult?(.success("Exact preview\nvalue"))
-    let sheetViews = descendants(of: value.panel.window.attachedSheet!.contentView!)
-    let copy = sheetViews.compactMap { $0 as? NSButton }.first { $0.title == "В буфер" }!
-    let cancel = sheetViews.compactMap { $0 as? NSButton }.first { $0.title == "Отмена" }!
-    check(copy.isEnabled && copied.isEmpty,
-          "a prepared transformation does not write the clipboard before explicit confirmation")
-    cancel.performClick(nil)
-    check(cancellations == 1 && copied.isEmpty && value.requests.count == 1,
-          "cancelling invalidates pending writes and refreshes history changed behind the sheet")
+          "capture, OCR, and navigation preserve the selected source while its transformation runs")
+    pendingResult?(.success("Exact transformed\nvalue"))
+    waitUntil("automatic transformed clipboard write") { copied.count == 1 }
+    check(copied[0].0 == 1 && copied[0].1 == "Exact transformed\nvalue"
+          && value.panel.isConfirmingCopyTransform && value.panel.window.attachedSheet == nil,
+          "the exact transformed text goes straight to the copy boundary without another confirmation")
+
+    pendingCopy?(HistoryError.database("Clipboard fixture failure"))
+    waitUntil("failed copy restores history") { !value.panel.isConfirmingCopyTransform }
+    check(value.panel.window.isVisible && value.search.isEnabled && value.requests.count == 1,
+          "a failed write leaves history open and refreshes records changed during transformation")
     value.panel.receive(rows, total: rows.count, offset: 0)
-    let shortcut = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
-        windowNumber: value.panel.window.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
-        isARepeat: false, keyCode: 8)!
-    check(value.panel.window.onKeyDown?(shortcut) == true && requests.count == 2,
-          "Command-Shift-C opens the same transformation flow")
-    pendingResult?(.success("Exact preview\nvalue"))
-    let confirm = descendants(of: value.panel.window.attachedSheet!.contentView!).compactMap { $0 as? NSButton }
-        .first { $0.title == "В буфер" }!
-    confirm.performClick(nil)
-    check(copied.count == 1 && copied[0].0 == 1 && copied[0].1 == "Exact preview\nvalue",
-          "confirmation passes the exact preview and original source id to the existing copy boundary")
+    start()
+    pendingResult?(.failure(TextTransformationError.noText))
+    waitUntil("failed transformation restores history") { !value.panel.isConfirmingCopyTransform }
+    check(copied.count == 1 && value.panel.window.isVisible && value.search.isEnabled,
+          "a transformation error writes nothing and leaves the same history available to retry")
+
+    start()
+    let cancelledResult = pendingResult!
+    let beforeComputeCancellation = cancellations
+    escape(value)
+    cancelledResult(.success("Cancelled computation"))
+    check(cancellations == beforeComputeCancellation + 1 && !value.panel.isConfirmingCopyTransform
+          && copied.count == 1 && value.panel.window.isVisible,
+          "Escape cancels computation and ignores a late result without closing history")
+    start()
+    pendingResult?(.success("Cancelled write"))
+    waitUntil("pending cancellable write") { copied.count == 2 }
+    let cancelledWrite = pendingCopy!
+    let beforeWriteCancellation = cancellations
+    escape(value)
+    cancelledWrite(nil)
+    check(cancellations == beforeWriteCancellation + 1 && !value.panel.isConfirmingCopyTransform
+          && value.panel.window.isVisible && value.search.isEnabled,
+          "Escape invalidates a pending write and its late success cannot close history")
+    start()
+    let closedResult = pendingResult!
+    let beforeCloseCancellation = cancellations
     value.panel.close(restoreFocus: false)
-    pendingCopy?(nil)
-    check(cancellations == 2 && value.panel.window.attachedSheet == nil,
-          "closing history cancels a pending transformed copy and ignores its late completion")
+    closedResult(.success("Closed computation"))
+    check(cancellations == beforeCloseCancellation + 1 && copied.count == 2
+          && !value.panel.isConfirmingCopyTransform,
+          "closing history cancels computation and ignores its late transformed result")
+
+    let success = PanelHarness(rows: rows)
+    defer { success.panel.close(restoreFocus: false); success.finish() }
+    success.panel.requestCopyTransformOperations = { _, completion in completion(.success(offered)) }
+    var successfulSource: Int64?
+    var successfulText: String?
+    var successfulCompletion: ((Error?) -> Void)?
+    success.panel.requestCopyTransform = { id, operation, completion in
+        successfulSource = id
+        completion(.success("Direct menu result"))
+    }
+    success.panel.onCopyTransformed = { id, text, completion in
+        successfulText = text; successfulCompletion = completion
+    }
+    var closed = false
+    success.panel.onClose = { closed = true }
+    choose(menu(success, at: 1), .text(.plainText))
+    waitUntil("copy from another card") { successfulCompletion != nil }
+    check(successfulSource == 2 && success.panel.selected?.id == 2 && successfulText == "Direct menu result",
+          "a nonselected card's submenu copies that card instead of the previous selection")
+    successfulCompletion?(nil)
+    waitUntil("successful transformed copy closes history") { closed }
+    check(!success.panel.isConfirmingCopyTransform && success.panel.window.attachedSheet == nil,
+          "successful transformed copying follows the normal history-close path")
+
+    let closingWrite = PanelHarness(rows: rows)
+    defer { closingWrite.finish() }
+    closingWrite.panel.requestCopyTransformOperations = { _, completion in completion(.success(offered)) }
+    closingWrite.panel.requestCopyTransform = { _, _, completion in completion(.success("Closing write")) }
+    var writeAfterClose: ((Error?) -> Void)?
+    var closeCancellations = 0
+    var closeCount = 0
+    closingWrite.panel.onCopyTransformed = { _, _, completion in writeAfterClose = completion }
+    closingWrite.panel.onCancelCopyTransformed = { closeCancellations += 1 }
+    closingWrite.panel.onClose = { closeCount += 1 }
+    choose(menu(closingWrite), .text(.plainText))
+    waitUntil("write pending before close") { writeAfterClose != nil }
+    closingWrite.panel.close(restoreFocus: false)
+    writeAfterClose?(nil)
+    check(closeCancellations == 1 && closeCount == 1 && !closingWrite.panel.isConfirmingCopyTransform,
+          "closing history cancels a pending write and ignores its late successful completion")
+
+    let unsupported = ClipSummary(id: 2, date: Date(), kind: .file, title: "Fixture file", text: "",
+                                  source: "Panel Fixture App", byteCount: 0)
+    let changingSelection = PanelHarness(rows: [fixture(1), unsupported])
+    defer { changingSelection.panel.close(restoreFocus: false); changingSelection.finish() }
+    var availabilityCalls = 0
+    var delayedAvailability: ((Result<[CopyTransformOperation], Error>) -> Void)?
+    changingSelection.panel.requestCopyTransformOperations = { _, completion in
+        availabilityCalls += 1; delayedAvailability = completion
+    }
+    _ = menu(changingSelection)
+    changingSelection.panel.move(1)
+    check(changingSelection.panel.selected?.id == 2 && delayedAvailability != nil,
+          "availability may still be loading when selection moves to an unsupported file")
+    delayedAvailability?(.success(offered))
+    changingSelection.panel.move(-1)
+    let returnedMenu = menu(changingSelection)
+    check(availabilityCalls == 1
+          && returnedMenu.items.compactMap { $0.representedObject as? CopyTransformOperation } == offered,
+          "returning from an unsupported record reuses completed availability without getting stuck loading")
 
     let hidden = ClipSummary(id: 7, date: Date(), kind: .text, title: "Hidden", text: "", source: "Panel Fixture App",
                              byteCount: 20, isConcealed: true)

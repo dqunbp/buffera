@@ -3,8 +3,8 @@ import BufferaCore
 
 // Run from the repository root (the windows stay offscreen; no history or prefs):
 // mkdir -p .build/history-cards-checks
-// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift -emit-module-path .build/history-cards-checks/BufferaCore.swiftmodule -o .build/history-cards-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I .build/history-cards-checks -L .build/history-cards-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-cards-checks" -module-cache-path .build/ModuleCache Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryCardsView.swift Tests/HistoryCardsChecks/main.swift -o .build/history-cards-checks/checks
+// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/TextTransformation.swift -emit-module-path .build/history-cards-checks/BufferaCore.swiftmodule -o .build/history-cards-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
+// swiftc -I .build/history-cards-checks -L .build/history-cards-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-cards-checks" -module-cache-path .build/ModuleCache Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformMenu.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryCardsView.swift Tests/HistoryCardsChecks/main.swift -o .build/history-cards-checks/checks
 // .build/history-cards-checks/checks
 
 var checkCount = 0
@@ -32,6 +32,62 @@ check(below.columns == 3 && below.itemSize.height == 96, "column boundary and de
 check(HistoryCardsMetrics.selection(9, count: 4) == 3 && HistoryCardsMetrics.selection(0, count: 0) == -1, "selection clamps after removal and empty list")
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
+
+let menuEvent = NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+                                   timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
+                                   clickCount: 1, pressure: 1)!
+var transformRequests = 0
+var chosenTransforms: [CopyTransformOperation] = []
+var transformCardActions: [ClipCardAction] = []
+let transformCard = ClipCardView(clip: fixture(900), revealedText: nil, thumbnail: nil) {
+    transformCardActions.append($0)
+}
+transformCard.onRequestCopyTransformOperations = { transformRequests += 1 }
+transformCard.onCopyTransform = { chosenTransforms.append($0) }
+let contextMenu = transformCard.menu(for: menuEvent)!
+let transformItem = contextMenu.item(withTag: ClipCardAction.copyDifferently.rawValue)!
+let transformMenu = transformItem.submenu!
+check(transformItem.title == "Скопировать иначе" && transformItem.submenu is CopyTransformMenu,
+      "copy differently is a native submenu with no intermediate window action")
+check(transformRequests == 1 && transformMenu.items.count == 1
+      && transformMenu.items[0].title == "Проверяем варианты…" && !transformMenu.items[0].isEnabled,
+      "unknown applicability requests content and shows only a disabled loading item")
+transformCard.setCopyTransformOperations([.text(.plainText), .text(.formatJSON)])
+check(transformItem.submenu === transformMenu && transformMenu.items.map(\.title) == ["Без оформления", "Форматировать JSON"],
+      "prepared operations update the existing submenu in place")
+transformMenu.performActionForItem(at: 1)
+check(chosenTransforms == [.text(.formatJSON)] && transformCardActions.isEmpty,
+      "choosing an operation dispatches it directly without invoking the sheet action")
+let staleItem = transformMenu.items[1]
+transformCard.setCopyTransformOperations([.text(.plainText)])
+NSApp.sendAction(staleItem.action!, to: staleItem.target, from: staleItem)
+check(chosenTransforms == [.text(.formatJSON)], "removed operation items cannot invoke a stale transformation")
+transformCard.setActionsEnabled(false)
+transformMenu.performActionForItem(at: 0)
+check(!transformMenu.items[0].isEnabled && chosenTransforms.count == 1 && transformCard.menu(for: menuEvent) == nil,
+      "pending card actions also disable an already-created transformation menu")
+transformCard.setActionsEnabled(true)
+transformMenu.performActionForItem(at: 0)
+check(chosenTransforms == [.text(.formatJSON), .text(.plainText)], "reenabling the card restores direct transformation actions")
+let transformButton = descendants(of: transformCard).compactMap { $0 as? NSButton }
+    .first { $0.tag == ClipCardAction.copyDifferently.rawValue }!
+transformButton.performClick(nil)
+check(transformCardActions == [.copyDifferently], "footer uses the panel action so the shared popup lifecycle is preserved")
+transformCard.setCopyTransformOperations([])
+check(transformButton.isHidden && transformCard.menu(for: menuEvent)?.item(withTag: ClipCardAction.copyDifferently.rawValue) == nil,
+      "records without applicable operations omit the submenu and footer button")
+check(transformMenu.items.count == 1 && !transformMenu.items[0].isEnabled
+      && transformMenu.items[0].title == "Нет подходящих вариантов",
+      "an already-created menu becomes noninteractive when no operation remains")
+transformCard.setCopyTransformOperations(nil)
+check(!transformButton.isHidden, "invalidating applicability restores the pending button")
+let privateClip = ClipSummary(id: 901, date: Date(), kind: .text, title: "Private", text: "Private",
+                              source: "Checks", byteCount: 7, isConcealed: true)
+let privateCard = ClipCardView(clip: privateClip, revealedText: "Private", thumbnail: nil) { _ in }
+privateCard.setCopyTransformOperations([.text(.plainText)])
+check(privateCard.menu(for: menuEvent)?.item(withTag: ClipCardAction.copyDifferently.rawValue) == nil,
+      "a concealed record never offers transformations even if operations were supplied")
+
 let grid = HistoryCardsView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 let window = NSWindow(contentRect: grid.frame, styleMask: [.borderless], backing: .buffered, defer: false)
 window.contentView = grid

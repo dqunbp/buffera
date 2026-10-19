@@ -15,7 +15,7 @@ enum CopyTransformOperation: Hashable {
     var detail: String {
         switch self {
         case .text(let transformation): return transformation.detail
-        case .imageText: return "Распознать текст на изображении. Проверьте результат перед копированием."
+        case .imageText: return "Распознать и скопировать текст с изображения."
         }
     }
 
