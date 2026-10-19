@@ -5,6 +5,7 @@ import CSQLite
 public final class HistoryStore {
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
     private static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
         SearchFilter.normalize(concealedTitle + " " + source)
@@ -135,23 +136,56 @@ public final class HistoryStore {
 
     public func search(_ filter: SearchFilter, limit: Int = 150, offset: Int = 0) throws -> [ClipSummary] {
         let (clause, bindings) = predicate(filter)
-        let statement = try prepare("SELECT id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote FROM clips \(clause) ORDER BY sort_date DESC,id DESC LIMIT ? OFFSET ?")
+        return try summaries("SELECT \(Self.summaryColumns) FROM clips \(clause) ORDER BY sort_date DESC,id DESC LIMIT ? OFFSET ?",
+                             bindings: bindings + [.integer(Int64(limit)), .integer(Int64(offset))])
+    }
+
+    /// Nearest captures across the whole history, newest first. Counts on either side are clamped to 0...100.
+    /// "Before" means older captures; "after" means newer captures. Equal dates are ordered by ID.
+    public func nearby(anchorID: Int64, before: Int = 10, after: Int = 10) throws -> [ClipSummary] {
+        let statement = try prepare("SELECT \(Self.summaryColumns) FROM clips WHERE id=?")
         defer { sqlite3_finalize(statement) }
-        try bind(bindings + [.integer(Int64(limit)), .integer(Int64(offset))], to: statement)
+        try bind([.integer(anchorID)], to: statement)
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { throw HistoryError.missing }
+        guard status == SQLITE_ROW else { throw failure() }
+        let anchor = summary(statement)
+        // Preserve SQLite's exact timestamp for the cursor, without a Foundation Date round trip.
+        let cursor: [Value] = [.number(sqlite3_column_double(statement, 1)), .integer(anchorID)]
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+        let older = try summaries("""
+            SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)<(?,?)
+            ORDER BY date DESC,id DESC LIMIT ?
+            """, bindings: cursor + [.integer(Int64(max(0, min(100, before))))])
+        let newer = try summaries("""
+            SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)>(?,?)
+            ORDER BY date ASC,id ASC LIMIT ?
+            """, bindings: cursor + [.integer(Int64(max(0, min(100, after))))])
+        return newer.reversed() + [anchor] + older
+    }
+
+    private func summaries(_ sql: String, bindings: [Value]) throws -> [ClipSummary] {
+        let statement = try prepare(sql)
+        defer { sqlite3_finalize(statement) }
+        try bind(bindings, to: statement)
         var result: [ClipSummary] = []
         var status = sqlite3_step(statement)
         while status == SQLITE_ROW {
-            result.append(ClipSummary(id: sqlite3_column_int64(statement, 0),
-                date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
-                kind: ClipKind(rawValue: string(statement, 2)) ?? .other, title: string(statement, 3),
-                text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6)),
-                isConcealed: sqlite3_column_int(statement, 7) != 0,
-                isFavorite: sqlite3_column_int(statement, 8) != 0,
-                isRemote: sqlite3_column_int(statement, 9) != 0))
+            result.append(summary(statement))
             status = sqlite3_step(statement)
         }
         guard status == SQLITE_DONE else { throw failure() }
         return result
+    }
+
+    private func summary(_ statement: OpaquePointer) -> ClipSummary {
+        ClipSummary(id: sqlite3_column_int64(statement, 0),
+            date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
+            kind: ClipKind(rawValue: string(statement, 2)) ?? .other, title: string(statement, 3),
+            text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6)),
+            isConcealed: sqlite3_column_int(statement, 7) != 0,
+            isFavorite: sqlite3_column_int(statement, 8) != 0,
+            isRemote: sqlite3_column_int(statement, 9) != 0)
     }
 
     public func count(_ filter: SearchFilter = SearchFilter()) throws -> Int {

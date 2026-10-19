@@ -117,6 +117,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func connectPanel() {
+        panel.onNavigate = { [weak self] in
+            self?.searchGeneration += 1
+            self?.generation += 1
+            self?.confirmationToken += 1
+        }
+        panel.requestNearby = { [weak self] anchorID, token in
+            guard let self else { return }
+            self.work.async {
+                let result = Result { try self.store.nearby(anchorID: anchorID) }
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let rows): self.panel.receiveNearby(rows, anchorID: anchorID, token: token)
+                    case .failure(let error): self.panel.nearbyFailed(error, token: token)
+                    }
+                }
+            }
+        }
         panel.onShowSettings = { [weak self] in self?.showSettings() }
         panel.onAppearanceChange = { [weak self] value in self?.settings?.updateAppearance(value) }
         panel.request = { [weak self] filter, offset, limit in

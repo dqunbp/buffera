@@ -163,6 +163,106 @@ final class HistoryStoreTests {
         try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 1))
     }
 
+    func testNearbyUsesCaptureOrderAcrossSearchFilters() throws {
+        let oldest = try insert("terminal error", time: 10, source: "Terminal")
+        let older = try insert("a command", time: 20, source: "Terminal")
+        let anchor = try insert("documentation", time: 30, kind: .link, source: "Safari")
+        let newer = try insertImage("screenshot", time: 40, source: "Preview")
+        try insert("latest note", time: 50, source: "Notes")
+        try store.setFavorite(id: anchor, isFavorite: true)
+        try store.markUsed(id: oldest, date: Date(timeIntervalSince1970: 100))
+        var filter = SearchFilter(); filter.query = "documentation"; filter.kind = .link
+        filter.source = "Safari"; filter.favoritesOnly = true
+        filter.from = Date(timeIntervalSince1970: 30); filter.until = Date(timeIntervalSince1970: 31)
+        try checkEqual(try store.search(filter).map(\.id), [anchor])
+        try checkEqual(try store.search(SearchFilter()).first?.id, oldest)
+        try checkEqual(try store.nearby(anchorID: anchor, before: 1, after: 1).map(\.id), [newer, anchor, older])
+        try checkEqual(try store.nearby(anchorID: anchor, before: 2, after: 0).map(\.id), [anchor, older, oldest])
+        // Browsing neighboring captures must not change the normal history order.
+        try checkEqual(try store.search(SearchFilter()).first?.id, oldest)
+    }
+
+    func testNearbyEqualDatesHaveStableSidesWithoutDuplicates() throws {
+        var ids: [Int64] = []
+        for index in 0..<7 { ids.append(try insert("same time \(index)", time: 42)) }
+        let anchor = ids[3]
+        try checkEqual(try store.nearby(anchorID: anchor, before: 2, after: 1).map(\.id),
+                       [ids[4], anchor, ids[2], ids[1]])
+        let all = try store.nearby(anchorID: anchor).map(\.id)
+        try checkEqual(all, Array(ids.reversed()))
+        try checkEqual(Set(all).count, ids.count)
+        try checkEqual(try store.nearby(anchorID: anchor, before: 0, after: 0).map(\.id), [anchor])
+    }
+
+    func testNearbyBoundsDefaultWindowAndCounts() throws {
+        var ids: [Int64] = []
+        for index in 0..<205 { ids.append(try insert("window \(index)", time: Double(index))) }
+        let anchor = ids[102]
+        try checkEqual(try store.nearby(anchorID: anchor).map(\.id), Array(ids[92...112].reversed()))
+        try checkEqual(try store.nearby(anchorID: anchor, before: Int.min, after: -1).map(\.id), [anchor])
+        try checkEqual(try store.nearby(anchorID: anchor, before: Int.max, after: Int.max).map(\.id),
+                       Array(ids[2...202].reversed()))
+        try checkEqual(try store.nearby(anchorID: ids[0], before: 7, after: 2).map(\.id), [ids[2], ids[1], ids[0]])
+        try checkEqual(try store.nearby(anchorID: ids[204], before: 2, after: 7).map(\.id), [ids[204], ids[203], ids[202]])
+    }
+
+    func testNearbyRefreshesRepeatedCaptureDateAndSource() throws {
+        let older = try insert("older", time: 5, source: "Terminal")
+        let anchor = try insert("anchor", time: 10, source: "First App")
+        let newer = try insert("newer", time: 15)
+        let newest = try insert("newest", time: 20)
+        try checkEqual(try store.nearby(anchorID: anchor, before: 1, after: 1).map(\.id), [newer, anchor, older])
+        try checkEqual(try insert("anchor", time: 17, source: "Last App"), anchor)
+        let updated = try store.nearby(anchorID: anchor, before: 1, after: 1)
+        try checkEqual(updated.map(\.id), [newest, anchor, newer])
+        try checkEqual(updated[1].date, Date(timeIntervalSince1970: 17))
+        try checkEqual(updated[1].source, "Last App")
+        try checkEqual(try insert("older", time: 18, source: "New Source"), older)
+        let movedNeighbor = try store.nearby(anchorID: anchor, before: 1, after: 1)
+        try checkEqual(movedNeighbor.map(\.id), [older, anchor, newer])
+        try checkEqual(movedNeighbor[0].source, "New Source")
+        try checkEqual(try store.count(), 4)
+    }
+
+    func testNearbyPreservesConcealmentWithoutLoadingPayloads() throws {
+        let concealed = try store.insert(payload: payload("hidden payload"), kind: .text,
+                                         title: "secret title", text: "secret text", source: "Password App",
+                                         isConcealed: true, isRemote: true, date: Date(timeIntervalSince1970: 1))
+        try store.setFavorite(id: concealed, isFavorite: true)
+        let anchor = try insert("anchor", time: 2)
+        let image = try insertImage("pixels", time: 3)
+        try store.completeImageText(id: image, text: "recognized content")
+        // Summaries remain available even when no encoded payload can be read.
+        try withRawDatabase(at: directory.appendingPathComponent("history.sqlite")) { db in
+            try checkEqual(sqlite3_exec(db, "DELETE FROM payloads", nil, nil, nil), SQLITE_OK)
+        }
+        let nearby = try store.nearby(anchorID: anchor)
+        try checkEqual(nearby.map(\.id), [image, anchor, concealed])
+        try checkEqual(nearby[2].title, "Скрытая запись"); try checkEqual(nearby[2].text, "")
+        try check(nearby[2].isConcealed && nearby[2].isFavorite && nearby[2].isRemote)
+        try checkEqual(nearby[2].source, "Password App")
+        try checkEqual(nearby[0].text, "")
+        try store.conceal(id: anchor)
+        let hiddenAnchor = try store.nearby(anchorID: anchor, before: 0, after: 0)[0]
+        try check(hiddenAnchor.isConcealed)
+        try checkEqual(hiddenAnchor.title, "Скрытая запись"); try checkEqual(hiddenAnchor.text, "")
+    }
+
+    func testNearbyMissingOrDeletedAnchorThrowsAndLeavesStoreUsable() throws {
+        let deleted = try insert("deleted anchor", time: 1)
+        let remaining = try insert("remaining", time: 2)
+        try store.delete(id: deleted)
+        for id in [deleted, 9999] {
+            do {
+                _ = try store.nearby(anchorID: id)
+                throw CheckFailure(description: "Expected HistoryError.missing")
+            } catch HistoryError.missing { }
+        }
+        try checkEqual(try store.nearby(anchorID: remaining).map(\.id), [remaining])
+        let latest = try insert("after missing anchor", time: 3)
+        try checkEqual(try store.nearby(anchorID: remaining).map(\.id), [latest, remaining])
+    }
+
     func testDateTypeAndCaseInsensitiveWordsCombine() throws {
         try insert("Проект ССЫЛКА", time: 100, kind: .link)
         try insert("проект ссылка", time: 200)

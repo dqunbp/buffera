@@ -2,7 +2,7 @@ import AppKit
 import BufferaCore
 
 enum ClipCardAction: Int, CaseIterable {
-    case copy, preview, favorite, reveal, finder, save, delete
+    case copy, preview, favorite, reveal, finder, save, delete, nearby
 
     var title: String {
         switch self {
@@ -13,6 +13,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .finder: return "Показать в Finder"
         case .save: return "Сохранить как…"
         case .delete: return "Удалить запись"
+        case .nearby: return "Показать рядом"
         }
     }
 
@@ -25,6 +26,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .finder: return "folder"
         case .save: return "square.and.arrow.down"
         case .delete: return "trash"
+        case .nearby: return "clock"
         }
     }
 
@@ -37,6 +39,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .finder: return "⇧⌘R"
         case .save: return "⇧⌘S"
         case .delete: return "⌘⌫"
+        case .nearby: return "⇧⌘N"
         }
     }
 
@@ -49,13 +52,14 @@ enum ClipCardAction: Int, CaseIterable {
         case .finder: return "r"
         case .save: return "s"
         case .delete: return "\u{8}"
+        case .nearby: return "n"
         }
     }
 
     var keyEquivalentModifierMask: NSEvent.ModifierFlags {
         switch self {
         case .copy: return []
-        case .reveal, .finder, .save: return [.command, .shift]
+        case .reveal, .finder, .save, .nearby: return [.command, .shift]
         case .preview, .favorite, .delete: return .command
         }
     }
@@ -64,7 +68,7 @@ enum ClipCardAction: Int, CaseIterable {
         switch self {
         case .reveal: return clip.isConcealed || clip.kind == .text || clip.kind == .link
         case .finder, .save: return clip.kind == .image && !clip.isConcealed
-        case .copy, .preview, .favorite, .delete: return true
+        case .copy, .preview, .favorite, .delete, .nearby: return true
         }
     }
 
@@ -113,6 +117,8 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private let quickShortcut = NSTextField(labelWithString: "")
     private var buttons: [ClipCardAction: NSButton] = [:]
     private var selected = false
+    private var nearbyAnchor = false
+    private var quickNumber: Int?
     private var actionsEnabled = true
     var onMenuTracking: ((Bool) -> Void)?
     var onSelect: (() -> Void)?
@@ -194,6 +200,12 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         updateAppearance()
     }
 
+    func setNearbyAnchor(_ value: Bool) {
+        nearbyAnchor = value
+        updateQuickLabel()
+        updateAppearance()
+    }
+
     func setThumbnail(_ image: NSImage) {
         guard clip.kind == .image, !clip.isConcealed else { return }
         thumbnailView.image = image
@@ -201,14 +213,21 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     func setQuickShortcut(_ number: Int?) {
-        guard let number, (1...9).contains(number) else {
-            quickShortcut.stringValue = ""
-            quickShortcut.isHidden = true
-            return
+        quickNumber = number.flatMap { (1...9).contains($0) ? $0 : nil }
+        updateQuickLabel()
+    }
+
+    private func updateQuickLabel() {
+        if let number = quickNumber {
+            quickShortcut.stringValue = "⌘\(number)"
+            quickShortcut.setAccessibilityLabel("Выбрать запись, Command \(number)")
+        } else {
+            quickShortcut.stringValue = nearbyAnchor ? "●" : ""
+            quickShortcut.setAccessibilityLabel(nearbyAnchor ? "Опорная запись" : nil)
         }
-        quickShortcut.stringValue = "⌘\(number)"
-        quickShortcut.setAccessibilityLabel("Выбрать запись, Command \(number)")
-        quickShortcut.isHidden = false
+        quickShortcut.textColor = nearbyAnchor ? .controlAccentColor : .labelColor
+        quickShortcut.toolTip = nearbyAnchor ? "Опорная запись — соседи показаны вокруг этого копирования" : nil
+        quickShortcut.isHidden = quickNumber == nil && !nearbyAnchor
     }
 
     func setActionsEnabled(_ enabled: Bool) {
@@ -309,7 +328,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         footer.distribution = .fill
         footer.spacing = 3
         // Keep the most frequent final action at the right edge across all kinds.
-        let footerActions: [ClipCardAction] = [.favorite, .reveal, .finder, .save, .preview, .copy]
+        let footerActions: [ClipCardAction] = [.favorite, .nearby, .reveal, .finder, .save, .preview, .copy]
         for action in footerActions where action.isAvailable(for: clip) {
             let button = makeButton(action)
             buttons[action] = button
@@ -440,8 +459,9 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
                 ? NSColor.controlAccentColor.withAlphaComponent(0.08).blended(withFraction: 0.8, of: base)?.cgColor
                 : base.cgColor
             layer?.borderColor = selected ? NSColor.controlAccentColor.cgColor
-                : NSColor.separatorColor.withAlphaComponent(0.3).cgColor
-            layer?.borderWidth = selected ? 2 : 0.5
+                : (nearbyAnchor ? NSColor.controlAccentColor.withAlphaComponent(0.5)
+                    : NSColor.separatorColor.withAlphaComponent(0.3)).cgColor
+            layer?.borderWidth = selected ? 2 : (nearbyAnchor ? 1 : 0.5)
         }
     }
 }

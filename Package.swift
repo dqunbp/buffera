@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Buffera",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     products: [.executable(name: "Buffera", targets: ["Buffera"])],
     targets: [
         .systemLibrary(name: "CSQLite"),

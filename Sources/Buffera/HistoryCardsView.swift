@@ -201,6 +201,13 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         collectionView.layoutSubtreeIfNeeded()
     }
 
+    /// Restore a saved search viewport after visiting a temporary list.
+    func restoreScrollPosition(_ origin: NSPoint) {
+        collectionView.layoutSubtreeIfNeeded()
+        restoreViewport(origin)
+        collectionView.layoutSubtreeIfNeeded()
+    }
+
     var isNearEnd: Bool {
         guard itemCount > 0, let last = visibleIndices().last else { return false }
         return last >= itemCount - max(12, effectiveColumns * 2)
