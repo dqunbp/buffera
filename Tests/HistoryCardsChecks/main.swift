@@ -65,6 +65,15 @@ let copyButton = descendants(of: original).compactMap { $0 as? NSButton }.first 
 copyButton.performClick(nil)
 check(actions == [2], "retained card action still targets the original record after removal")
 grid.select(50, scrollIntoView: true)
+let gridSelectionEvents = selections.count
+grid.scrollToSelection(centered: true)
+let gridCollection = grid.scrollView.documentView as! NSCollectionView
+let centeredGridFrame = gridCollection.layoutAttributesForItem(at: IndexPath(item: 50, section: 0))!.frame
+check(abs(centeredGridFrame.midY - grid.scrollView.contentView.bounds.midY) < 1
+      && grid.visibleIndices().contains(46) && grid.visibleIndices().contains(54),
+      "centering in a four-column grid keeps neighboring rows visible above and below")
+check(grid.selectedIndex == 50 && selections.count == gridSelectionEvents,
+      "centering scrolls without changing selection or emitting a selection callback")
 let origin = grid.scrollView.contentView.bounds.origin
 let selectedCard = grid.card(at: 50)
 clips += (80..<100).map(fixture)
@@ -86,6 +95,16 @@ let replacementCard = grid.card(at: visibleReplacement)!
 check(descendants(of: replacementCard).compactMap { $0 as? NSTextField }
     .contains { $0.stringValue == clips[visibleReplacement].text },
       "larger search result replaces visible records instead of appending stale cards")
+grid.select(0, scrollIntoView: false)
+grid.scrollToSelection(centered: true)
+check(grid.scrollView.contentView.bounds.origin.y == 0 && grid.visibleIndices().contains(0),
+      "centering the first card clamps to the start of the list")
+grid.select(clips.count - 1, scrollIntoView: false)
+grid.scrollToSelection(centered: true)
+let gridMaximumY = max(0, gridCollection.bounds.height - grid.scrollView.contentView.bounds.height)
+check(abs(grid.scrollView.contentView.bounds.origin.y - gridMaximumY) < 1
+      && grid.visibleIndices().contains(clips.count - 1),
+      "centering the last card clamps to the end of the list")
 window.setContentSize(NSSize(width: 444, height: 300))
 grid.layoutSubtreeIfNeeded()
 check(grid.effectiveColumns == 1, "resize reduces effective columns")
@@ -223,6 +242,13 @@ check((1..<contentClips.count).allSatisfy { abs(itemFrame($0).minY - itemFrame($
       "heterogeneous panel cards retain the normal gap without empty row space")
 
 contentGrid.select(20, scrollIntoView: true)
+let contentCenterSelectionEvents = contentSelections.count
+contentGrid.scrollToSelection(centered: true)
+check(abs(itemFrame(20).midY - contentGrid.scrollView.contentView.bounds.midY) < 1
+      && contentGrid.visibleIndices().contains(19) && contentGrid.visibleIndices().contains(21),
+      "content-sized cards center by their actual frame with visible neighbors on both sides")
+check(contentGrid.selectedIndex == 20 && contentSelections.count == contentCenterSelectionEvents,
+      "centering a content-sized card preserves selection without callbacks")
 let contentOrigin = contentGrid.scrollView.contentView.bounds.origin
 let contentSelectedCard = contentGrid.card(at: 20)
 let contentSelectionEvents = contentSelections.count

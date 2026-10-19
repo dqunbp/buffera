@@ -307,7 +307,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let index = max(0, min(result.count - 1, base + pendingMoveDelta))
         pendingSelectionID = nil; pendingMoveDelta = 0
         cards.replace(count: rows.count, selectedIndex: index)
-        cards.scrollToSelection()
+        cards.scrollToSelection(centered: true)
         updateSelection(); updateCount()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
     }

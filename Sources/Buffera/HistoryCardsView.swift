@@ -190,12 +190,16 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         scheduleNeedMore()
     }
 
-    func scrollToSelection() {
+    func scrollToSelection(centered: Bool = false) {
         guard (0..<itemCount).contains(selectedIndex) else { return }
         collectionView.layoutSubtreeIfNeeded()
         guard let frame = collectionView.layoutAttributesForItem(at: indexPath(selectedIndex))?.frame else { return }
-        collectionView.scrollToVisible(frame)
-        scrollView.reflectScrolledClipView(scrollView.contentView)
+        if centered {
+            restoreViewport(NSPoint(x: 0, y: frame.midY - scrollView.contentView.bounds.height / 2))
+        } else {
+            collectionView.scrollToVisible(frame)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
         // Scrolling changes which reusable items AppKit must realize. Finish
         // that pass now so a reopened panel never exposes the old viewport.
         collectionView.layoutSubtreeIfNeeded()

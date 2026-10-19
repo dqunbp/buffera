@@ -636,6 +636,26 @@ func nearbyChecks() -> [(Bool, String)] {
         value.panel.receiveNearby(rows, anchorID: request.anchorID, token: request.token)
     }
 
+    let centered = harness()
+    centered.panel.move(16)
+    let centeredOriginalID = centered.panel.selected!.id
+    let centeredOriginalOrigin = centered.cards.scrollView.contentView.bounds.origin
+    centered.panel.showNearby(id: centeredOriginalID)
+    let centeredNeighbors = (0..<21).map { index in
+        fixture(index == 10 ? Int(centeredOriginalID) : 3_000 + index)
+    }
+    complete(centered, rows: centeredNeighbors)
+    let centeredCollection = centered.cards.scrollView.documentView as! NSCollectionView
+    let anchorFrame = centeredCollection.layoutAttributesForItem(at: IndexPath(item: 10, section: 0))!.frame
+    results.append((centered.panel.selected?.id == centeredOriginalID
+                    && abs(anchorFrame.midY - centered.cards.scrollView.contentView.bounds.midY) < 1
+                    && centered.cards.visibleIndices().contains(9) && centered.cards.visibleIndices().contains(11),
+                    "nearby opens with the anchor centered between visible earlier and later captures"))
+    centered.panel.returnFromNearby()
+    results.append((!centered.panel.isShowingNearby && centered.panel.selected?.id == centeredOriginalID
+                    && centered.cards.scrollView.contentView.bounds.origin == centeredOriginalOrigin,
+                    "returning from centered nearby restores the original search viewport and selection"))
+
     let filtered = harness()
     let views = descendants(of: filtered.panel.window.contentView!)
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
