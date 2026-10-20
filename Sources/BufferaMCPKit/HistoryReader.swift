@@ -7,10 +7,11 @@ public struct HistoryItem: Codable, Sendable, Equatable {
     public let copiedAt: String
     public let kind: String
     public let title: String
-    public let snippet: String
-    public let snippetTruncated: Bool
+    public let snippet: String?
+    public let snippetTruncated: Bool?
     public let source: String
-    public let byteCount: Int
+    public let byteCount: Int?
+    public let isConcealed: Bool
     public let isFavorite: Bool
     public let isRemote: Bool
 
@@ -21,12 +22,21 @@ public struct HistoryItem: Codable, Sendable, Equatable {
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         copiedAt = formatter.string(from: clip.date)
         kind = clip.kind.rawValue
-        title = boundedPrefix(clip.title[...], characters: 240, bytes: 1_024).text
-        let preview = boundedPrefix(clip.text[...], characters: 600, bytes: 4_096)
-        snippet = preview.text
-        snippetTruncated = preview.endIndex != clip.text.endIndex
+        isConcealed = clip.isConcealed
+        if clip.isConcealed {
+            // Mask at the serialization boundary as well as in storage.
+            title = HistoryStore.concealedTitle
+            snippet = nil
+            snippetTruncated = nil
+            byteCount = nil
+        } else {
+            title = boundedPrefix(clip.title[...], characters: 240, bytes: 1_024).text
+            let preview = boundedPrefix(clip.text[...], characters: 600, bytes: 4_096)
+            snippet = preview.text
+            snippetTruncated = preview.endIndex != clip.text.endIndex
+            byteCount = clip.byteCount
+        }
         source = boundedPrefix(clip.source[...], characters: 240, bytes: 1_024).text
-        byteCount = clip.byteCount
         isFavorite = clip.isFavorite
         isRemote = clip.isRemote
     }
@@ -40,6 +50,7 @@ public struct HistorySearchResult: Codable, Sendable, Equatable {
 }
 
 public enum HistoryContentKind: String, Codable, Sendable {
+    case masked
     case text
     case cachedOCR
     case filePaths
@@ -53,7 +64,8 @@ public struct HistoryReadResult: Codable, Sendable, Equatable {
     public let contentKind: HistoryContentKind
     /// Character offsets count Swift Characters (extended grapheme clusters), not bytes.
     public let offset: Int
-    public let totalCharacters: Int
+    /// Omitted for a masked record, whose content has not been read.
+    public let totalCharacters: Int?
     public let nextOffset: Int?
     /// Whether the source text is complete. Use nextOffset to determine whether more chunks remain.
     public let isComplete: Bool
@@ -104,12 +116,9 @@ public actor HistoryReader {
         try validate(limit, in: 1...50, name: "limit")
         try validate(offset, in: 0...100_000, name: "offset")
         return try withAccess { store in
-            var visibleFilter = filter
-            visibleFilter.concealedOnly = false
-            visibleFilter.excludesConcealed = true
             return try store.withReadSnapshot {
-                let clips = try store.search(visibleFilter, limit: limit, offset: offset)
-                let total = try store.count(visibleFilter)
+                let clips = try store.search(filter, limit: limit, offset: offset)
+                let total = try store.count(filter)
                 let end = offset + clips.count
                 return HistorySearchResult(items: clips.map(HistoryItem.init), total: total, offset: offset,
                                            nextOffset: end < total ? end : nil)
@@ -118,29 +127,55 @@ public actor HistoryReader {
     }
 
     public func read(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {
+        try read(id: id, offset: offset, limit: limit, reveal: false)
+    }
+
+    /// The caller chooses this explicit tool after applying its consent instructions.
+    /// This operation never changes concealment or records a persistent grant.
+    public func reveal(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {
+        try read(id: id, offset: offset, limit: limit, reveal: true)
+    }
+
+    private func read(id: Int64, offset: Int, limit: Int, reveal: Bool) throws -> HistoryReadResult {
         try validateID(id)
         try validate(limit, in: 1...32_000, name: "limit")
         guard offset >= 0 else { throw HistoryReaderError.invalidArgument("offset должен быть не меньше 0.") }
         return try withAccess { store in
-            let content = try store.visibleContent(id: id)
-            let decoded = try decode(content)
-            let total = decoded.text.count
-            guard offset <= total else {
-                throw HistoryReaderError.invalidArgument("offset превышает длину текста (\(total) символов).")
+            let summary = try store.summary(id: id)
+            if summary.isConcealed && !reveal { return masked(summary) }
+            do {
+                let content = try (reveal ? store.revealedContent(id: id) : store.visibleContent(id: id))
+                let decoded = try decode(content)
+                let total = decoded.text.count
+                guard offset <= total else {
+                    throw HistoryReaderError.invalidArgument("offset превышает длину текста (\(total) символов).")
+                }
+                let start = decoded.text.index(decoded.text.startIndex, offsetBy: offset)
+                let chunk = boundedPrefix(decoded.text[start...], characters: limit, bytes: 128 * 1_024)
+                guard chunk.characters > 0 || offset == total else { throw HistoryReaderError.oversizedCharacter }
+                let next = offset + chunk.characters
+                // Decoding may take time. Recheck deletion/concealment before releasing content.
+                let current = try store.summary(id: id)
+                if current.isConcealed && !reveal { return masked(current) }
+                return HistoryReadResult(
+                    item: HistoryItem(current), text: chunk.text,
+                    contentKind: decoded.kind, offset: offset, totalCharacters: total,
+                    nextOffset: next < total ? next : nil, isComplete: decoded.isComplete, note: decoded.note
+                )
+            } catch {
+                // Concurrent concealment also masks decoding/offset errors, which can reveal a length.
+                if !reveal, let current = try? store.summary(id: id), current.isConcealed {
+                    return masked(current)
+                }
+                throw error
             }
-            let start = decoded.text.index(decoded.text.startIndex, offsetBy: offset)
-            let chunk = boundedPrefix(decoded.text[start...], characters: limit, bytes: 128 * 1_024)
-            guard chunk.characters > 0 || offset == total else { throw HistoryReaderError.oversizedCharacter }
-            let next = offset + chunk.characters
-            let result = HistoryReadResult(
-                item: HistoryItem(content.summary), text: chunk.text,
-                contentKind: decoded.kind, offset: offset, totalCharacters: total,
-                nextOffset: next < total ? next : nil, isComplete: decoded.isComplete, note: decoded.note
-            )
-            // Decoding may take time. Check a new SQLite snapshot before releasing any content.
-            guard try !store.summary(id: id).isConcealed else { throw HistoryReaderError.missing }
-            return result
         }
+    }
+
+    private func masked(_ summary: ClipSummary) -> HistoryReadResult {
+        HistoryReadResult(item: HistoryItem(summary), text: "", contentKind: .masked, offset: 0,
+                          totalCharacters: nil, nextOffset: nil, isComplete: false,
+                          note: "Содержимое скрыто. Для раскрытия используйте reveal_clip согласно его инструкции о согласии пользователя.")
     }
 
     public func nearby(id: Int64, before: Int = 10, after: Int = 10) throws -> HistoryNeighborsResult {
@@ -148,7 +183,7 @@ public actor HistoryReader {
         try validate(before, in: 0...20, name: "before")
         try validate(after, in: 0...20, name: "after")
         return try withAccess { store in
-            let clips = try store.nearby(anchorID: id, before: before, after: after, includeConcealed: false)
+            let clips = try store.nearby(anchorID: id, before: before, after: after, includeConcealed: true)
             return HistoryNeighborsResult(anchorID: String(id), items: clips.map(HistoryItem.init))
         }
     }
@@ -180,7 +215,7 @@ public actor HistoryReader {
         let note: String?
     }
 
-    private func decode(_ content: VisibleClipContent) throws -> DecodedContent {
+    private func decode(_ content: ClipContent) throws -> DecodedContent {
         switch content.summary.kind {
         case .text, .link:
             let payload = try requiredPayload(content)
@@ -216,7 +251,7 @@ public actor HistoryReader {
         }
     }
 
-    private func requiredPayload(_ content: VisibleClipContent) throws -> ClipPayload {
+    private func requiredPayload(_ content: ClipContent) throws -> ClipPayload {
         guard let payload = content.payload, !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else {
             throw HistoryReaderError.unreadableContent
         }

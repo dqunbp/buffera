@@ -62,12 +62,14 @@ final class HistoryReaderTests {
         try access.setEnabled(false)
         try await expectError(.disabled) { _ = try await self.reader.search(filter: SearchFilter()) }
         try await expectError(.disabled) { _ = try await self.reader.read(id: id) }
+        try await expectError(.disabled) { _ = try await self.reader.reveal(id: id) }
         try await expectError(.disabled) { _ = try await self.reader.nearby(id: id) }
         try access.setEnabled(true)
         let first = try await reader.read(id: id)
         try checkEqual(first.text, "grant fixture")
         try access.setEnabled(false)
         try await expectError(.disabled) { _ = try await self.reader.read(id: id) }
+        try await expectError(.disabled) { _ = try await self.reader.reveal(id: id) }
         try access.setEnabled(true)
         let restored = try await reader.search(filter: SearchFilter())
         try checkEqual(restored.total, 1)
@@ -89,18 +91,55 @@ final class HistoryReaderTests {
         try checkFalse(FileManager.default.fileExists(atPath: absentAccess.databaseURL.path))
     }
 
-    func testSearchExcludesHiddenItemsFromResultsAndCount() async throws {
+    private func checkMaskedItem(_ item: HistoryItem) throws {
+        try checkTrue(item.isConcealed)
+        try checkEqual(item.title, "Скрытая запись")
+        try checkNil(item.snippet)
+        try checkNil(item.snippetTruncated)
+        try checkNil(item.byteCount)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(item)) as? [String: Any]
+        for key in ["snippet", "snippetTruncated", "byteCount"] {
+            try checkNil(json?[key], "Masked metadata must omit \(key), including null values")
+        }
+    }
+
+    func testSearchIncludesMaskedItemsAndSupportsConcealedFilters() async throws {
         let visible = try insert("visible needle", time: 1)
-        try insert("secret needle", time: 2, hidden: true)
+        let concealed = try insert("secret needle", time: 2, source: "Safari", hidden: true, remote: true)
+        try store.setFavorite(id: concealed, isFavorite: true)
+        // Masking must also hold for stale metadata left by an older writer or a damaged store.
+        try executeSQL("UPDATE clips SET title='legacy-secret-title',text='legacy-secret-snippet' WHERE id=\(concealed)")
+        let all = try await reader.search(filter: SearchFilter(), limit: 1)
+        try checkEqual(all.items.map(\.id), [String(concealed)])
+        try checkEqual(all.total, 2)
+        try checkEqual(all.nextOffset, 1)
+        try checkMaskedItem(all.items[0])
+        try checkEqual(all.items[0].source, "Safari")
+        try checkEqual(all.items[0].copiedAt, "1970-01-01T00:00:02.000Z")
+        try checkTrue(all.items[0].isRemote)
+        try checkTrue(all.items[0].isFavorite)
+        let next = try await reader.search(filter: SearchFilter(), limit: 1, offset: 1)
+        try checkEqual(next.items.map(\.id), [String(visible)])
+        try checkFalse(next.items[0].isConcealed)
         var filter = SearchFilter()
         filter.concealedOnly = true
-        let all = try await reader.search(filter: filter)
-        try checkEqual(all.items.map(\.id), [String(visible)])
-        try checkEqual(all.total, 1)
-        filter.query = "secret"
+        filter.source = "Safari"
+        filter.kind = .text
+        filter.remoteOnly = true
+        filter.favoritesOnly = true
+        filter.from = Date(timeIntervalSince1970: 2)
+        filter.until = Date(timeIntervalSince1970: 3)
         let hidden = try await reader.search(filter: filter)
-        try checkEqual(hidden.total, 0)
-        try checkTrue(hidden.items.isEmpty)
+        try checkEqual(hidden.items.map(\.id), [String(concealed)])
+        try checkEqual(hidden.total, 1)
+        filter.query = "secret"
+        let secret = try await reader.search(filter: filter)
+        try checkEqual(secret.total, 0)
+        try checkTrue(secret.items.isEmpty)
+        filter = SearchFilter()
+        filter.query = "needle"
+        let matches = try await reader.search(filter: filter)
+        try checkEqual(matches.items.map(\.id), [String(visible)])
     }
 
     func testSearchFiltersAndPaginationHaveStableMetadata() async throws {
@@ -142,8 +181,8 @@ final class HistoryReaderTests {
         let result = try await reader.search(filter: SearchFilter())
         try checkEqual(result.items[0].id, "9007199254740993")
         try checkEqual(result.items[0].title.count, 240)
-        try checkEqual(result.items[0].snippet.count, 600)
-        try checkTrue(result.items[0].snippetTruncated)
+        try checkEqual(result.items[0].snippet?.count, 600)
+        try checkEqual(result.items[0].snippetTruncated, true)
         let json = String(decoding: try JSONEncoder().encode(result), as: UTF8.self)
         try checkTrue(json.contains("\"id\":\"9007199254740993\""))
     }
@@ -180,9 +219,9 @@ final class HistoryReaderTests {
         let id = try insert(full, source: String(repeating: character, count: 240))
         let search = try await reader.search(filter: SearchFilter())
         try checkTrue(search.items[0].title.utf8.count <= 1_024)
-        try checkTrue(search.items[0].snippet.utf8.count <= 4_096)
+        try checkTrue((search.items[0].snippet?.utf8.count ?? Int.max) <= 4_096)
         try checkTrue(search.items[0].source.utf8.count <= 1_024)
-        try checkTrue(search.items[0].snippetTruncated)
+        try checkEqual(search.items[0].snippetTruncated, true)
         let first = try await reader.read(id: id, limit: 32_000)
         let expectedCharacters = (128 * 1_024) / character.utf8.count
         try checkEqual(first.text.count, expectedCharacters)
@@ -191,6 +230,11 @@ final class HistoryReaderTests {
         let second = try await reader.read(id: id, offset: expectedCharacters)
         try checkEqual(first.text + second.text, full)
         try checkNil(second.nextOffset)
+        try store.conceal(id: id)
+        let revealed = try await reader.reveal(id: id, limit: 32_000)
+        try checkEqual(revealed.text, first.text)
+        try checkEqual(revealed.nextOffset, expectedCharacters)
+        try checkMaskedItem(revealed.item)
     }
 
     func testOversizedSingleGraphemeHasExplicitErrorAndCannotOverflowMetadata() async throws {
@@ -201,8 +245,12 @@ final class HistoryReaderTests {
         try checkEqual(search.items[0].title, "")
         try checkEqual(search.items[0].snippet, "")
         try checkEqual(search.items[0].source, "")
-        try checkTrue(search.items[0].snippetTruncated)
+        try checkEqual(search.items[0].snippetTruncated, true)
         try await expectError(.oversizedCharacter) { _ = try await self.reader.read(id: id) }
+        try store.conceal(id: id)
+        let masked = try await reader.read(id: id)
+        try checkEqual(masked.contentKind, .masked)
+        try await expectError(.oversizedCharacter) { _ = try await self.reader.reveal(id: id) }
     }
 
     func testReadRequiresEveryItemToDecode() async throws {
@@ -226,30 +274,94 @@ final class HistoryReaderTests {
         try checkEqual(result.contentKind, .text)
     }
 
-    func testMissingAndHiddenReadAndNeighborsHaveIdenticalErrors() async throws {
+    func testHiddenReadMasksPayloadAndMissingRecordsStillFail() async throws {
         let hidden = try insert("concealed fixture", hidden: true)
-        try await expectError(.missing) { _ = try await self.reader.read(id: hidden) }
+        // A masked read must not decode payloads or validate offsets against the secret length.
+        try executeSQL("UPDATE payloads SET data=X'00' WHERE clip_id=\(hidden)")
+        try executeSQL("UPDATE clips SET title='legacy-secret-title',text='legacy-secret-snippet' WHERE id=\(hidden)")
+        let result = try await reader.read(id: hidden, offset: Int.max)
+        try checkMaskedItem(result.item)
+        try checkEqual(result.contentKind, .masked)
+        try checkEqual(result.text, "")
+        try checkEqual(result.offset, 0)
+        try checkNil(result.totalCharacters)
+        try checkNil(result.nextOffset)
+        try checkFalse(result.isComplete)
+        try checkTrue(result.note?.contains("reveal_clip") == true)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
+        try checkNil(json?["totalCharacters"])
+        try checkNil(json?["nextOffset"])
+        try await expectError(.unreadableContent) { _ = try await self.reader.reveal(id: hidden) }
         try await expectError(.missing) { _ = try await self.reader.read(id: Int64.max) }
-        try await expectError(.missing) { _ = try await self.reader.nearby(id: hidden) }
+        try await expectError(.missing) { _ = try await self.reader.reveal(id: Int64.max) }
         try await expectError(.missing) { _ = try await self.reader.nearby(id: Int64.max) }
         let visible = try insert("will be concealed")
         _ = try await reader.read(id: visible)
         try store.conceal(id: visible)
-        try await expectError(.missing) { _ = try await self.reader.read(id: visible) }
+        let newlyHidden = try await reader.read(id: visible)
+        try checkEqual(newlyHidden.contentKind, .masked)
+        try checkEqual(newlyHidden.text, "")
     }
 
-    func testNeighborsUseCaptureTimeAndSkipHiddenBeforeApplyingLimits() async throws {
+    func testNeighborsUseCaptureTimeAndIncludeMaskedItemsInLimitsAndAnchors() async throws {
         let older = try insert("older", time: 1)
-        try insert("older hidden", time: 2, hidden: true)
+        let olderHidden = try insert("older hidden", time: 2, hidden: true)
         let anchor = try insert("anchor", time: 3)
-        try insert("newer hidden", time: 4, hidden: true)
-        let newer = try insert("newer", time: 5)
+        let newerHidden = try insert("newer hidden", time: 4, hidden: true)
+        try executeSQL("UPDATE clips SET title='legacy-secret-title',text='legacy-secret-snippet' WHERE id IN (\(olderHidden),\(newerHidden))")
+        try insert("newer", time: 5)
         try store.markUsed(id: older, date: Date(timeIntervalSince1970: 99))
         let result = try await reader.nearby(id: anchor, before: 1, after: 1)
         try checkEqual(result.anchorID, String(anchor))
-        try checkEqual(result.items.map(\.id), [newer, anchor, older].map(String.init))
-        let only = try await reader.nearby(id: anchor, before: 0, after: 0)
-        try checkEqual(only.items.map(\.id), [String(anchor)])
+        try checkEqual(result.items.map(\.id), [newerHidden, anchor, olderHidden].map(String.init))
+        try checkMaskedItem(result.items[0])
+        try checkMaskedItem(result.items[2])
+        let hiddenAnchor = try await reader.nearby(id: olderHidden, before: 1, after: 1)
+        try checkEqual(hiddenAnchor.anchorID, String(olderHidden))
+        try checkEqual(hiddenAnchor.items.map(\.id), [anchor, olderHidden, older].map(String.init))
+        try checkMaskedItem(hiddenAnchor.items[1])
+        let only = try await reader.nearby(id: olderHidden, before: 0, after: 0)
+        try checkEqual(only.items.map(\.id), [String(olderHidden)])
+    }
+
+    func testRevealUsesFullUnicodePayloadAndDoesNotUnhideOrIndexIt() async throws {
+        let text = "👨‍👩‍👧‍👦e\u{301}private-reveal-needle\n" + String(repeating: "Я", count: 60_000)
+        let id = try insert(text, time: 1, hidden: true)
+        try store.setFavorite(id: id, isFavorite: true)
+        let originalPayload = try store.payload(id: id)
+        let originalSummary = try store.summary(id: id)
+        let order = try store.search(SearchFilter()).map(\.id)
+        let first = try await reader.reveal(id: id, limit: 2)
+        try checkEqual(first.text, "👨‍👩‍👧‍👦e\u{301}")
+        try checkEqual(first.totalCharacters, text.count)
+        try checkEqual(first.nextOffset, 2)
+        try checkEqual(first.contentKind, .text)
+        try checkTrue(first.isComplete)
+        try checkMaskedItem(first.item)
+        let second = try await reader.reveal(id: id, offset: 2, limit: 32_000)
+        try checkEqual(second.nextOffset, 32_002)
+        let third = try await reader.reveal(id: id, offset: 32_002, limit: 32_000)
+        try checkEqual(first.text + second.text + third.text, text)
+        try checkNil(third.nextOffset)
+        let maskedAgain = try await reader.read(id: id)
+        try checkEqual(maskedAgain.contentKind, .masked)
+        try checkEqual(maskedAgain.text, "")
+        var query = SearchFilter()
+        query.query = "private-reveal-needle"
+        let searched = try await reader.search(filter: query)
+        try checkTrue(searched.items.isEmpty)
+        try checkEqual(try store.payload(id: id), originalPayload)
+        let summary = try store.summary(id: id)
+        try checkTrue(summary.isConcealed)
+        try checkEqual(summary.date, originalSummary.date)
+        try checkEqual(summary.text, originalSummary.text)
+        try checkEqual(summary.title, originalSummary.title)
+        try checkTrue(summary.isFavorite)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), order)
+        let visible = try insert("already visible")
+        let ordinary = try await reader.reveal(id: visible)
+        try checkEqual(ordinary.text, "already visible")
+        try checkFalse(ordinary.item.isConcealed)
     }
 
     func testImageReadsOnlyCachedOCRAndReportsTruncation() async throws {
@@ -289,6 +401,11 @@ final class HistoryReaderTests {
         try checkEqual(result.text, "/nonexistent/first name.txt\n/nonexistent/second.txt")
         try checkEqual(result.contentKind, .filePaths)
         try checkTrue(result.isComplete)
+        try store.conceal(id: id)
+        let revealed = try await reader.reveal(id: id)
+        try checkEqual(revealed.text, result.text)
+        try checkEqual(revealed.contentKind, .filePaths)
+        try checkMaskedItem(revealed.item)
         let wrong = ClipPayload(items: [[Representation(type: "public.file-url", data: Data("https://example.invalid/secret".utf8))]])
         let wrongID = try store.insert(payload: wrong, kind: .file, title: "Wrong URL", text: "", source: "Fixture")
         try await expectError(.unreadableContent) { _ = try await self.reader.read(id: wrongID) }
@@ -340,6 +457,9 @@ final class HistoryReaderTests {
             try await expectError(.invalidArgument("limit должен быть от 1 до 32000.")) {
                 _ = try await self.reader.read(id: id, limit: limit)
             }
+            try await expectError(.invalidArgument("limit должен быть от 1 до 32000.")) {
+                _ = try await self.reader.reveal(id: id, limit: limit)
+            }
         }
         try await expectError(.invalidArgument("offset должен быть не меньше 0.")) {
             _ = try await self.reader.read(id: id, offset: -1)
@@ -347,12 +467,21 @@ final class HistoryReaderTests {
         try await expectError(.invalidArgument("offset превышает длину текста (6 символов).")) {
             _ = try await self.reader.read(id: id, offset: Int.max)
         }
+        try await expectError(.invalidArgument("offset должен быть не меньше 0.")) {
+            _ = try await self.reader.reveal(id: id, offset: -1)
+        }
+        try await expectError(.invalidArgument("offset превышает длину текста (6 символов).")) {
+            _ = try await self.reader.reveal(id: id, offset: Int.max)
+        }
         for badID in [Int64(0), Int64(-1)] {
             try await expectError(.invalidArgument("id должен быть положительным целым числом.")) {
                 _ = try await self.reader.read(id: badID)
             }
             try await expectError(.invalidArgument("id должен быть положительным целым числом.")) {
                 _ = try await self.reader.nearby(id: badID)
+            }
+            try await expectError(.invalidArgument("id должен быть положительным целым числом.")) {
+                _ = try await self.reader.reveal(id: badID)
             }
         }
         for count in [-1, 21] {
@@ -371,7 +500,7 @@ func runHistoryReaderChecks() async throws {
         ("testDisabledAndRevokedAccessAreCheckedOnEveryRequest", HistoryReaderTests.testDisabledAndRevokedAccessAreCheckedOnEveryRequest),
         ("testMissingDirectoryDoesNotCreateHistoryOrGrant", HistoryReaderTests.testMissingDirectoryDoesNotCreateHistoryOrGrant),
         ("testEnabledMissingDatabaseFailsWithoutCreatingIt", HistoryReaderTests.testEnabledMissingDatabaseFailsWithoutCreatingIt),
-        ("testSearchExcludesHiddenItemsFromResultsAndCount", HistoryReaderTests.testSearchExcludesHiddenItemsFromResultsAndCount),
+        ("testSearchIncludesMaskedItemsAndSupportsConcealedFilters", HistoryReaderTests.testSearchIncludesMaskedItemsAndSupportsConcealedFilters),
         ("testSearchFiltersAndPaginationHaveStableMetadata", HistoryReaderTests.testSearchFiltersAndPaginationHaveStableMetadata),
         ("testMetadataIsBoundedAndIDDoesNotLoseIntegerPrecision", HistoryReaderTests.testMetadataIsBoundedAndIDDoesNotLoseIntegerPrecision),
         ("testReadUsesFullPayloadAndUnicodeCharacterOffsets", HistoryReaderTests.testReadUsesFullPayloadAndUnicodeCharacterOffsets),
@@ -380,8 +509,9 @@ func runHistoryReaderChecks() async throws {
         ("testOversizedSingleGraphemeHasExplicitErrorAndCannotOverflowMetadata", HistoryReaderTests.testOversizedSingleGraphemeHasExplicitErrorAndCannotOverflowMetadata),
         ("testReadRequiresEveryItemToDecode", HistoryReaderTests.testReadRequiresEveryItemToDecode),
         ("testLinkUsesOriginalURLPayload", HistoryReaderTests.testLinkUsesOriginalURLPayload),
-        ("testMissingAndHiddenReadAndNeighborsHaveIdenticalErrors", HistoryReaderTests.testMissingAndHiddenReadAndNeighborsHaveIdenticalErrors),
-        ("testNeighborsUseCaptureTimeAndSkipHiddenBeforeApplyingLimits", HistoryReaderTests.testNeighborsUseCaptureTimeAndSkipHiddenBeforeApplyingLimits),
+        ("testHiddenReadMasksPayloadAndMissingRecordsStillFail", HistoryReaderTests.testHiddenReadMasksPayloadAndMissingRecordsStillFail),
+        ("testNeighborsUseCaptureTimeAndIncludeMaskedItemsInLimitsAndAnchors", HistoryReaderTests.testNeighborsUseCaptureTimeAndIncludeMaskedItemsInLimitsAndAnchors),
+        ("testRevealUsesFullUnicodePayloadAndDoesNotUnhideOrIndexIt", HistoryReaderTests.testRevealUsesFullUnicodePayloadAndDoesNotUnhideOrIndexIt),
         ("testImageReadsOnlyCachedOCRAndReportsTruncation", HistoryReaderTests.testImageReadsOnlyCachedOCRAndReportsTruncation),
         ("testFilesExposePathsWithoutReadingFiles", HistoryReaderTests.testFilesExposePathsWithoutReadingFiles),
         ("testOtherTypesOnlyReturnMetadataEvenIfPayloadIsCorrupt", HistoryReaderTests.testOtherTypesOnlyReturnMetadataEvenIfPayloadIsCorrupt),

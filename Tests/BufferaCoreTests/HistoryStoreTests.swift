@@ -1235,6 +1235,37 @@ final class HistoryStoreTests {
         try checkEqual(try store.payload(id: text), payload("complete text payload"))
     }
 
+    func testExplicitRevealReadsOriginalWithoutRemovingConcealment() throws {
+        let secret = try insert("original concealed payload", time: 1)
+        let image = try insertImage("concealed image bytes")
+        try store.completeImageText(id: image, text: "recognition to be removed")
+        try store.setFavorite(id: secret, isFavorite: true)
+        try store.conceal(id: secret)
+        try store.conceal(id: image)
+        let originalPayload = try store.payload(id: secret)
+        let order = try store.search(SearchFilter()).map(\.id)
+        let reader = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"), mode: .readOnly)
+
+        let content = try reader.revealedContent(id: secret)
+        try checkEqual(content.payload, originalPayload)
+        try checkEqual(content.summary.title, HistoryStore.concealedTitle)
+        try checkEqual(content.summary.text, "")
+        try check(content.summary.isConcealed)
+        try check(content.summary.isFavorite)
+        try checkEqual(content.summary.date, Date(timeIntervalSince1970: 1))
+        try checkEqual(content.imageText, nil)
+        try checkEqual(try reader.revealedContent(id: image).payload, nil)
+        try checkEqual(try reader.revealedContent(id: image).imageText, nil)
+        try checkThrows(try reader.visibleContent(id: secret))
+        try checkThrows(try reader.revealedContent(id: Int64.max))
+        try checkEqual(try store.search(SearchFilter()).map(\.id), order)
+        try checkEqual(try store.payload(id: secret), originalPayload)
+        try check(try store.summary(id: secret).isConcealed)
+        var query = SearchFilter()
+        query.query = "original concealed payload"
+        try checkEqual(try store.count(query), 0)
+    }
+
     private func withRawDatabase(at url: URL, _ body: (OpaquePointer) throws -> Void) throws {
         var db: OpaquePointer?
         let status = sqlite3_open(url.path, &db)

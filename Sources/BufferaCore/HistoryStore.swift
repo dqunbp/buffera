@@ -9,7 +9,7 @@ public final class HistoryStore {
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     private static let schemaVersion = 6
     private static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
-    private static let concealedTitle = "Скрытая запись"
+    public static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
         SearchFilter.normalize(concealedTitle + " " + source)
     }
@@ -210,15 +210,25 @@ public final class HistoryStore {
     }
 
     /// Reads only visible content. Images expose cached OCR; binary image/other payloads are not loaded.
-    public func visibleContent(id: Int64) throws -> VisibleClipContent {
+    public func visibleContent(id: Int64) throws -> ClipContent {
+        try content(id: id, includeConcealed: false)
+    }
+
+    /// Explicit read of the original content, including concealed records. Does not remove concealment.
+    public func revealedContent(id: Int64) throws -> ClipContent {
+        try content(id: id, includeConcealed: true)
+    }
+
+    private func content(id: Int64, includeConcealed: Bool) throws -> ClipContent {
         let record: (ClipSummary, Data?, String?) = try withReadSnapshot {
             let columns = Self.summaryColumns.split(separator: ",").map { "clips.\($0)" }.joined(separator: ",")
+            let visibility = includeConcealed ? "" : " AND clips.is_concealed=0"
             let statement = try prepare("""
                 SELECT \(columns),payloads.data,clip_ocr.status,clip_ocr.text
                 FROM clips
                 LEFT JOIN payloads ON payloads.clip_id=clips.id AND clips.kind IN ('text','link','file')
                 LEFT JOIN clip_ocr ON clip_ocr.clip_id=clips.id AND clips.kind='image'
-                WHERE clips.id=? AND clips.is_concealed=0
+                WHERE clips.id=?\(visibility)
                 """)
             defer { sqlite3_finalize(statement) }
             try bind([.integer(id)], to: statement)
@@ -237,7 +247,7 @@ public final class HistoryStore {
         }
         // Release the read transaction before property-list decoding.
         let payload = try record.1.map { try PropertyListDecoder().decode(ClipPayload.self, from: $0) }
-        return VisibleClipContent(summary: record.0, payload: payload, imageText: record.2)
+        return ClipContent(summary: record.0, payload: payload, imageText: record.2)
     }
 
     private func summaries(_ sql: String, bindings: [Value]) throws -> [ClipSummary] {

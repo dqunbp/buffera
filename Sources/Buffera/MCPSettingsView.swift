@@ -19,7 +19,7 @@ final class MCPSettingsView: NSView {
         enabled.action = #selector(changeAccess)
         enabled.font = .systemFont(ofSize: 12)
         enabled.identifier = NSUserInterfaceItemIdentifier("mcp.enabled")
-        let disclosure = paragraph("Агент сможет искать и читать нескрытые записи истории. Их содержимое попадёт в его контекст; дальнейшая обработка зависит от выбранного агента.")
+        let disclosure = paragraph("Агент сможет читать историю и отдельно раскрывать скрытые записи. Инструкция просит его получить ваше согласие, если оно ещё не дано. Прочитанное попадёт в контекст агента.")
         let connection = paragraph("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON.")
         let command = paragraph(executableURL.path)
         command.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
@@ -63,7 +63,7 @@ final class MCPSettingsView: NSView {
 
     func refresh() {
         enabled.state = access.isEnabled() ? .on : .off
-        showStatus(enabled.state == .on ? "Доступ включён. Скрытые записи недоступны агентам."
+        showStatus(enabled.state == .on ? "Доступ включён. Скрытые записи показаны масками; раскрытие — через reveal_clip."
                    : "Доступ выключен. Конфигурацию можно подготовить заранее.")
     }
 

@@ -89,8 +89,9 @@ public struct SearchFilter {
     }
 }
 
-/// A visible record read consistently with its text payload or already-completed image OCR.
-public struct VisibleClipContent {
+/// A record read consistently with its text payload or already-completed image OCR.
+/// The store operation determines whether concealed content may be loaded.
+public struct ClipContent {
     public let summary: ClipSummary
     public let payload: ClipPayload?
     public let imageText: String?

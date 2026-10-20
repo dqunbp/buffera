@@ -39,6 +39,56 @@ func runRawJSONChecks() async throws {
             let fallback = try JSONSerialization.jsonObject(with: Data((content?.first?["text"] as? String ?? "").utf8)) as? [String: Any]
             try checkEqual(fallback?["text"] as? String, text)
         }
+        let toolList = try connection.request("tools/list", parameters: [:])
+        let listed = (toolList["result"] as? [String: Any])?["tools"] as? [[String: Any]]
+        try checkEqual(listed?.count, 4)
+        let revealTool = listed?.first { $0["name"] as? String == "reveal_clip" }
+        let schema = revealTool?["inputSchema"] as? [String: Any]
+        try checkEqual(Set((schema?["properties"] as? [String: Any] ?? [:]).keys), ["id", "offset", "limit"])
+        let description = (revealTool?["description"] as? String ?? "")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        for phrase in ["Before calling, ask", "already authorized", "general permission", "Do not ask again",
+                       "conversation context", "stays concealed"] {
+            try checkTrue(description.contains(phrase), "Reveal description must communicate \(phrase)")
+        }
+        for tool in listed ?? [] {
+            let metadata = tool["_meta"] as? [String: Any]
+            try checkNil(metadata?["anthropic/requiresUserInteraction"])
+        }
+        let search = try rawStructuredResult(connection.call("search_history", arguments: ["concealed_only": true]))
+        try checkEqual(search["total"] as? Int, 1)
+        let hiddenItem = (search["items"] as? [[String: Any]])?.first
+        try checkRawMaskedItem(hiddenItem, id: fixture.hiddenID)
+        let neighbors = try rawStructuredResult(connection.call("get_neighbors", arguments: [
+            "id": String(fixture.hiddenID), "before": 0, "after": 0
+        ]))
+        try checkEqual(neighbors["anchor_id"] as? String, String(fixture.hiddenID))
+        try checkRawMaskedItem((neighbors["items"] as? [[String: Any]])?.first, id: fixture.hiddenID)
+        let masked = try rawStructuredResult(connection.call("read_clip", arguments: ["id": String(fixture.hiddenID)]))
+        try checkRawMaskedItem(masked["item"] as? [String: Any], id: fixture.hiddenID)
+        try checkEqual(masked["content_kind"] as? String, "masked")
+        try checkEqual(masked["text"] as? String, "")
+        try checkEqual(masked["offset"] as? Int, 0)
+        try checkNil(masked["total_characters"])
+        try checkNil(masked["next_offset"])
+        try checkEqual(masked["is_complete"] as? Bool, false)
+        for response in [search, neighbors, masked] {
+            let json = String(decoding: try JSONSerialization.data(withJSONObject: response), as: UTF8.self)
+            try checkFalse(json.contains("hidden-marker"))
+        }
+        let revealed = try rawStructuredResult(connection.call("reveal_clip", arguments: [
+            "id": String(fixture.hiddenID), "offset": 7, "limit": 32_000
+        ]))
+        try checkEqual(revealed["text"] as? String, String(fixture.hiddenText.dropFirst(7).prefix(32_000)))
+        try checkEqual(revealed["total_characters"] as? Int, fixture.hiddenText.count)
+        try checkEqual(revealed["next_offset"] as? Int, 32_007)
+        try checkRawMaskedItem(revealed["item"] as? [String: Any], id: fixture.hiddenID)
+        let afterReveal = try rawStructuredResult(connection.call("read_clip", arguments: ["id": String(fixture.hiddenID)]))
+        try checkEqual(afterReveal["content_kind"] as? String, "masked")
+        try checkEqual(afterReveal["text"] as? String, "")
+        let secretQuery = try rawStructuredResult(connection.call("search_history", arguments: ["query": "hidden-marker"]))
+        try checkEqual(secretQuery["total"] as? Int, 0)
+        try checkTrue(try fixture.store.summary(id: fixture.hiddenID).isConcealed)
         let integral = try connection.callRawArguments(#"{"limit":1.0}"#)
         try checkEqual((integral["result"] as? [String: Any])?["isError"] as? Bool, false)
         let spoofed = try connection.request("tools/call", parameters: [
@@ -58,8 +108,36 @@ func runRawJSONChecks() async throws {
         let disabledResult = disabled["result"] as? [String: Any]
         try checkEqual(disabledResult?["isError"] as? Bool, true)
         try checkNil(disabledResult?["structuredContent"])
+        let disabledReveal = try connection.call("reveal_clip", arguments: ["id": String(fixture.hiddenID)])
+        let disabledRevealResult = disabledReveal["result"] as? [String: Any]
+        try checkEqual(disabledRevealResult?["isError"] as? Bool, true)
+        try checkNil(disabledRevealResult?["structuredContent"])
         print("PASS: raw JSON preserves data URL queries and results, numeric types and errors")
     }.value
+}
+
+/// Masked metadata omits private fields entirely, rather than serializing them as null.
+private func checkRawMaskedItem(_ item: [String: Any]?, id: Int64) throws {
+    try checkEqual(item?["id"] as? String, String(id))
+    try checkEqual(item?["is_concealed"] as? Bool, true)
+    try checkEqual(item?["title"] as? String, "Скрытая запись")
+    try checkEqual(item?["source"] as? String, "MCP Test")
+    try checkNotNil(item?["copied_at"] as? String)
+    for key in ["snippet", "snippet_truncated", "byte_count"] { try checkNil(item?[key]) }
+}
+
+private func rawStructuredResult(_ response: [String: Any]) throws -> [String: Any] {
+    let result = response["result"] as? [String: Any]
+    try checkEqual(result?["isError"] as? Bool, false)
+    guard let structured = result?["structuredContent"] as? [String: Any],
+          let content = result?["content"] as? [[String: Any]],
+          let text = content.first?["text"] as? String,
+          let fallback = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
+        try checkFail("Missing JSON structured content or text fallback")
+        return [:]
+    }
+    try checkTrue(NSDictionary(dictionary: structured).isEqual(to: fallback), "Both tool result encodings must agree")
+    return structured
 }
 
 private final class RawJSONConnection: @unchecked Sendable {
