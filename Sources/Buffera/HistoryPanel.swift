@@ -25,6 +25,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let logger = Logger(subsystem: "local.buffera.app", category: "panel")
     private let search = NSSearchField()
     private let semanticSearch = NSButton(checkboxWithTitle: "Искать также по смыслу", target: nil, action: nil)
+    private let chatButton = NSButton(title: "Спросить", target: nil, action: nil)
+    private let searchOptionsRow = NSStackView()
+    private var semanticSearchAvailable = false
+    private var chatAvailable = false
     private var actualSearchMode: ActualSearchMode = .literal
     private var searchFallbackReason: String?
     private let filters = HistoryFilters(frame: .zero)
@@ -42,7 +46,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let thumbnails = NSCache<NSNumber, NSImage>()
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
-    private let pinButton = NSButton()
+    private let pinButton = NSButton(image: HistoryPanel.anchorImage(), target: nil, action: nil)
     private let scope = NSSegmentedControl(labels: ["История", "Избранное"], trackingMode: .selectOne, target: nil, action: nil)
     private let nearbyBack = NSButton(title: "Назад в историю", target: nil, action: nil)
     private var nearbyState: NearbyHistoryState?
@@ -107,7 +111,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isShowingNearby: Bool { nearbyState != nil }
     var isPinned: Bool { pinButton.state == .on }
-    var searchMode: HistorySearchMode { semanticSearch.state == .on ? .automatic : .literal }
+    var searchMode: HistorySearchMode { semanticSearchAvailable && semanticSearch.state == .on ? .automatic : .literal }
     var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
 
@@ -171,7 +175,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let token = presentationToken
         commitWhenLoaded = false; pendingMoveDelta = 0; confirming = false
         invalidateReveal()
-        search.isEnabled = true; semanticSearch.isEnabled = true; filters.setInteractionEnabled(true); scope.isEnabled = true
+        updateNavigationControls()
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
         else { positionDockedWindow() }
@@ -426,8 +430,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func updateNavigationControls() {
         let enabled = !isShowingNearby && !confirming && !commitWhenLoaded
-        search.isEnabled = enabled; semanticSearch.isEnabled = enabled; filters.setInteractionEnabled(enabled); scope.isEnabled = enabled
-        semanticSearch.isHidden = isShowingNearby
+        search.isEnabled = enabled; semanticSearch.isEnabled = enabled && semanticSearchAvailable; filters.setInteractionEnabled(enabled); scope.isEnabled = enabled
+        semanticSearch.isHidden = isShowingNearby || !semanticSearchAvailable
+        chatButton.isHidden = !chatAvailable
+        chatButton.isEnabled = chatAvailable && !confirming && !commitWhenLoaded
+        searchOptionsRow.isHidden = semanticSearch.isHidden && chatButton.isHidden
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
@@ -435,6 +442,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         hint.stringValue = isShowingNearby
             ? "Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр"
             : "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
+    }
+
+    func updateFeatureAvailability(semanticSearch: Bool, chat: Bool) {
+        let previousMode = searchMode
+        semanticSearchAvailable = semanticSearch
+        chatAvailable = chat
+        updateNavigationControls()
+        // Keep the checkbox preference, but never request semantic search while unavailable.
+        if previousMode != searchMode { searchIndexDidChange() }
     }
 
     func updateSearchMode(_ actual: ActualSearchMode, reason: String?) {
@@ -672,7 +688,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 if event.keyCode == 1 { performSelected(.save); return nil }
             }
             if event.keyCode == 2 { performSelected(.favorite); return nil }
-            if event.keyCode == 51 { performSelected(.delete); return nil }
+            // The search field owns Command-Delete's standard text-editing action.
+            if event.keyCode == 51, !editingSearch { performSelected(.delete); return nil }
         }
         if event.keyCode == 49 && !editingSearch && flags.intersection([.command, .option, .control]).isEmpty {
             previewSelected(); return nil
@@ -1219,11 +1236,17 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         sidebarButton.target = self; sidebarButton.action = #selector(toggleSidebar)
         settingsButton.target = self; settingsButton.action = #selector(showSettings)
         settingsButton.toolTip = "Настройки · ⌘,"
-        for button in [sidebarButton, resetSearch, settingsButton] {
+        pinButton.setButtonType(.toggle)
+        pinButton.imagePosition = .imageOnly
+        pinButton.target = self; pinButton.action = #selector(togglePinned)
+        pinButton.identifier = NSUserInterfaceItemIdentifier("history.pin")
+        for button in [sidebarButton, resetSearch, settingsButton, pinButton] {
             button.isBordered = false; button.widthAnchor.constraint(equalToConstant: 26).isActive = true
             button.contentTintColor = .secondaryLabelColor
         }
-        let searchRow = NSStackView(views: [sidebarButton, search, resetSearch, filters, settingsButton]); searchRow.spacing = 8; searchRow.distribution = .fill
+        updatePinButton()
+        let searchRow = NSStackView(views: [sidebarButton, search, resetSearch, filters, settingsButton, pinButton]); searchRow.spacing = 6; searchRow.distribution = .fill
+        searchRow.alignment = .centerY
         search.setContentHuggingPriority(.defaultLow, for: .horizontal)
         search.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         root.addArrangedSubview(searchRow)
@@ -1251,7 +1274,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.toolTip = "Назад в историю · Esc"
         nearbyBack.setAccessibilityLabel("Назад в историю")
         nearbyBack.isHidden = true
-        let chatButton = NSButton(title: "Спросить", target: self, action: #selector(showChat))
+        chatButton.target = self; chatButton.action = #selector(showChat)
         chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
         chatButton.font = .systemFont(ofSize: 12)
         chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
@@ -1262,7 +1285,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let searchOptionsSpacer = NSView()
         searchOptionsSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         searchOptionsSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let searchOptionsRow = NSStackView(views: [semanticSearch, searchOptionsSpacer, chatButton])
+        [semanticSearch, searchOptionsSpacer, chatButton].forEach(searchOptionsRow.addArrangedSubview)
+        searchOptionsRow.identifier = NSUserInterfaceItemIdentifier("history.searchOptions")
         searchOptionsRow.spacing = 8; searchOptionsRow.distribution = .fill; searchOptionsRow.alignment = .centerY
         root.addArrangedSubview(searchOptionsRow)
         searchOptionsRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
@@ -1286,18 +1310,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor; hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         hint.stringValue = "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
-        pinButton.setButtonType(.toggle)
-        pinButton.bezelStyle = .texturedRounded; pinButton.controlSize = .small
-        pinButton.image = Self.anchorImage()
-        pinButton.imagePosition = .imageOnly
-        pinButton.target = self; pinButton.action = #selector(togglePinned)
-        pinButton.identifier = NSUserInterfaceItemIdentifier("history.pin")
-        pinButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
-        updatePinButton()
-        let footer = NSStackView(views: [hint, pinButton])
-        footer.spacing = 8; footer.distribution = .fill
-        root.addArrangedSubview(footer)
-        footer.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        root.addArrangedSubview(hint)
+        hint.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        updateNavigationControls()
     }
 
     @objc private func togglePinned() {
@@ -1336,5 +1351,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         return image
     }
 
-    @objc private func showChat() { onShowChat?() }
+    @objc private func showChat() {
+        guard chatAvailable, !confirming, !commitWhenLoaded else { return }
+        onShowChat?()
+    }
 }

@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var historyChat: HistoryChatCoordinator?
     private var embeddingStatus = EmbeddingIndexStatus.disabled
     private var embeddingEnabled: Bool?
+    private var assistantEnabled = false
+    private var chatMenuItems: [NSMenuItem] = []
     private var preparationMonitor: BackgroundPreparationMonitor?
     private var preparationPolicy = BackgroundPreparationPolicy(environment:
         BackgroundPreparationEnvironment(powerSource: .unknown, lowPowerMode: false, thermalState: .nominal))
@@ -427,8 +429,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let enabled = snapshots.contains {
             $0.descriptor.role == .embedding && $0.isReadyForUse
         }
-        guard enabled != embeddingEnabled else { return }
+        let embeddingChanged = enabled != embeddingEnabled
         embeddingEnabled = enabled
+        assistantEnabled = snapshots.contains {
+            $0.descriptor.role == .assistant && $0.isReadyForUse
+        }
+        panel?.updateFeatureAvailability(semanticSearch: enabled, chat: assistantEnabled)
+        chatMenuItems.forEach { $0.isHidden = !assistantEnabled }
+        guard embeddingChanged else { return }
         // Let an active query finish (or fall back after runtime unload). Cancelling here leaves
         // the panel in its loading state, which also prevents the deferred index refresh.
         Task { @MainActor [weak self] in
@@ -510,7 +518,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showHistory() { open() }
     @objc private func showChat() {
-        guard let historyChat else { return }
+        guard assistantEnabled, let historyChat else { return }
         if panel?.window.attachedSheet != nil { return }
         if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
         historyChat.show()
@@ -679,7 +687,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
         _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
-        _ = add("Спросить Buffera…", #selector(showChat))
+        let statusChatItem = add("Спросить Buffera…", #selector(showChat))
+        statusChatItem.isHidden = true
+        chatMenuItems.append(statusChatItem)
         let settingsItem = add("Настройки…", #selector(showSettings))
         settingsItem.keyEquivalent = ","
         shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
@@ -699,6 +709,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mainMenu = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: BrandIdentity.name)
         let chatItem = NSMenuItem(title: "Спросить Buffera…", action: #selector(showChat), keyEquivalent: "")
+        chatItem.isHidden = true
+        chatMenuItems.append(chatItem)
         chatItem.target = self; appMenu.addItem(chatItem)
         let appearanceItem = NSMenuItem(title: "Настройки…", action: #selector(showSettings), keyEquivalent: ",")
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())

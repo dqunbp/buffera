@@ -44,6 +44,8 @@ final class PanelHarness {
     var confirmations: [Int64] = []
 
     init(rows: [ClipSummary] = []) {
+        // Existing interaction fixtures exercise both ready features.
+        panel.updateFeatureAvailability(semanticSearch: true, chat: true)
         let views = descendants(of: panel.window.contentView!)
         search = views.compactMap { $0 as? NSSearchField }.first!
         cards = views.compactMap { $0 as? HistoryCardsView }.first!
@@ -90,6 +92,96 @@ final class PanelHarness {
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
+
+func searchDeletionChecks() {
+    let harness = PanelHarness(rows: [fixture(1)])
+    defer { harness.finish() }
+    var deletions: [Int64] = []
+    harness.panel.onDelete = { deletions.append($0) }
+    harness.panel.window.makeFirstResponder(harness.search)
+    guard let editor = harness.search.currentEditor() as? NSTextView else {
+        fatalError("Search has no field editor")
+    }
+    let commandDelete = NSEvent.keyEvent(with: .keyDown, location: .zero,
+        modifierFlags: [.command], timestamp: 0, windowNumber: harness.panel.window.windowNumber,
+        context: nil, characters: "\u{7f}", charactersIgnoringModifiers: "\u{7f}",
+        isARepeat: false, keyCode: 51)!
+
+    func deletePrefix(_ text: String, caret: Int, expected: String) {
+        harness.search.stringValue = text
+        editor.string = text
+        editor.setSelectedRange(NSRange(location: caret, length: 0))
+        harness.panel.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification,
+                                                       object: harness.search))
+        check(harness.panel.window.onKeyDown?(commandDelete) == false,
+              "Command-Delete in search reaches the native text editor")
+        editor.interpretKeyEvents([commandDelete])
+        check(editor.string == expected, "Command-Delete removes the query prefix at caret \(caret)")
+        check(deletions.isEmpty && harness.confirmations.isEmpty,
+              "Editing the query never deletes or copies a history entry")
+        check(harness.requests.last?.query == expected,
+              "Native query deletion refreshes search through its normal delegate")
+    }
+    deletePrefix("alpha beta", caret: 10, expected: "")
+    deletePrefix("alpha beta gamma", caret: 10, expected: " gamma")
+    deletePrefix("", caret: 0, expected: "")
+    harness.panel.receive([fixture(1)], total: 1, offset: 0)
+    harness.panel.window.makeFirstResponder(harness.cards)
+    check(harness.panel.window.onKeyDown?(commandDelete) == true && deletions == [1],
+          "Command-Delete still deletes the selected entry when the list has focus")
+}
+searchDeletionChecks()
+
+func featureAvailabilityChecks() {
+    let initial = HistoryPanel()
+    check(initial.searchMode == .literal, "search starts in literal mode before feature readiness arrives")
+    let harness = PanelHarness(rows: [fixture(20)])
+    defer { harness.finish() }
+    let content = harness.panel.window.contentView!
+    let views = descendants(of: content)
+    let toggle = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.searchMode" }!
+    let chat = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.chat" }!
+    let options = views.first { $0.identifier?.rawValue == "history.searchOptions" }!
+    var chatOpened = false
+    harness.panel.onShowChat = { chatOpened = true }
+
+    harness.panel.updateFeatureAvailability(semanticSearch: false, chat: false)
+    content.layoutSubtreeIfNeeded()
+    check(toggle.isHidden && chat.isHidden && options.isHidden,
+          "disabling both features hides their controls and the whole options row")
+    check(harness.panel.searchMode == .literal && !toggle.isEnabled,
+          "a hidden semantic checkbox cannot request semantic search")
+    chat.performClick(nil)
+    check(!chatOpened && harness.confirmations.isEmpty, "an unavailable assistant cannot open or copy a record")
+    waitUntil("literal refresh after disabling semantic search") { !harness.requests.isEmpty }
+    check(harness.requests.last?.mode == .literal && harness.requests.last?.query == "fixture"
+          && harness.requests.last?.silent == true, "disabling semantic search refreshes the same query without clearing selection")
+    harness.panel.receive([fixture(20)], total: 1, offset: 0)
+    check(harness.panel.selected?.id == 20, "feature changes preserve the selected record")
+
+    harness.panel.updateFeatureAvailability(semanticSearch: false, chat: true)
+    check(toggle.isHidden && !chat.isHidden && !options.isHidden,
+          "assistant availability updates independently of semantic search")
+    chat.performClick(nil)
+    check(chatOpened && harness.confirmations.isEmpty, "the ready assistant opens without copying a record")
+    harness.panel.updateFeatureAvailability(semanticSearch: true, chat: false)
+    check(!toggle.isHidden && chat.isHidden && !options.isHidden && harness.panel.searchMode == .automatic,
+          "re-enabling semantic search restores its checkbox preference without the assistant")
+    harness.panel.showNearby(id: 20)
+    check(options.isHidden, "nearby collapses the options row when only semantic search is available")
+    harness.panel.updateFeatureAvailability(semanticSearch: false, chat: false)
+    harness.panel.returnFromNearby()
+    check(toggle.isHidden && options.isHidden && harness.panel.searchMode == .literal,
+          "returning from nearby does not reveal a feature disabled while browsing neighbors")
+    harness.panel.receive([fixture(20)], total: 1, offset: 0)
+    harness.panel.updateFeatureAvailability(semanticSearch: true, chat: false)
+    toggle.performClick(nil)
+    harness.panel.updateFeatureAvailability(semanticSearch: false, chat: false)
+    harness.panel.updateFeatureAvailability(semanticSearch: true, chat: false)
+    check(toggle.state == .off && harness.panel.searchMode == .literal,
+          "disabling and re-enabling a feature preserves an unchecked search preference")
+}
+featureAvailabilityChecks()
 
 let modeHarness = PanelHarness(rows: [fixture(20)])
 let semanticSearch = descendants(of: modeHarness.panel.window.contentView!).compactMap { $0 as? NSButton }
@@ -151,9 +243,15 @@ func searchLayoutChecks() {
                 && $0.bounds.width >= $0.intrinsicContentSize.width - 1
         } && abs(chatFrame.midY - toggleFrame.midY) < 1 && chatFrame.minX >= toggleFrame.maxX + 8,
               "the ask button and full semantic-search label share one row at \(Int(width)) pt")
-        check(content.bounds.contains(pinButton.convert(pinButton.bounds, to: content))
-              && pinButton.bounds.width >= 28 && pinButton.superview !== chatButton.superview,
-              "the anchor stays visible in the footer at \(Int(width)) pt")
+        let pinFrame = pinButton.convert(pinButton.bounds, to: content)
+        let settingsButton = views.compactMap { $0 as? NSButton }.first { $0.toolTip == "Настройки · ⌘," }!
+        let settingsFrame = settingsButton.convert(settingsButton.bounds, to: content)
+        // AppKit applies different optical insets to toggle and momentary buttons.
+        check(content.bounds.contains(pinFrame) && pinButton.bounds.width >= 26
+              && pinButton.superview === harness.search.superview
+              && (pinButton.superview as? NSStackView)?.arrangedSubviews.last === pinButton
+              && pinFrame.minX >= settingsFrame.maxX && abs(pinFrame.midY - settingsFrame.midY) <= 2,
+              "the anchor is the last visible top-row icon after settings at \(Int(width)) pt")
         harness.panel.showNearby(id: 20)
         content.layoutSubtreeIfNeeded()
         check(toggle.isHidden && !toggle.isEnabled,
