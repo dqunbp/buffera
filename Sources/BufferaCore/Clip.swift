@@ -29,7 +29,7 @@ public struct ClipPayload: Codable, Equatable {
     }
 }
 
-public enum ClipKind: String, CaseIterable, Codable {
+public enum ClipKind: String, CaseIterable, Codable, Sendable {
     case text, link, image, file, other
     public var label: String {
         switch self {
@@ -51,7 +51,7 @@ public enum ClipKind: String, CaseIterable, Codable {
     }
 }
 
-public struct ClipSummary: Identifiable {
+public struct ClipSummary: Identifiable, Sendable {
     public let id: Int64
     public let date: Date
     public let kind: ClipKind
@@ -73,7 +73,7 @@ public struct ClipSummary: Identifiable {
     }
 }
 
-public struct SearchFilter {
+public struct SearchFilter: Sendable {
     public var query = ""
     public var kind: ClipKind?
     public var source: String?

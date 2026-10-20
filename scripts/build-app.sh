@@ -7,6 +7,8 @@ swift build -c release --product Buffera --cache-path "$PWD/.build/cache" "$@"
 swift build -c release --product BufferaMCP --cache-path "$PWD/.build/cache" "$@"
 APP="$PWD/dist/Buffera.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/Resources/SQLiteVec"
+cp Sources/CSQLiteVec/LICENSE-* Sources/CSQLiteVec/README.md "$APP/Contents/Resources/SQLiteVec/"
 cp .build/release/Buffera "$APP/Contents/MacOS/Buffera"
 cp .build/release/BufferaMCP "$APP/Contents/MacOS/BufferaMCP"
 if [[ "$(uname -m)" == arm64 ]]; then

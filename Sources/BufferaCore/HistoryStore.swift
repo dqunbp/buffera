@@ -1,14 +1,15 @@
 import Foundation
 import CSQLite
+import CSQLiteVec
 
 /// Confined to one serial queue by the application. No AppKit objects cross this boundary.
 public final class HistoryStore {
     public enum OpenMode { case readWrite, readOnly }
 
-    private var db: OpaquePointer?
+    var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private static let schemaVersion = 6
-    private static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
+    private static let schemaVersion = 7
+    static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
     public static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
         SearchFilter.normalize(concealedTitle + " " + source)
@@ -27,6 +28,7 @@ public final class HistoryStore {
             sqlite3_close(db); db = nil; throw error
         }
         do {
+            guard sqlite3_vec_init(db, nil, nil) == SQLITE_OK else { throw failure() }
             sqlite3_busy_timeout(db, 3000)
             if mode == .readOnly {
                 let version = try schemaVersion()
@@ -99,6 +101,30 @@ public final class HistoryStore {
                 PRAGMA user_version=6;
                 """)
             }
+            if version < 7 {
+                try execute("""
+                CREATE TABLE embedding_index (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                    fingerprint TEXT NOT NULL, dimensions INTEGER NOT NULL CHECK(dimensions>0),
+                    input_version TEXT NOT NULL
+                );
+                CREATE TABLE clip_embedding_jobs (
+                    clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE,
+                    content_fingerprint TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('pending','complete','failed')),
+                    input_truncated INTEGER NOT NULL DEFAULT 0,
+                    index_truncated INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE INDEX clip_embedding_pending ON clip_embedding_jobs(clip_id) WHERE status='pending';
+                CREATE TABLE clip_embedding_chunks (
+                    clip_id INTEGER NOT NULL REFERENCES clip_embedding_jobs(clip_id) ON DELETE CASCADE,
+                    chunk_index INTEGER NOT NULL,
+                    vector BLOB NOT NULL,
+                    PRIMARY KEY(clip_id,chunk_index)
+                );
+                PRAGMA user_version=7;
+                """)
+            }
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -162,6 +188,7 @@ public final class HistoryStore {
             try bind([.integer(id), .blob(encoded)], to: blob)
             guard sqlite3_step(blob) == SQLITE_DONE else { throw failure() }
             try syncImageTextJob(id: id)
+            try syncEmbeddingJob(id: id)
             try prune(maxCount: maxCount, maxBytes: maxBytes)
             try execute("COMMIT")
             return id
@@ -250,7 +277,7 @@ public final class HistoryStore {
         return ClipContent(summary: record.0, payload: payload, imageText: record.2)
     }
 
-    private func summaries(_ sql: String, bindings: [Value]) throws -> [ClipSummary] {
+    func summaries(_ sql: String, bindings: [Value]) throws -> [ClipSummary] {
         let statement = try prepare(sql)
         defer { sqlite3_finalize(statement) }
         try bind(bindings, to: statement)
@@ -264,7 +291,7 @@ public final class HistoryStore {
         return result
     }
 
-    private func summary(_ statement: OpaquePointer) -> ClipSummary {
+    func summary(_ statement: OpaquePointer) -> ClipSummary {
         ClipSummary(id: sqlite3_column_int64(statement, 0),
             date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
             kind: ClipKind(rawValue: string(statement, 2)) ?? .other, title: string(statement, 3),
@@ -356,6 +383,7 @@ public final class HistoryStore {
             try bind([.text(Self.concealedTitle), .text(Self.concealedSearch(source: source)), .integer(id)], to: statement)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
             try deleteImageText(id: id)
+            try syncEmbeddingJob(id: id)
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -433,6 +461,16 @@ public final class HistoryStore {
     }
 
     private func finishImageText(id: Int64, status: String, text: String, search: String) throws -> Bool {
+        try execute("BEGIN IMMEDIATE")
+        do {
+            let changed = try updateImageText(id: id, status: status, text: text, search: search)
+            if changed { try syncEmbeddingJob(id: id) }
+            try execute("COMMIT")
+            return changed
+        } catch { try? execute("ROLLBACK"); throw error }
+    }
+
+    private func updateImageText(id: Int64, status: String, text: String, search: String) throws -> Bool {
         let statement = try prepare("""
             UPDATE clip_ocr SET status=?,text=?,search=?
             WHERE clip_id=? AND status='pending' AND EXISTS (
@@ -488,8 +526,8 @@ public final class HistoryStore {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
     }
 
-    private enum Value { case text(String), number(Double), integer(Int64), blob(Data) }
-    private func predicate(_ filter: SearchFilter) -> (String, [Value]) {
+    enum Value { case text(String), number(Double), integer(Int64), blob(Data) }
+    func predicate(_ filter: SearchFilter) -> (String, [Value]) {
         var clauses: [String] = []; var bindings: [Value] = []
         for token in SearchFilter.normalize(filter.query).split(whereSeparator: { $0.isWhitespace }) {
             let escaped = token.replacingOccurrences(of: "\\", with: "\\\\")
@@ -513,16 +551,16 @@ public final class HistoryStore {
         return (clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND "), bindings)
     }
 
-    private func failure() -> HistoryError { .database(db.map { String(cString: sqlite3_errmsg($0)) } ?? "не удалось открыть файл") }
-    private func execute(_ sql: String) throws {
+    func failure() -> HistoryError { .database(db.map { String(cString: sqlite3_errmsg($0)) } ?? "не удалось открыть файл") }
+    func execute(_ sql: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw failure() }
     }
-    private func prepare(_ sql: String) throws -> OpaquePointer {
+    func prepare(_ sql: String) throws -> OpaquePointer {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw failure() }
         return statement
     }
-    private func bind(_ values: [Value], to statement: OpaquePointer) throws {
+    func bind(_ values: [Value], to statement: OpaquePointer) throws {
         for (offset, value) in values.enumerated() {
             let index = Int32(offset + 1)
             let status: Int32
@@ -535,7 +573,7 @@ public final class HistoryStore {
             guard status == SQLITE_OK else { throw failure() }
         }
     }
-    private func string(_ statement: OpaquePointer, _ index: Int32) -> String {
+    func string(_ statement: OpaquePointer, _ index: Int32) -> String {
         guard let pointer = sqlite3_column_text(statement, index) else { return "" }
         return String(cString: pointer)
     }

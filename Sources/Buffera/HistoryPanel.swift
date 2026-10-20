@@ -24,6 +24,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                               styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
     private let logger = Logger(subsystem: "local.buffera.app", category: "panel")
     private let search = NSSearchField()
+    private let semanticSearch = NSButton(checkboxWithTitle: "Искать также по смыслу", target: nil, action: nil)
+    private var actualSearchMode: ActualSearchMode = .literal
+    private var searchFallbackReason: String?
     private let filters = HistoryFilters(frame: .zero)
     private let cards = HistoryCardsView()
     private var appearance = HistoryAppearance.load()
@@ -99,6 +102,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isConfirmingCopyTransform: Bool { copyTransformSourceID != nil && confirming }
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isShowingNearby: Bool { nearbyState != nil }
+    var searchMode: HistorySearchMode { semanticSearch.state == .on ? .automatic : .literal }
     var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
 
@@ -149,7 +153,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let token = presentationToken
         commitWhenLoaded = false; pendingMoveDelta = 0; confirming = false
         invalidateReveal()
-        search.isEnabled = true; filters.setInteractionEnabled(true); scope.isEnabled = true
+        search.isEnabled = true; semanticSearch.isEnabled = true; filters.setInteractionEnabled(true); scope.isEnabled = true
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
         else { positionDockedWindow() }
@@ -368,7 +372,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func updateNavigationControls() {
         let enabled = !isShowingNearby && !confirming && !commitWhenLoaded
-        search.isEnabled = enabled; filters.setInteractionEnabled(enabled); scope.isEnabled = enabled
+        search.isEnabled = enabled; semanticSearch.isEnabled = enabled; filters.setInteractionEnabled(enabled); scope.isEnabled = enabled
+        semanticSearch.isHidden = isShowingNearby
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
@@ -378,7 +383,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             : "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
     }
 
-    /// OCR updates the search index without changing a card's displayed content.
+    func updateSearchMode(_ actual: ActualSearchMode, reason: String?) {
+        actualSearchMode = actual
+        searchFallbackReason = reason
+        semanticSearch.toolTip = reason ?? (searchMode == .literal
+            ? "Все слова запроса должны встретиться в записи."
+            : "По словам и по смыслу, когда модель поиска включена. Пустой запрос показывает историю.")
+    }
+
+    /// OCR and embeddings update the search index without changing a card's displayed content.
     func searchIndexDidChange() {
         if selected?.kind == .image {
             copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
@@ -434,6 +447,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         dismissPreview()
         invalidateReveal()
         loading = true
+        actualSearchMode = .literal; searchFallbackReason = nil
         pendingMoveDelta = 0; rows = []; cards.reload(count: 0, selectedIndex: -1, scrollToSelection: false); updateSelection()
         status.stringValue = "Загружаем историю…"
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
@@ -604,13 +618,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard !isClosing, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if loading && rows.isEmpty {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
-            scope.isEnabled = false; updateVisibleCards()
+            scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
             status.stringValue = "Ожидаем историю…"; logger.notice("Confirm waiting for history")
             return
         }
         guard let selected else { close(); return }
         confirming = true; search.isEnabled = false; filters.setInteractionEnabled(false)
-        scope.isEnabled = false; updateVisibleCards()
+        scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
         status.stringValue = "Копируем в буфер…"
         logger.notice("Confirm requested")
         onConfirm?(selected.id)
@@ -626,6 +640,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     func controlTextDidChange(_ obj: Notification) { refresh() }
     @objc private func scopeChanged() { refresh() }
+    @objc private func searchModeChanged() { refresh(preservingSelection: true) }
     @objc private func resetEverything() {
         guard !confirming, !commitWhenLoaded else { return }
         restoreSearchFromNearby(reloadIfNeeded: false)
@@ -784,8 +799,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             status.toolTip = "\(context.title)\nЗаписей: \(total). Все типы и приложения."
             return
         }
-        status.toolTip = nil
-        status.stringValue = total == 0 ? (scope.selectedSegment == 1 ? "Нет избранного по этим условиям" : "Ничего не найдено") : "Записей: \(total.formatted())"
+        status.toolTip = searchFallbackReason
+        status.stringValue = "Записей: \(total.formatted())"
+        if !search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, searchFallbackReason == nil {
+            status.toolTip = actualSearchMode == .hybrid
+                ? "Найдены совпадения текста и похожие по смыслу записи."
+                : "Найдены совпадения текста."
+        }
     }
 
     private func previewSelected() {
@@ -1014,7 +1034,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.isMovable = appearance.mode == .floating
         bodyMinimumHeight.constant = appearance.sidebarVisible ? 320 : 260
         window.minSize = NSSize(width: appearance.sidebarVisible ? 480 : 340,
-                                height: appearance.sidebarVisible ? 470 : 410)
+                                height: appearance.sidebarVisible ? 494 : 434)
     }
 
     func applyAppearance(_ value: HistoryAppearance) {
@@ -1129,6 +1149,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         scope.target = self; scope.action = #selector(scopeChanged)
         scope.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil), forSegment: 0)
         scope.setImage(NSImage(systemSymbolName: "star", accessibilityDescription: nil), forSegment: 1)
+        semanticSearch.state = .on
+        semanticSearch.controlSize = .small
+        semanticSearch.font = .systemFont(ofSize: 12)
+        semanticSearch.target = self
+        semanticSearch.action = #selector(searchModeChanged)
+        semanticSearch.identifier = NSUserInterfaceItemIdentifier("history.searchMode")
+        semanticSearch.setAccessibilityLabel(semanticSearch.title)
+        semanticSearch.toolTip = "Дополнять совпадения текста похожими по смыслу записями. Требуется включённая модель поиска."
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor; status.lineBreakMode = .byTruncatingTail
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -1140,6 +1168,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.toolTip = "Назад в историю · Esc"
         nearbyBack.setAccessibilityLabel("Назад в историю")
         nearbyBack.isHidden = true
+        root.addArrangedSubview(semanticSearch)
+        root.setCustomSpacing(6, after: searchRow)
+        root.setCustomSpacing(8, after: semanticSearch)
         let scopeRow = NSStackView(views: [scope, nearbyBack, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
         scope.widthAnchor.constraint(equalToConstant: 210).isActive = true
         root.addArrangedSubview(scopeRow)

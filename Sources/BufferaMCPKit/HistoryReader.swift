@@ -1,5 +1,6 @@
 import Foundation
 import BufferaCore
+import BufferaSearch
 
 /// Bounded metadata shared by all MCP history results. IDs are strings to preserve Int64 precision.
 public struct HistoryItem: Codable, Sendable, Equatable {
@@ -47,6 +48,10 @@ public struct HistorySearchResult: Codable, Sendable, Equatable {
     public let total: Int
     public let offset: Int
     public let nextOffset: Int?
+    public let searchMode: String
+    public let fallbackReason: String?
+    public let indexed: Int?
+    public let eligible: Int?
 }
 
 public enum HistoryContentKind: String, Codable, Sendable {
@@ -107,23 +112,61 @@ public enum HistoryReaderError: LocalizedError, Equatable {
 /// Serial, read-only access to history. Every request checks the on-disk grant and opens a fresh connection.
 public actor HistoryReader {
     private let directory: URL
+    private let searchService: HybridSearchService
 
-    public init(directory: URL = MCPAccess.defaultDirectory) {
+    public init(directory: URL = MCPAccess.defaultDirectory, searchService: HybridSearchService? = nil) {
         self.directory = directory
+        self.searchService = searchService ?? HybridSearchService(
+            modelRootURL: directory.appendingPathComponent("Models", isDirectory: true),
+            bundleURL: Self.helperBundleURL
+        )
     }
 
-    public func search(filter: SearchFilter, limit: Int = 20, offset: Int = 0) throws -> HistorySearchResult {
+    public func search(filter: SearchFilter, mode: HistorySearchMode = .automatic,
+                       limit: Int = 20, offset: Int = 0) async throws -> HistorySearchResult {
         try validate(limit, in: 1...50, name: "limit")
         try validate(offset, in: 0...100_000, name: "offset")
-        return try withAccess { store in
-            return try store.withReadSnapshot {
-                let clips = try store.search(filter, limit: limit, offset: offset)
-                let total = try store.count(filter)
-                let end = offset + clips.count
-                return HistorySearchResult(items: clips.map(HistoryItem.init), total: total, offset: offset,
-                                           nextOffset: end < total ? end : nil)
+        let access = MCPAccess(directory: directory)
+        guard access.isEnabled() else { throw HistoryReaderError.disabled }
+        do {
+            let result = try await searchService.search(databaseURL: access.databaseURL, filter: filter,
+                                                        mode: mode, limit: limit, offset: offset)
+            try Task.checkCancellation()
+            return try withAccess { store in
+                try store.withReadSnapshot {
+                    // Inference can outlive a concealment or deletion. Refresh metadata after it;
+                    // a newly concealed semantic match must not reveal even its membership.
+                    let clips = try result.rows.compactMap { previous -> ClipSummary? in
+                        do {
+                            let current = try store.summary(id: previous.id)
+                            guard previous.isConcealed || !current.isConcealed else { return nil }
+                            return current
+                        } catch HistoryError.missing { return nil }
+                    }
+                    let end = offset + result.rows.count
+                    return HistorySearchResult(
+                        items: clips.map(HistoryItem.init), total: result.total, offset: offset,
+                        nextOffset: end < result.total ? end : nil,
+                        searchMode: result.mode.rawValue, fallbackReason: result.fallbackReason,
+                        indexed: result.progress?.complete, eligible: result.progress?.total
+                    )
+                }
             }
+        } catch {
+            guard access.isEnabled() else { throw HistoryReaderError.disabled }
+            if error is CancellationError { throw CancellationError() }
+            if let error = error as? HistoryReaderError { throw error }
+            throw HistoryReaderError.storageUnavailable
         }
+    }
+
+    private static var helperBundleURL: URL {
+        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+        let macOS = executable.deletingLastPathComponent()
+        if macOS.lastPathComponent == "MacOS", macOS.deletingLastPathComponent().lastPathComponent == "Contents" {
+            return macOS.deletingLastPathComponent().deletingLastPathComponent()
+        }
+        return Bundle.main.bundleURL
     }
 
     public func read(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {

@@ -9,6 +9,8 @@ func runToolArgumentChecks() async throws {
     try await fixture.withConnection { connection in
         let invalid: [(String, [String: Value])] = [
             ("search_history", ["include_hidden": true]),
+            ("search_history", ["mode": "semantic"]),
+            ("search_history", ["mode": true]),
             ("read_clip", ["id": 12]),
             ("read_clip", ["id": "9223372036854775808"]),
             ("read_clip", ["id": "01"]),
@@ -54,6 +56,17 @@ func runToolArgumentChecks() async throws {
             "from": "2026-10-19T00:00:00+04:00", "until": "2026-10-20T00:00:00.000+04:00"
         ])
         try checkEqual(filtered.isError, false)
+        for mode in ["automatic", "literal", "hybrid"] {
+            let result = try await connection.call("search_history", ["query": "Buffera", "mode": .string(mode)])
+            try checkEqual(result.isError, false)
+            try checkEqual(result.structuredContent?.objectValue?["search_mode"], "literal",
+                           "Absent models preserve word search for every requested mode")
+            if mode == "literal" {
+                try checkNil(result.structuredContent?.objectValue?["fallback_reason"])
+            } else {
+                try checkNotNil(result.structuredContent?.objectValue?["fallback_reason"])
+            }
+        }
         for date in ["2024-02-29T12:34:56Z", "2026-10-20T12:34:56.123456789+04:00",
                      "2026-10-20T12:34:56-03:30", "2026-10-20t12:34:56z",
                      "2026-10-20T12:34:56+0400"] {
@@ -70,6 +83,8 @@ func runToolArgumentChecks() async throws {
             try checkEqual(tool.annotations.openWorldHint, false)
             try checkEqual(tool.inputSchema.objectValue?["additionalProperties"], false)
         }
+        let search = tools.first { $0.name == "search_history" }
+        try checkEqual(search?.inputSchema.objectValue?["properties"]?.objectValue?["mode"]?.objectValue?["default"], "automatic")
         let text = "data:text/plain;charset=utf-8;base64,SGVsbG8="
         let id = try fixture.store.insert(
             payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text", data: Data(text.utf8))]]),

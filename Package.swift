@@ -13,17 +13,25 @@ let package = Package(
     ],
     targets: [
         .systemLibrary(name: "CSQLite"),
-        .target(name: "BufferaCore", dependencies: ["CSQLite"]),
+        .target(name: "CSQLiteVec", dependencies: ["CSQLite"],
+                exclude: ["sqlite-vec.c", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+                cSettings: [.define("SQLITE_CORE"), .define("SQLITE_VEC_STATIC")]),
+        .target(name: "BufferaCore", dependencies: ["CSQLite", "CSQLiteVec"]),
         .target(name: "BufferaModels"),
-        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels"],
+        .target(name: "BufferaSearch", dependencies: ["BufferaCore", "BufferaModels"]),
+        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch"],
                           linkerSettings: [.linkedFramework("Carbon")]),
         .target(name: "BufferaMCPKit", dependencies: [
-            "BufferaCore", .product(name: "MCP", package: "swift-sdk")
+            "BufferaCore", "BufferaSearch", .product(name: "MCP", package: "swift-sdk")
         ]),
         .executableTarget(name: "BufferaMCP", dependencies: ["BufferaMCPKit"]),
-        .executableTarget(name: "BufferaMCPChecks", dependencies: ["BufferaMCPKit", "BufferaCore", "CSQLite"],
+        .executableTarget(name: "BufferaMCPChecks", dependencies: ["BufferaMCPKit", "BufferaCore", "BufferaSearch", "CSQLite"],
                     path: "Tests/BufferaMCPTests"),
         .executableTarget(name: "BufferaChecks", dependencies: ["BufferaCore"], path: "Tests/BufferaCoreTests"),
-        .executableTarget(name: "BufferaModelChecks", dependencies: ["BufferaModels"], path: "Tests/BufferaModelTests")
+        .executableTarget(name: "BufferaModelChecks", dependencies: ["BufferaModels"], path: "Tests/BufferaModelTests"),
+        .executableTarget(name: "BufferaEmbeddingRuntimeChecks", dependencies: ["BufferaModels"],
+                          path: "Tests/BufferaEmbeddingRuntimeTests"),
+        .executableTarget(name: "BufferaSearchChecks", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch"],
+                          path: "Tests/BufferaSearchTests")
     ]
 )

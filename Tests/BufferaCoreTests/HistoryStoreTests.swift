@@ -88,7 +88,7 @@ final class HistoryStoreTests {
             _ = try store.imageText(id: empty)
             throw CheckFailure(description: "Expected missing image text record")
         } catch HistoryError.missing { }
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 6)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 7)
     }
 
     func testDuplicateMovesToTopWithoutNewRecord() throws {
@@ -416,11 +416,11 @@ final class HistoryStoreTests {
         try checkEqual(records.map(\.title), (1...8).reversed().map { "legacy \($0)" })
         try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite && !$0.isRemote })
         for index in 1...8 { try checkEqual(try store.payload(id: Int64(index)), payload("legacy \(index)")) }
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         store = nil; store = try HistoryStore(url: url)
         try checkEqual(try store.count(), 8)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
     }
 
     func testVersionTwoMigrationPreservesConcealmentAndPayloads() throws {
@@ -452,7 +452,7 @@ final class HistoryStoreTests {
         try checkEqual(record.source, "Old App"); try checkEqual(record.byteCount, encoded.count)
         try check(record.isConcealed && !record.isFavorite && !record.isRemote)
         try checkEqual(try store.payload(id: 42), original)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         try store.setFavorite(id: 42, isFavorite: true)
         store = nil; store = try HistoryStore(url: url)
@@ -463,7 +463,7 @@ final class HistoryStoreTests {
     func testFavoriteSurvivesRepeatSetReopenDeduplicationAndConcealment() throws {
         let id = try insert("favorite-fixture", time: 100)
         try check(!store.search(SearchFilter())[0].isFavorite)
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 6)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 7)
         try store.setFavorite(id: id, isFavorite: true)
         try store.setFavorite(id: id, isFavorite: true)
         try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 100))
@@ -595,10 +595,10 @@ final class HistoryStoreTests {
     func testNewerSchemaIsNotDowngraded() throws {
         let url = directory.appendingPathComponent("future.sqlite")
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=7", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=8", nil, nil, nil), SQLITE_OK)
         }
         try checkThrows(try HistoryStore(url: url))
-        try checkEqual(try rawSchemaVersion(at: url), 7)
+        try checkEqual(try rawSchemaVersion(at: url), 8)
     }
 
     func testVersionThreeMigrationBackfillsOnlyVisibleImagesWithoutChangingHistory() throws {
@@ -631,7 +631,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try HistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         try checkEqual(try store.count(), 4)
         let records = try store.search(SearchFilter())
         for entry in entries {
@@ -717,7 +717,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try HistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         let records = try store.search(SearchFilter())
         try checkEqual(records.count, entries.count)
         for entry in entries {
@@ -737,7 +737,7 @@ final class HistoryStoreTests {
         filter.query = ""
         try checkEqual(try store.count(filter), 0)
         store = nil; store = try HistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
         try withRawDatabase(at: url) { db in
             try checkEqual(sqlite3_exec(db, "UPDATE clips SET is_remote=2 WHERE id=21", nil, nil, nil), SQLITE_CONSTRAINT)
@@ -787,7 +787,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try HistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 6)
+        try checkEqual(try rawSchemaVersion(at: url), 7)
         let records = try store.search(SearchFilter())
         try checkEqual(records.map(\.id), [34, 33, 31, 32])
         for entry in entries {
@@ -1108,7 +1108,7 @@ final class HistoryStoreTests {
 
         let url = directory.appendingPathComponent("history.sqlite")
         let id = try insert("read-only version fixture")
-        for version in [0, 5, 7] {
+        for version in [0, 5, 6, 8] {
             try withRawDatabase(at: url) { db in
                 try checkEqual(sqlite3_exec(db, "PRAGMA user_version=\(version)", nil, nil, nil), SQLITE_OK)
             }
@@ -1117,7 +1117,7 @@ final class HistoryStoreTests {
             try checkEqual(try store.payload(id: id), payload("read-only version fixture"))
         }
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=6", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=7", nil, nil, nil), SQLITE_OK)
         }
         let reader = try HistoryStore(url: url, mode: .readOnly)
         try checkEqual(try reader.summary(id: id).text, "read-only version fixture")

@@ -6,6 +6,7 @@ final class ModelSettingsView: NSView {
     var onCheck: ((ModelRole) -> Void)?
     var onCancelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemove: ((ModelRole) -> Void)?
+    var onRetryEmbeddingIndex: (() -> Void)?
 
     private let manager: LocalModelManager?
     private var cards: [ModelRole: ModelCardView] = [:]
@@ -15,7 +16,7 @@ final class ModelSettingsView: NSView {
         super.init(frame: .zero)
 
         let introduction = modelParagraph(
-            "Скачайте нужные модели независимо друг от друга. Поиск по смыслу и чат появятся на следующих этапах."
+            "Включите модель поиска, чтобы находить записи по смыслу. История обрабатывается постепенно на этом Mac. Локальный чат появится на следующем этапе."
         )
         let content = NSStackView()
         content.orientation = .vertical
@@ -51,6 +52,7 @@ final class ModelSettingsView: NSView {
             }
             card.onCheck = { [weak self] in self?.onCheck?(role) }
             card.onCancelCheck = { [weak self] in self?.onCancelCheck?(role) }
+            card.onRetryIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
             cards[role] = card
             content.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -58,7 +60,7 @@ final class ModelSettingsView: NSView {
         introduction.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let note = modelParagraph(
-            "Выключение останавливает проверку и освобождает память. Скачанные файлы остаются на диске; «Удалить» убирает их отдельно."
+            "Выключение останавливает обработку и освобождает память. Скачанные файлы остаются на диске; «Удалить» убирает их отдельно. Скрытые записи не индексируются."
         )
         content.addArrangedSubview(note)
         note.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -104,6 +106,10 @@ final class ModelSettingsView: NSView {
     func updateCheck(role: ModelRole, status: String, running: Bool) {
         cards[role]?.updateCheck(status: status, running: running)
     }
+
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
+        cards[.embedding]?.updateIndex(status: status, progress: progress, canRetry: canRetry)
+    }
 }
 
 private final class ModelSettingsDocumentView: NSView {
@@ -117,6 +123,7 @@ private final class ModelCardView: NSBox {
     var onSetEnabled: ((Bool) -> Void)?
     var onCheck: (() -> Void)?
     var onCancelCheck: (() -> Void)?
+    var onRetryIndex: (() -> Void)?
 
     private var snapshot: LocalModelSnapshot
     private var isChecking = false
@@ -128,6 +135,9 @@ private final class ModelCardView: NSBox {
     private let remove = NSButton()
     private let check = NSButton()
     private let checkStatus = modelParagraph("")
+    private let indexStatus = modelParagraph("")
+    private let indexProgress = NSProgressIndicator()
+    private let retryIndex = NSButton()
 
     init(snapshot: LocalModelSnapshot) {
         self.snapshot = snapshot
@@ -182,8 +192,22 @@ private final class ModelCardView: NSBox {
         checkStatus.identifier = NSUserInterfaceItemIdentifier("\(prefix).checkStatus")
         checkStatus.isSelectable = true
         checkStatus.isHidden = true
+        indexStatus.identifier = NSUserInterfaceItemIdentifier("\(prefix).indexStatus")
+        indexStatus.isHidden = true
+        indexProgress.style = .bar
+        indexProgress.controlSize = .small
+        indexProgress.minValue = 0
+        indexProgress.maxValue = 1
+        indexProgress.isIndeterminate = false
+        indexProgress.isHidden = true
+        indexProgress.identifier = NSUserInterfaceItemIdentifier("\(prefix).indexProgress")
+        indexProgress.setAccessibilityLabel("Подготовка истории для поиска по смыслу")
+        configure(retryIndex, action: #selector(retryIndexing), identifier: "\(prefix).retryIndex")
+        retryIndex.title = "Повторить обработку"
+        retryIndex.isHidden = true
 
-        let stack = NSStackView(views: [heading, modelName, status, progress, actions, checkStatus])
+        let stack = NSStackView(views: [heading, modelName, status, progress, actions, checkStatus,
+                                      indexStatus, indexProgress, retryIndex])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -196,7 +220,7 @@ private final class ModelCardView: NSBox {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
-        for view in [heading, modelName, status, progress, checkStatus] {
+        for view in [heading, modelName, status, progress, checkStatus, indexStatus, indexProgress] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         update(snapshot)
@@ -265,6 +289,16 @@ private final class ModelCardView: NSBox {
         updateCheckButton()
     }
 
+    func updateIndex(status: String, progress: Double?, canRetry: Bool) {
+        guard snapshot.descriptor.role == .embedding else { return }
+        indexStatus.stringValue = status
+        indexStatus.isHidden = status.isEmpty
+        indexProgress.isHidden = progress == nil
+        if let progress { indexProgress.doubleValue = max(0, min(1, progress)) }
+        retryIndex.isHidden = !canRetry
+        retryIndex.isEnabled = snapshot.state == .downloaded && snapshot.isEnabled && platformSupported
+    }
+
     private func updateCheckButton() {
         check.isHidden = snapshot.state != .downloaded && !isChecking
         check.title = isChecking ? "Остановить проверку" : "Проверить модель"
@@ -294,6 +328,7 @@ private final class ModelCardView: NSBox {
 
     @objc private func changeEnabled() { onSetEnabled?(enabled.state == .on) }
     @objc private func removeModel() { onRemove?() }
+    @objc private func retryIndexing() { onRetryIndex?() }
     @objc private func checkModel() {
         if isChecking { onCancelCheck?() }
         else { onCheck?() }

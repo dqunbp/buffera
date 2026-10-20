@@ -11,6 +11,7 @@ final class SettingsWindow: NSWindowController {
     var onCheckModel: ((ModelRole) -> Void)?
     var onCancelModelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
+    var onRetryEmbeddingIndex: (() -> Void)?
 
     private let settings: SettingsContentController
 
@@ -42,6 +43,7 @@ final class SettingsWindow: NSWindowController {
         settings.onCheckModel = { [weak self] role in self?.onCheckModel?(role) }
         settings.onCancelModelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
         settings.onWillDisableOrRemoveModel = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
+        settings.onRetryEmbeddingIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -60,6 +62,9 @@ final class SettingsWindow: NSWindowController {
     func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
         settings.updateModelCheck(role: role, status: status, running: running)
+    }
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
+        settings.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry)
     }
 }
 
@@ -84,6 +89,7 @@ private final class SettingsContentController: NSViewController {
     var onCheckModel: ((ModelRole) -> Void)?
     var onCancelModelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
+    var onRetryEmbeddingIndex: (() -> Void)?
 
     private let mcp: MCPSettingsView
     private let models: ModelSettingsView
@@ -113,6 +119,7 @@ private final class SettingsContentController: NSViewController {
         models.onCheck = { [weak self] role in self?.onCheckModel?(role) }
         models.onCancelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
         models.onWillDisableOrRemove = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
+        models.onRetryEmbeddingIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -122,6 +129,9 @@ private final class SettingsContentController: NSViewController {
     func updateModels(_ snapshots: [LocalModelSnapshot]) { models.update(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
         models.updateCheck(role: role, status: status, running: running)
+    }
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
+        models.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry)
     }
 
     override func loadView() {

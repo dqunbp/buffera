@@ -2,6 +2,7 @@ import Foundation
 import CSQLite
 import BufferaCore
 import BufferaMCPKit
+import BufferaSearch
 
 final class HistoryReaderTests {
     private var directory: URL!
@@ -171,6 +172,118 @@ final class HistoryReaderTests {
         try checkEqual(beyond.total, 2)
         try checkTrue(beyond.items.isEmpty)
         try checkNil(beyond.nextOffset)
+    }
+
+    func testSearchReportsActualModeAndKeepsLiteralModeIndependentOfInference() async throws {
+        let id = try insert("exact words", time: 1)
+        var filter = SearchFilter()
+        filter.query = "exact"
+        let unavailable = try await reader.search(filter: filter, mode: .hybrid)
+        try checkEqual(unavailable.searchMode, "literal")
+        try checkNotNil(unavailable.fallbackReason)
+        try checkEqual(unavailable.items.map(\.id), [String(id)])
+
+        let literalOnly = HistoryReader(directory: directory, searchService: HybridSearchService(queryProvider: { _ in
+            throw HistoryReaderError.invalidArgument("Literal search must not compute an embedding")
+        }))
+        let literal = try await literalOnly.search(filter: filter, mode: .literal)
+        try checkEqual(literal.searchMode, "literal")
+        try checkNil(literal.fallbackReason)
+        try checkEqual(literal.items.map(\.id), [String(id)])
+        let browse = try await literalOnly.search(filter: SearchFilter())
+        try checkNil(browse.fallbackReason)
+        try checkEqual(browse.total, 1)
+    }
+
+    func testRevokingAccessDuringQueryInferenceDiscardsResults() async throws {
+        try insert("still private", time: 1)
+        let directory = self.directory!
+        let delayed = HistoryReader(directory: directory, searchService: HybridSearchService(queryProvider: { _ in
+            try MCPAccess(directory: directory).setEnabled(false)
+            throw HistoryReaderError.invalidArgument("An inference failure cannot override revocation")
+        }))
+        var filter = SearchFilter()
+        filter.query = "private"
+        try await expectError(.disabled) { _ = try await delayed.search(filter: filter, mode: .hybrid) }
+    }
+
+    func testModelUnloadFallsBackButRequestCancellationPropagates() async throws {
+        let id = try insert("query survives model unload")
+        var filter = SearchFilter()
+        filter.query = "query"
+        let unloaded = HistoryReader(directory: directory, searchService: HybridSearchService(queryProvider: { _ in
+            // Runtime unload cancels its continuation without cancelling the caller's Task.
+            throw CancellationError()
+        }))
+        let fallback = try await unloaded.search(filter: filter, mode: .hybrid)
+        try checkEqual(fallback.searchMode, "literal")
+        try checkNotNil(fallback.fallbackReason)
+        try checkEqual(fallback.items.map(\.id), [String(id)])
+
+        let invocation = QueryInvocation()
+        let delayed = HistoryReader(directory: directory, searchService: HybridSearchService(queryProvider: { _ in
+            await invocation.start()
+            try await Task.sleep(nanoseconds: 30_000_000_000)
+            throw HistoryReaderError.invalidArgument("The cancelled request must not finish")
+        }))
+        let request = Task { try await delayed.search(filter: filter, mode: .hybrid) }
+        for _ in 0..<100 {
+            if await invocation.started { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let started = await invocation.started
+        request.cancel()
+        try checkTrue(started, "Cancellation fixture reached inference")
+        do {
+            _ = try await request.value
+            try checkFail("Cancelling the actual request must not publish a literal fallback")
+        } catch is CancellationError {
+            try checkTrue(true)
+        }
+    }
+
+    func testHybridSearchUsesSharedIndexFiltersPaginationAndMasks() async throws {
+        let literalID = try insert("database error", time: 3, source: "Terminal")
+        let semanticID = try insert("connection refused", time: 2, source: "Terminal")
+        try insert("unrelated document", time: 4, source: "Safari")
+        let hiddenID = try insert("database secret", time: 5, source: "Terminal", hidden: true)
+        let identity = EmbeddingIndexIdentity(fingerprint: "reader-fixture-v1", dimensions: 2)
+        try store.configureEmbeddingIndex(identity)
+        while let job = try store.nextPendingEmbedding() {
+            let vector: [Float] = job.clipID == semanticID ? [1, 0] : [0, 1]
+            try checkTrue(store.completeEmbedding(job, vectors: [vector]))
+        }
+        let service = HybridSearchService(queryProvider: { _ in SemanticQuery(vector: [1, 0], identity: identity) })
+        let hybrid = HistoryReader(directory: directory, searchService: service)
+        var filter = SearchFilter()
+        filter.query = "database"
+        filter.source = "Terminal"
+        let first = try await hybrid.search(filter: filter, limit: 1)
+        try checkEqual(first.searchMode, "hybrid")
+        try checkNil(first.fallbackReason)
+        try checkEqual(first.total, 2)
+        try checkEqual(first.items.map(\.id), [String(literalID)])
+        try checkEqual(first.nextOffset, 1)
+        try checkEqual(first.indexed, 3)
+        try checkEqual(first.eligible, 3)
+        let second = try await hybrid.search(filter: filter, limit: 1, offset: 1)
+        try checkEqual(second.items.map(\.id), [String(semanticID)])
+        try checkNil(second.nextOffset)
+        let literal = try await hybrid.search(filter: filter, mode: .literal)
+        try checkEqual(literal.items.map(\.id), [String(literalID)])
+
+        filter.query = ""
+        filter.concealedOnly = true
+        let hidden = try await hybrid.search(filter: filter, mode: .hybrid)
+        try checkEqual(hidden.searchMode, "literal")
+        try checkEqual(hidden.items.map(\.id), [String(hiddenID)])
+        try checkMaskedItem(hidden.items[0])
+
+        try store.conceal(id: semanticID)
+        filter.query = "database"; filter.concealedOnly = false
+        let concealed = try await hybrid.search(filter: filter)
+        try checkEqual(concealed.items.map(\.id), [String(literalID)],
+                       "A previous semantic match disappears once concealed")
     }
 
     func testMetadataIsBoundedAndIDDoesNotLoseIntegerPrecision() async throws {
@@ -502,6 +615,10 @@ func runHistoryReaderChecks() async throws {
         ("testEnabledMissingDatabaseFailsWithoutCreatingIt", HistoryReaderTests.testEnabledMissingDatabaseFailsWithoutCreatingIt),
         ("testSearchIncludesMaskedItemsAndSupportsConcealedFilters", HistoryReaderTests.testSearchIncludesMaskedItemsAndSupportsConcealedFilters),
         ("testSearchFiltersAndPaginationHaveStableMetadata", HistoryReaderTests.testSearchFiltersAndPaginationHaveStableMetadata),
+        ("testSearchReportsActualModeAndKeepsLiteralModeIndependentOfInference", HistoryReaderTests.testSearchReportsActualModeAndKeepsLiteralModeIndependentOfInference),
+        ("testRevokingAccessDuringQueryInferenceDiscardsResults", HistoryReaderTests.testRevokingAccessDuringQueryInferenceDiscardsResults),
+        ("testModelUnloadFallsBackButRequestCancellationPropagates", HistoryReaderTests.testModelUnloadFallsBackButRequestCancellationPropagates),
+        ("testHybridSearchUsesSharedIndexFiltersPaginationAndMasks", HistoryReaderTests.testHybridSearchUsesSharedIndexFiltersPaginationAndMasks),
         ("testMetadataIsBoundedAndIDDoesNotLoseIntegerPrecision", HistoryReaderTests.testMetadataIsBoundedAndIDDoesNotLoseIntegerPrecision),
         ("testReadUsesFullPayloadAndUnicodeCharacterOffsets", HistoryReaderTests.testReadUsesFullPayloadAndUnicodeCharacterOffsets),
         ("testReadDoesNotTreatCappedSummaryAsCompleteText", HistoryReaderTests.testReadDoesNotTreatCappedSummaryAsCompleteText),
@@ -531,4 +648,9 @@ func runHistoryReaderChecks() async throws {
             throw error
         }
     }
+}
+
+private actor QueryInvocation {
+    private(set) var started = false
+    func start() { started = true }
 }

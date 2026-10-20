@@ -102,4 +102,5 @@ for (name, run) in checks {
     } catch { failures += 1; fputs("FAIL: \(name): \(error)\n", stderr) }
 }
 print("\(checks.count - failures)/\(checks.count) checks passed")
+failures += runSemanticIndexChecks()
 exit(failures == 0 ? 0 : 1)

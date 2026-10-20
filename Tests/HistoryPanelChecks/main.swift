@@ -5,7 +5,7 @@ import BufferaCore
 // clipboard, database, or app activation are used. Appearance checks restore
 // every preference they touch before asserting their results.
 // mkdir -p .build/history-panel-checks
-// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/ClipboardText.swift Sources/BufferaCore/TextTransformation.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
+// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/ClipboardText.swift Sources/BufferaCore/TextTransformation.swift Sources/BufferaCore/SearchMode.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
 // swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformMenu.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
 // .build/history-panel-checks/checks
 
@@ -34,7 +34,7 @@ func fixture(_ id: Int) -> ClipSummary {
 }
 
 final class PanelHarness {
-    struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool; let filter: SearchFilter }
+    struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool; let filter: SearchFilter; let mode: HistorySearchMode }
     struct NearbyRequest { let anchorID: Int64; let token: Int }
     let panel = HistoryPanel()
     let search: NSSearchField
@@ -58,7 +58,7 @@ final class PanelHarness {
         panel.request = { [weak self] filter, offset, limit in
             guard let self else { return }
             self.requests.append(Request(query: filter.query, offset: offset, limit: limit,
-                                         silent: self.panel.isRefreshingSearchIndex, filter: filter))
+                                         silent: self.panel.isRefreshingSearchIndex, filter: filter, mode: self.panel.searchMode))
         }
         panel.onConfirm = { [weak self] in self?.confirmations.append($0) }
         panel.requestNearby = { [weak self] id, token in
@@ -90,6 +90,67 @@ final class PanelHarness {
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
+
+let modeHarness = PanelHarness(rows: [fixture(20)])
+let semanticSearch = descendants(of: modeHarness.panel.window.contentView!).compactMap { $0 as? NSButton }
+    .first { $0.identifier?.rawValue == "history.searchMode" }!
+check(modeHarness.panel.searchMode == .automatic && semanticSearch.title == "Искать также по смыслу",
+      "new panels explain semantic search as an addition to text matches")
+semanticSearch.performClick(nil)
+check(modeHarness.requests.last?.mode == .literal && modeHarness.requests.last?.query == "fixture",
+      "word-only mode requeries the existing text through the shared request path")
+modeHarness.panel.updateSearchMode(.literal, reason: "Fixture fallback")
+modeHarness.panel.receive([fixture(20)], total: 1, offset: 0)
+check(semanticSearch.toolTip == "Fixture fallback",
+      "the active search mode exposes its fallback reason without replacing results")
+semanticSearch.performClick(nil)
+modeHarness.panel.updateSearchMode(.hybrid, reason: nil)
+modeHarness.panel.receive([fixture(20)], total: 1, offset: 0)
+check(descendants(of: modeHarness.panel.window.contentView!).compactMap { $0 as? NSTextField }
+        .contains { $0.stringValue == "Записей: 1" },
+      "the record count is not prefixed with search mode text")
+modeHarness.enter()
+check(!semanticSearch.isEnabled && modeHarness.confirmations == [20],
+      "confirmation freezes semantic search together with the current selection")
+modeHarness.finish()
+
+// Regression: the mode control used to squeeze the count out of the narrow window.
+func searchLayoutChecks() {
+    let defaults = UserDefaults.standard
+    let keys = ["historyAppearance.mode", "historyAppearance.columns", "historyAppearance.visibleRows",
+                "historyAppearance.sidebarVisible", "NSWindow Frame BufferaHistory"]
+    let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+    defer {
+        for (key, value) in saved {
+            if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+        }
+    }
+    for (width, sidebar) in [(340.0, false), (360.0, false), (480.0, true)] {
+        HistoryAppearance(mode: .floating, columns: 1, visibleRows: 6, sidebarVisible: sidebar).save()
+        let harness = PanelHarness(rows: [fixture(20)])
+        defer { harness.finish() }
+        harness.panel.window.setContentSize(NSSize(width: width, height: 590))
+        harness.panel.updateSearchMode(.hybrid, reason: nil)
+        harness.panel.receive([fixture(20)], total: 100_000, offset: 0)
+        let content = harness.panel.window.contentView!
+        content.layoutSubtreeIfNeeded()
+        let views = descendants(of: content)
+        let count = views.compactMap { $0 as? NSTextField }.first { $0.stringValue.hasPrefix("Записей:") }!
+        let toggle = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.searchMode" }!
+        let countFrame = count.convert(count.bounds, to: content)
+        check(content.bounds.contains(countFrame) && count.bounds.width >= count.intrinsicContentSize.width - 1,
+              "all count digits remain visible at \(Int(width)) pt")
+        check(harness.search.bounds.width >= 150 && toggle.superview !== count.superview,
+              "semantic search does not squeeze the query or the count at \(Int(width)) pt")
+        harness.panel.showNearby(id: 20)
+        content.layoutSubtreeIfNeeded()
+        check(toggle.isHidden && !toggle.isEnabled,
+              "nearby hides and disables the semantic-search row at \(Int(width)) pt")
+        harness.panel.returnFromNearby()
+        check(!toggle.isHidden && toggle.isEnabled, "return restores semantic search at \(Int(width)) pt")
+    }
+}
+searchLayoutChecks()
 
 let entering = PanelHarness()
 var completions = 0

@@ -7,14 +7,21 @@ enum MCPTools {
     static let definitions: [Tool] = [
         tool("search_history", title: "Поиск в истории",
              description: """
-             Search Buffera clipboard history using literal terms (all words must match).
-             Includes already indexed image OCR. Empty query browses history. Results follow the app's
-             recently-used ordering; copied_at remains the original capture date. Use read_clip for
+             Search Buffera clipboard history, including cached image OCR. Automatic mode combines
+             literal matches with semantic matches when the embedding model is enabled and its index
+             is available. Literal mode requires all words to match and keeps recently-used ordering.
+             Hybrid mode requests semantic search; unavailable inference falls back to literal search.
+             search_mode and fallback_reason describe what actually ran; indexed and eligible describe
+             index coverage when available. Empty query browses history in recently-used order.
+             Filters apply to both kinds of matches; copied_at is the original capture date. Use read_clip for
              full text and get_neighbors for surrounding captures. Concealed records appear masked,
              with metadata only: their contents are not searched or included in snippets. Use source,
              date, and other metadata filters to find them, then reveal_clip to read their contents.
              """, properties: [
                 "query": string("Text to search; empty means browse.", max: 1_000),
+                "mode": .object(["type": "string", "enum": .array(["automatic", "literal", "hybrid"]),
+                                 "default": "automatic",
+                                 "description": "automatic uses semantic search when available; literal searches words only; hybrid requests both."]),
                 "kind": .object(["type": "string", "enum": .array(ClipKind.allCases.map { .string($0.rawValue) })]),
                 "source": string("Exact application name, as returned in results.", max: 256),
                 "favorites_only": boolean("Only favorites."),
@@ -190,5 +197,13 @@ struct ToolArguments {
             throw MCPError.invalidParams("from должен быть раньше until.")
         }
         return filter
+    }
+
+    func searchMode() throws -> HistorySearchMode {
+        guard let raw = try string("mode", max: 16) else { return .automatic }
+        guard let mode = HistorySearchMode(rawValue: raw) else {
+            throw MCPError.invalidParams("mode: используйте automatic, literal или hybrid.")
+        }
+        return mode
     }
 }

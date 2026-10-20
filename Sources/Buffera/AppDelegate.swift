@@ -1,6 +1,7 @@
 import AppKit
 import BufferaCore
 import BufferaModels
+import BufferaSearch
 import UniformTypeIdentifiers
 import os
 
@@ -16,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var modelManager: LocalModelManager?
     private var modelStorageError: String?
     private let modelProbe = ModelProbeController()
+    private var embeddingIndexer: EmbeddingIndexer?
+    private var searchService: HybridSearchService!
+    private var searchTask: Task<Void, Never>?
+    private var embeddingStatus = EmbeddingIndexStatus.disabled
+    private var embeddingEnabled: Bool?
     private var imageTextIndexer: ImageTextIndexer?
     private var copyTransformService: CopyTransformService?
     private var generation = 0
@@ -64,9 +70,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenu()
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }
+        let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
+        searchService = HybridSearchService(modelRootURL: modelRoot)
+        embeddingIndexer = EmbeddingIndexer(databaseURL: folder.appendingPathComponent("history.sqlite"),
+            modelRootURL: modelRoot,
+            onProgress: { [weak self] status in
+                DispatchQueue.main.async { self?.showEmbeddingProgress(status) }
+            },
+            onIndexed: { [weak self] in
+                DispatchQueue.main.async { self?.panel?.searchIndexDidChange() }
+            })
         do {
-            let manager = try LocalModelManager(rootURL: folder.appendingPathComponent("Models", isDirectory: true))
-            manager.onChange = { [weak self] snapshots in self?.settings?.updateModels(snapshots) }
+            let manager = try LocalModelManager(rootURL: modelRoot)
+            manager.onChange = { [weak self] snapshots in self?.modelsChanged(snapshots) }
             modelManager = manager
         } catch { modelStorageError = error.localizedDescription; showError(error) }
         modelProbe.onChange = { [weak self] role, status, running in
@@ -77,7 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectPanel()
         imageTextIndexer = ImageTextIndexer(store: store, storageQueue: work,
             onProgress: { [weak self] in self?.showImageTextProgress($0) },
-            onIndexed: { [weak self] in self?.panel.searchIndexDidChange() },
+            onIndexed: { [weak self] in
+                self?.panel.searchIndexDidChange()
+                self?.scheduleEmbeddings()
+            },
             onError: { [weak self] in self?.showError($0) })
         cleanupExports()
         exportCleanupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.cleanupExports() }
@@ -96,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.panel.clipboardDidCapture(id: id)
                     }
                     self.imageTextIndexer?.schedule()
+                    self.scheduleEmbeddings()
                 } catch { DispatchQueue.main.async { self.showError(error) } }
             }
         }
@@ -130,11 +150,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         imageTextIndexer?.stop()
         modelManager?.shutdown()
         modelProbe.shutdown()
+        searchTask?.cancel()
+        embeddingIndexer?.shutdown()
+        searchService?.shutdown()
     }
 
     private func connectPanel() {
         panel.onNavigate = { [weak self] in
             self?.searchGeneration += 1
+            self?.searchTask?.cancel()
             self?.generation += 1
             self?.confirmationToken += 1
         }
@@ -161,17 +185,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !self.panel.isRefreshingSearchIndex { self.generation += 1 }
             }
             let searchGeneration = self.searchGeneration
-            self.work.async {
-                let result = Result { (try self.store.search(filter, limit: limit, offset: offset), try self.store.count(filter),
-                                       refreshSources ? try self.store.sources() : nil) }
-                DispatchQueue.main.async {
-                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
-                    switch result {
-                    case .success(let (rows, count, sources)):
-                        if let sources { self.panel.setSources(sources) }
-                        self.panel.receive(rows, total: count, offset: offset)
-                    case .failure(let error): self.panel.searchFailed(error); self.showError(error)
+            self.searchTask?.cancel()
+            let mode = self.panel.searchMode
+            let databaseURL = self.folder.appendingPathComponent("history.sqlite")
+            self.searchTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    if offset == 0, !filter.query.isEmpty {
+                        try await Task.sleep(nanoseconds: 180_000_000)
                     }
+                    let response = try await self.searchService.search(databaseURL: databaseURL,
+                        filter: filter, mode: mode, limit: limit, offset: offset)
+                    let sources: [String]? = refreshSources
+                        ? try await self.historySources() : nil
+                    try Task.checkCancellation()
+                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
+                    if let sources { self.panel.setSources(sources) }
+                    self.panel.updateSearchMode(response.mode, reason: response.fallbackReason)
+                    self.panel.receive(response.rows, total: response.total, offset: offset)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
+                    self.panel.searchFailed(error); self.showError(error)
                 }
             }
         }
@@ -256,7 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onConceal = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.conceal(id: id); self.imageTextIndexer?.schedule(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do { try self.store.conceal(id: id); self.imageTextIndexer?.schedule(); self.scheduleEmbeddings(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
             }
         }
@@ -290,7 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onDelete = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.delete(id: id); self.imageTextIndexer?.schedule(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do { try self.store.delete(id: id); self.imageTextIndexer?.schedule(); self.scheduleEmbeddings(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
@@ -298,10 +334,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onClose = { [weak self] in
             self?.generation += 1
             self?.searchGeneration += 1
+            self?.searchTask?.cancel()
             self?.confirmationToken += 1
             self?.hotKeys.resetPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
         }
+    }
+
+    private func historySources() async throws -> [String] {
+        try await withCheckedThrowingContinuation { continuation in
+            work.async { continuation.resume(with: Result { try self.store.sources() }) }
+        }
+    }
+
+    private func scheduleEmbeddings() {
+        guard let embeddingIndexer else { return }
+        Task { await embeddingIndexer.schedule() }
+    }
+
+    private func modelsChanged(_ snapshots: [LocalModelSnapshot]) {
+        settings?.updateModels(snapshots)
+        let enabled = snapshots.contains {
+            $0.descriptor.role == .embedding && $0.state == .downloaded && $0.isEnabled
+        }
+        guard enabled != embeddingEnabled else { return }
+        embeddingEnabled = enabled
+        // Let an active query finish (or fall back after runtime unload). Cancelling here leaves
+        // the panel in its loading state, which also prevents the deferred index refresh.
+        Task { @MainActor [weak self] in
+            guard let self, enabled == self.embeddingEnabled else { return }
+            await self.embeddingIndexer?.setEnabled(enabled)
+            guard enabled == self.embeddingEnabled else { return }
+            if !enabled { await self.searchService.unload() }
+            self.panel?.searchIndexDidChange()
+        }
+    }
+
+    private func showEmbeddingProgress(_ status: EmbeddingIndexStatus) {
+        embeddingStatus = status
+        settings?.updateEmbeddingIndex(status: status.message, progress: status.fraction, canRetry: status.canRetry)
     }
 
     /// Normal and transformed copies share suppression and usage ordering.
@@ -376,6 +447,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             controller.onCancelModelCheck = { [weak self] role in self?.modelProbe.cancel(role) }
             controller.onWillDisableOrRemoveModel = { [weak self] role in self?.modelProbe.cancel(role) }
+            controller.onRetryEmbeddingIndex = { [weak self] in
+                guard let indexer = self?.embeddingIndexer else { return }
+                Task { await indexer.retry() }
+            }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onRevealData = { [weak self] in self?.revealData() }
             controller.onCopyMCPConfiguration = { [weak self] configuration in
@@ -384,6 +459,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
             }
             settings = controller
+            showEmbeddingProgress(embeddingStatus)
         }
         if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
         settings?.show()

@@ -31,10 +31,11 @@ public enum BufferaMCPServer {
                 case "search_history":
                     let args = try ToolArguments(arguments, allowed: [
                         "query", "kind", "source", "favorites_only", "remote_only", "concealed_only",
-                        "from", "until", "limit", "offset"
+                        "from", "until", "limit", "offset", "mode"
                     ])
                     let result = try await reader.search(
                         filter: args.filter(),
+                        mode: args.searchMode(),
                         limit: args.integer("limit", default: 20, range: 1...50),
                         offset: args.integer("offset", default: 0, range: 0...100_000))
                     return try encode(result)

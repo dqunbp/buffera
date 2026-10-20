@@ -2,6 +2,7 @@
 // Keeping inference in a child process makes cancellation and memory release immediate.
 #include "llama.h"
 #include "ggml-backend.h"
+#include "EmbeddingEncoder.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -82,38 +83,6 @@ static Context makeContext(llama_model * model, bool embedding) {
     return context;
 }
 
-static std::vector<float> embed(llama_model * model, const std::string & text) {
-    auto context = makeContext(model, true);
-    auto tokens = tokenize(llama_model_get_vocab(model), "title: none | text: " + text);
-    auto batch = llama_batch_init(int(tokens.size()), 0, 1);
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        batch.token[i] = tokens[i];
-        batch.pos[i] = int(i);
-        batch.n_seq_id[i] = 1;
-        batch.seq_id[i][0] = 0;
-        batch.logits[i] = true;
-    }
-    batch.n_tokens = int(tokens.size());
-    int status = llama_model_has_encoder(model) ? llama_encode(context.get(), batch)
-                                               : llama_decode(context.get(), batch);
-    llama_batch_free(batch);
-    if (status != 0) throw std::runtime_error("Модель не смогла вычислить эмбеддинг.");
-    int dimension = llama_model_n_embd_out(model);
-    const float * values = llama_get_embeddings_seq(context.get(), 0);
-    if (!values || dimension != 768) {
-        throw std::runtime_error("Модель вернула эмбеддинг неожиданного размера.");
-    }
-    std::vector<float> result(values, values + dimension);
-    double norm = 0;
-    for (float value : result) {
-        if (!std::isfinite(value)) throw std::runtime_error("Эмбеддинг содержит некорректные числа.");
-        norm += double(value) * value;
-    }
-    if (norm < 1e-12) throw std::runtime_error("Модель вернула пустой эмбеддинг.");
-    for (float & value : result) value = float(value / std::sqrt(norm));
-    return result;
-}
-
 static double cosine(const std::vector<float> & left, const std::vector<float> & right) {
     double result = 0;
     for (size_t i = 0; i < left.size(); ++i) result += double(left[i]) * right[i];
@@ -128,7 +97,8 @@ static std::string checkEmbeddings(llama_model * model) {
         "raise ConnectionError(\"connection refused\")"
     };
     std::vector<std::vector<float>> embeddings;
-    for (const auto & text : samples) embeddings.push_back(embed(model, text));
+    buffera::EmbeddingEncoder encoder(model);
+    for (const auto & text : samples) embeddings.push_back(encoder.embed(text, false).vectors.front());
     std::ostringstream result;
     result << "\"summary\":\"Русский, английский и код: получены 3 корректных эмбеддинга по 768 чисел.\","
            << "\"dimensions\":768,\"samples\":[";
