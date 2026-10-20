@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var embeddingIndexer: EmbeddingIndexer?
     private var searchService: HybridSearchService!
     private var searchTask: Task<Void, Never>?
+    private var historyChat: HistoryChatCoordinator?
     private var embeddingStatus = EmbeddingIndexStatus.disabled
     private var embeddingEnabled: Bool?
     private var imageTextIndexer: ImageTextIndexer?
@@ -72,6 +73,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catch { showError(error, alert: true); return }
         let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
         searchService = HybridSearchService(modelRootURL: modelRoot)
+        historyChat = HistoryChatCoordinator(databaseURL: folder.appendingPathComponent("history.sqlite"),
+            modelRootURL: modelRoot)
+        historyChat?.onOpenSource = { [weak self] in self?.openChatSource($0) }
+        historyChat?.onShowModels = { [weak self] in
+            self?.showSettings()
+            self?.settings?.showModels()
+        }
         embeddingIndexer = EmbeddingIndexer(databaseURL: folder.appendingPathComponent("history.sqlite"),
             modelRootURL: modelRoot,
             onProgress: { [weak self] status in
@@ -153,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         searchTask?.cancel()
         embeddingIndexer?.shutdown()
         searchService?.shutdown()
+        historyChat?.shutdown()
     }
 
     private func connectPanel() {
@@ -175,6 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         panel.onShowSettings = { [weak self] in self?.showSettings() }
+        panel.onShowChat = { [weak self] in self?.showChat() }
         panel.onAppearanceChange = { [weak self] value in self?.settings?.updateAppearance(value) }
         panel.request = { [weak self] filter, offset, limit in
             guard let self else { return }
@@ -292,7 +302,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onConceal = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.conceal(id: id); self.imageTextIndexer?.schedule(); self.scheduleEmbeddings(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do {
+                    try self.store.conceal(id: id)
+                    self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
+                    DispatchQueue.main.async {
+                        self.historyChat?.historyChanged(id: id)
+                        if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) }
+                    }
+                }
                 catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
             }
         }
@@ -326,7 +343,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onDelete = { [weak self] id in
             guard let self else { return }
             self.work.async {
-                do { try self.store.delete(id: id); self.imageTextIndexer?.schedule(); self.scheduleEmbeddings(); DispatchQueue.main.async { if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) } } }
+                do {
+                    try self.store.delete(id: id)
+                    self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
+                    DispatchQueue.main.async {
+                        self.historyChat?.historyChanged(id: id)
+                        if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) }
+                    }
+                }
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
@@ -354,6 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func modelsChanged(_ snapshots: [LocalModelSnapshot]) {
         settings?.updateModels(snapshots)
+        historyChat?.modelsChanged(snapshots)
         let enabled = snapshots.contains {
             $0.descriptor.role == .embedding && $0.state == .downloaded && $0.isEnabled
         }
@@ -432,6 +457,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do { try hotKeys.setPreviousEnabled(true) } catch { panel.failed(error); showError(error) }
     }
     @objc private func showHistory() { open() }
+    @objc private func showChat() {
+        guard let historyChat else { return }
+        if panel?.window.attachedSheet != nil { return }
+        if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
+        historyChat.show()
+    }
+
+    private func openChatSource(_ id: Int64) {
+        guard panel.window.attachedSheet == nil else { return }
+        work.async { [weak self] in
+            guard let self else { return }
+            let result = Result {
+                let summary = try self.store.summary(id: id)
+                guard !summary.isConcealed else { throw HistoryError.missing }
+                return summary
+            }
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let clip):
+                    self.confirmationToken += 1
+                    self.panel.openSource(clip)
+                    do { try self.hotKeys.setPreviousEnabled(true) } catch { self.showError(error) }
+                case .failure:
+                    self.historyChat?.historyChanged(id: id)
+                }
+            }
+        }
+    }
+
     @objc private func showSettings() {
         // A save sheet must finish before its parent can be hidden.
         if let window = panel?.window, window.attachedSheet != nil {
@@ -446,7 +500,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.modelProbe.check(role, modelURL: url)
             }
             controller.onCancelModelCheck = { [weak self] role in self?.modelProbe.cancel(role) }
-            controller.onWillDisableOrRemoveModel = { [weak self] role in self?.modelProbe.cancel(role) }
+            controller.onWillDisableOrRemoveModel = { [weak self] role in
+                self?.modelProbe.cancel(role)
+                self?.historyChat?.willDisableModel(role)
+            }
             controller.onRetryEmbeddingIndex = { [weak self] in
                 guard let indexer = self?.embeddingIndexer else { return }
                 Task { await indexer.retry() }
@@ -543,6 +600,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
         _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
+        _ = add("Чат по истории…", #selector(showChat))
         let settingsItem = add("Настройки…", #selector(showSettings))
         settingsItem.keyEquivalent = ","
         shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
@@ -561,6 +619,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Standard editing commands are needed for the search field in an accessory app.
         let mainMenu = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: BrandIdentity.name)
+        let chatItem = NSMenuItem(title: "Чат по истории…", action: #selector(showChat), keyEquivalent: "")
+        chatItem.target = self; appMenu.addItem(chatItem)
         let appearanceItem = NSMenuItem(title: "Настройки…", action: #selector(showSettings), keyEquivalent: ",")
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())
         let helpItem = NSMenuItem(title: "Клавиши и справка…", action: #selector(help), keyEquivalent: "")

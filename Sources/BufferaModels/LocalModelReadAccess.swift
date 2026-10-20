@@ -55,15 +55,31 @@ public struct LocalModelReadAccess: Sendable {
         self.descriptor = descriptor
     }
 
+    public init(rootURL: URL, role: ModelRole) {
+        self.init(rootURL: rootURL, descriptor: LocalModelCatalog.models.first { $0.role == role }!)
+    }
+
     public func enabledEmbedding() throws -> InstalledEmbeddingModel {
+        let fileURL = try enabledFileURL(role: .embedding, unavailable: EmbeddingRuntimeError.unavailable,
+                                         disabled: EmbeddingRuntimeError.disabled)
+        return InstalledEmbeddingModel(descriptor: descriptor, fileURL: fileURL)
+    }
+
+    public func enabledAssistant() throws -> InstalledAssistantModel {
+        let fileURL = try enabledFileURL(role: .assistant, unavailable: ChatRuntimeError.unavailable,
+                                         disabled: ChatRuntimeError.disabled)
+        return InstalledAssistantModel(descriptor: descriptor, fileURL: fileURL)
+    }
+
+    private func enabledFileURL(role: ModelRole, unavailable: Error, disabled: Error) throws -> URL {
         try ModelStorage.validate(descriptor)
-        guard descriptor.role == .embedding else { throw EmbeddingRuntimeError.unavailable }
-        let roleDirectory = rootURL.appendingPathComponent(ModelRole.embedding.rawValue)
+        guard descriptor.role == role else { throw unavailable }
+        let roleDirectory = rootURL.appendingPathComponent(role.rawValue)
         let revisionDirectory = roleDirectory.appendingPathComponent(descriptor.revision)
         for directory in [rootURL, roleDirectory, revisionDirectory] {
             guard let attributes = try? FileManager.default.attributesOfItem(atPath: directory.path),
                   attributes[.type] as? FileAttributeType == .typeDirectory else {
-                throw EmbeddingRuntimeError.unavailable
+                throw unavailable
             }
         }
         let receiptURL = rootURL.appendingPathComponent("state.json")
@@ -71,16 +87,16 @@ public struct LocalModelReadAccess: Sendable {
               receiptSize > 0, receiptSize <= 16_384,
               let bytes = try? Data(contentsOf: receiptURL),
               let receipts = try? JSONDecoder().decode([String: ModelReceipt].self, from: bytes),
-              let receipt = receipts[ModelRole.embedding.rawValue],
+              let receipt = receipts[role.rawValue],
               receipt.revision == descriptor.revision, receipt.sha256 == descriptor.sha256,
               receipt.state == .downloaded else {
-            throw EmbeddingRuntimeError.unavailable
+            throw unavailable
         }
-        guard receipt.enabled else { throw EmbeddingRuntimeError.disabled }
+        guard receipt.enabled else { throw disabled }
         let fileURL = revisionDirectory.appendingPathComponent(descriptor.filename)
         guard (try? ModelStorage.fileSize(fileURL)) == descriptor.byteCount else {
-            throw EmbeddingRuntimeError.unavailable
+            throw unavailable
         }
-        return InstalledEmbeddingModel(descriptor: descriptor, fileURL: fileURL)
+        return fileURL
     }
 }

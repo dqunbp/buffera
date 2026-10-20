@@ -97,6 +97,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onClose: (() -> Void)?
     var onShortcutGestureEnd: (() -> Void)?
     var onShowSettings: (() -> Void)?
+    var onShowChat: (() -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
     var isConfirmingCopyTransform: Bool { copyTransformSourceID != nil && confirming }
@@ -299,6 +300,24 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             nearbyState = NearbyHistoryState(returnPoint: returnPoint, anchorID: id, anchorDate: clip.date)
         }
         loadNearby(anchorID: id, date: clip.date)
+    }
+
+    /// A chat source can be outside the current search page. Opening it only
+    /// navigates; clipboard confirmation remains an explicit separate action.
+    func openSource(_ clip: ClipSummary) {
+        guard !clip.isConcealed, window.attachedSheet == nil else { return }
+        let returnPoint = NearbyHistoryState.ReturnPoint(rows: [], total: total,
+            selectedID: selected?.id ?? pendingSelectionID ?? retainedSelectionID,
+            viewport: cards.scrollView.contentView.bounds.origin)
+        open()
+        // Source navigation starts in Buffera's chat, not the older external
+        // application remembered by a previous global-hotkey presentation.
+        previousApp = .current
+        if nearbyState == nil {
+            nearbyState = NearbyHistoryState(returnPoint: returnPoint, anchorID: clip.id, anchorDate: clip.date)
+        }
+        nearbyState?.needsReload = true
+        loadNearby(anchorID: clip.id, date: clip.date)
     }
 
     private func loadNearby(anchorID: Int64, date: Date, preservingSelection: Bool = false) {
@@ -1189,7 +1208,18 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor; hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         hint.stringValue = "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
-        root.addArrangedSubview(hint)
-        hint.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        let chatButton = NSButton(title: "Чат", target: self, action: #selector(showChat))
+        chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
+        chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
+        chatButton.imagePosition = .imageLeading
+        chatButton.toolTip = "Чат по истории"
+        chatButton.setAccessibilityLabel("Чат по истории")
+        chatButton.identifier = NSUserInterfaceItemIdentifier("history.chat")
+        let footer = NSStackView(views: [hint, chatButton])
+        footer.spacing = 8; footer.distribution = .fill
+        root.addArrangedSubview(footer)
+        footer.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
     }
+
+    @objc private func showChat() { onShowChat?() }
 }

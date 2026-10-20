@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Bundle the official llama.cpp runtime, synthetic checker, and local embedding worker.
+# Bundle the official llama.cpp runtime, synthetic checker, and private model workers.
 # Requires only Command Line Tools; Metal shaders are embedded in the upstream library.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -84,6 +84,14 @@ clang++ -std=c++17 -O2 -fobjc-arc -arch arm64 -mmacosx-version-min=14.0 \
   "$APP_RUNTIME/libllama.0.dylib" "$APP_RUNTIME/libggml.0.dylib" "$APP_RUNTIME/libggml-base.0.dylib" \
   -o "$APP_BUNDLE/Contents/MacOS/BufferaEmbeddingWorker"
 
+clang++ -std=c++17 -O2 -fobjc-arc -arch arm64 -mmacosx-version-min=14.0 \
+  -I "$RUNTIME_INCLUDE" Sources/BufferaModelRuntime/ChatWorker.mm \
+  -framework Foundation \
+  -L "$APP_RUNTIME" -Wl,-rpath,@executable_path/../Frameworks/BufferaModels \
+  -Wl,-rpath,@loader_path \
+  "$APP_RUNTIME/libllama.0.dylib" "$APP_RUNTIME/libggml.0.dylib" "$APP_RUNTIME/libggml-base.0.dylib" \
+  -o "$APP_BUNDLE/Contents/MacOS/BufferaChatWorker"
+
 cp "$RUNTIME_SOURCE/LICENSE" "$APP_NOTICES/llama.cpp-LICENSE.txt"
 "$RUNTIME_SOURCE/llama" licenses > "$APP_NOTICES/THIRD-PARTY-NOTICES.txt"
 cat > "$APP_NOTICES/runtime.txt" <<NOTICE
@@ -91,7 +99,7 @@ llama.cpp $RUNTIME_TAG ($RUNTIME_REVISION)
 https://github.com/ggml-org/llama.cpp/releases/tag/$RUNTIME_TAG
 Runtime archive SHA-256: $RUNTIME_SHA256
 Official macOS arm64 binaries. The probe uses fixed synthetic checks.
-The embedding worker processes text locally over anonymous stdin/stdout pipes.
+The embedding and chat workers process text locally over anonymous stdin/stdout pipes.
 Model weights are downloaded separately and are not included in this application.
 NOTICE
 
@@ -100,4 +108,5 @@ for LIBRARY in "$APP_RUNTIME"/*.dylib; do
 done
 codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaModelProbe"
 codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaEmbeddingWorker"
+codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaChatWorker"
 print "Prepared local model runtime: $APP_BUNDLE"

@@ -259,46 +259,12 @@ public actor HistoryReader {
     }
 
     private func decode(_ content: ClipContent) throws -> DecodedContent {
-        switch content.summary.kind {
-        case .text, .link:
-            let payload = try requiredPayload(content)
-            let items = try payload.items.map { item in
-                guard let text = ClipboardText.decode(item) else { throw HistoryReaderError.unreadableContent }
-                return text
-            }
-            return DecodedContent(text: items.joined(separator: "\n"), kind: .text, isComplete: true, note: nil)
-        case .file:
-            let payload = try requiredPayload(content)
-            let paths = try payload.items.map { item in
-                guard let representation = item.first(where: { $0.type == "public.file-url" }),
-                      let rawURL = String(data: representation.data, encoding: .utf8),
-                      let url = URL(string: rawURL), url.isFileURL, !url.path.isEmpty else {
-                    throw HistoryReaderError.unreadableContent
-                }
-                return url.path
-            }
-            return DecodedContent(text: paths.joined(separator: "\n"), kind: .filePaths, isComplete: true,
-                                  note: "Только пути из буфера обмена. Содержимое файлов не читается.")
-        case .image:
-            guard let text = content.imageText else {
-                return DecodedContent(text: "", kind: .unavailableOCR, isComplete: false,
-                                      note: "Готового OCR нет. MCP не запускает распознавание и не передаёт изображение.")
-            }
-            let complete = text.count < 200_000
-            return DecodedContent(text: text, kind: .cachedOCR, isComplete: complete,
-                                  note: complete ? "Сохранённый результат OCR."
-                                      : "Сохранённый OCR достиг лимита 200000 символов и может быть обрезан.")
-        case .other:
-            return DecodedContent(text: "", kind: .unsupported, isComplete: false,
-                                  note: "Для этого типа записи доступны только метаданные.")
-        }
-    }
-
-    private func requiredPayload(_ content: ClipContent) throws -> ClipPayload {
-        guard let payload = content.payload, !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else {
+        let decoded = try HistoryTextContent.decode(content)
+        guard let kind = HistoryContentKind(rawValue: decoded.kind.rawValue) else {
             throw HistoryReaderError.unreadableContent
         }
-        return payload
+        return DecodedContent(text: decoded.text, kind: kind, isComplete: decoded.isComplete,
+                              note: decoded.note)
     }
 
     private func validate(_ value: Int, in range: ClosedRange<Int>, name: String) throws {

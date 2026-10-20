@@ -58,6 +58,11 @@ final class SettingsWindow: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
     }
 
+    func showModels() {
+        show()
+        settings.showModels()
+    }
+
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
@@ -126,6 +131,11 @@ private final class SettingsContentController: NSViewController {
 
     func refreshMCPAccess() { mcp.refresh() }
     func refreshModels() { models.refresh() }
+    func showModels() {
+        _ = view
+        tabs.selectedSegment = 4
+        presentPage(4)
+    }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { models.update(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
         models.updateCheck(role: role, status: status, running: running)

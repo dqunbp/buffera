@@ -698,6 +698,29 @@ func nearbyChecks() -> [(Bool, String)] {
         value.panel.receiveNearby(rows, anchorID: request.anchorID, token: request.token)
     }
 
+    let external = harness()
+    external.panel.move(16)
+    let previousID = external.panel.selected!.id
+    let source = fixture(90_001)
+    external.panel.openSource(source)
+    results.append((external.panel.isShowingNearby && external.nearbyRequests.last?.anchorID == source.id,
+                    "chat opens a source outside the currently loaded search page"))
+    external.panel.receive([fixture(90_002)], total: 1, offset: 0)
+    complete(external, rows: [fixture(90_000), source, fixture(90_003)])
+    results.append((external.panel.selected?.id == source.id && external.confirmations.isEmpty,
+                    "chat source selection ignores stale search results and never copies"))
+    external.panel.returnFromNearby()
+    external.panel.receive(originalRows, total: originalRows.count, offset: 0)
+    results.append((!external.panel.isShowingNearby && external.panel.selected?.id == previousID,
+                    "returning from a chat source reloads history and restores the previous selection"))
+    var chatOpened = false
+    external.panel.onShowChat = { chatOpened = true }
+    let chatButton = descendants(of: external.panel.window.contentView!).compactMap { $0 as? NSButton }
+        .first { $0.identifier?.rawValue == "history.chat" }
+    chatButton?.performClick(nil)
+    results.append((chatOpened && external.confirmations.isEmpty,
+                    "the history chat button opens chat without copying the selection"))
+
     let centered = harness()
     centered.panel.move(16)
     let centeredOriginalID = centered.panel.selected!.id

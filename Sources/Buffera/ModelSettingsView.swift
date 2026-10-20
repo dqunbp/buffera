@@ -16,7 +16,7 @@ final class ModelSettingsView: NSView {
         super.init(frame: .zero)
 
         let introduction = modelParagraph(
-            "Включите модель поиска, чтобы находить записи по смыслу. История обрабатывается постепенно на этом Mac. Локальный чат появится на следующем этапе."
+            "Модель поиска находит записи по смыслу. Локальный помощник отвечает на вопросы по истории и показывает найденные записи. Обе модели работают на этом Mac и включаются независимо."
         )
         let content = NSStackView()
         content.orientation = .vertical
