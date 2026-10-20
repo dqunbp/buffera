@@ -76,9 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyChat = HistoryChatCoordinator(databaseURL: folder.appendingPathComponent("history.sqlite"),
             modelRootURL: modelRoot)
         historyChat?.onOpenSource = { [weak self] in self?.openChatSource($0) }
-        historyChat?.onShowModels = { [weak self] in
+        historyChat?.onShowFeatures = { [weak self] in
             self?.showSettings()
-            self?.settings?.showModels()
+            self?.settings?.showFeatures()
         }
         embeddingIndexer = EmbeddingIndexer(databaseURL: folder.appendingPathComponent("history.sqlite"),
             modelRootURL: modelRoot,
@@ -380,7 +380,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings?.updateModels(snapshots)
         historyChat?.modelsChanged(snapshots)
         let enabled = snapshots.contains {
-            $0.descriptor.role == .embedding && $0.state == .downloaded && $0.isEnabled
+            $0.descriptor.role == .embedding && $0.isReadyForUse
         }
         guard enabled != embeddingEnabled else { return }
         embeddingEnabled = enabled
@@ -600,7 +600,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
         _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
-        _ = add("Чат по истории…", #selector(showChat))
+        _ = add("Спросить Buffera…", #selector(showChat))
         let settingsItem = add("Настройки…", #selector(showSettings))
         settingsItem.keyEquivalent = ","
         shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
@@ -619,7 +619,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Standard editing commands are needed for the search field in an accessory app.
         let mainMenu = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: BrandIdentity.name)
-        let chatItem = NSMenuItem(title: "Чат по истории…", action: #selector(showChat), keyEquivalent: "")
+        let chatItem = NSMenuItem(title: "Спросить Buffera…", action: #selector(showChat), keyEquivalent: "")
         chatItem.target = self; appMenu.addItem(chatItem)
         let appearanceItem = NSMenuItem(title: "Настройки…", action: #selector(showSettings), keyEquivalent: ",")
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())

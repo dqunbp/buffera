@@ -142,6 +142,18 @@ func searchLayoutChecks() {
               "all count digits remain visible at \(Int(width)) pt")
         check(harness.search.bounds.width >= 150 && toggle.superview !== count.superview,
               "semantic search does not squeeze the query or the count at \(Int(width)) pt")
+        let chatButton = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.chat" }!
+        let pinButton = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.pin" }!
+        let chatFrame = chatButton.convert(chatButton.bounds, to: content)
+        let toggleFrame = toggle.convert(toggle.bounds, to: content)
+        check([chatButton, toggle].allSatisfy {
+            content.bounds.contains($0.convert($0.bounds, to: content))
+                && $0.bounds.width >= $0.intrinsicContentSize.width - 1
+        } && abs(chatFrame.midY - toggleFrame.midY) < 1 && chatFrame.minX >= toggleFrame.maxX + 8,
+              "the ask button and full semantic-search label share one row at \(Int(width)) pt")
+        check(content.bounds.contains(pinButton.convert(pinButton.bounds, to: content))
+              && pinButton.bounds.width >= 28 && pinButton.superview !== chatButton.superview,
+              "the anchor stays visible in the footer at \(Int(width)) pt")
         harness.panel.showNearby(id: 20)
         content.layoutSubtreeIfNeeded()
         check(toggle.isHidden && !toggle.isEnabled,
@@ -654,6 +666,94 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     flushMainQueue()
     results.append((reopened.panel.window.isVisible && reopened.confirmations.isEmpty,
                     "a queued blur from an older presentation cannot close a newly reopened panel"))
+
+    let pinned = harness()
+    let pinButton = descendants(of: pinned.panel.window.contentView!).compactMap { $0 as? NSButton }
+        .first { $0.identifier?.rawValue == "history.pin" }!
+    results.append((!pinned.panel.isPinned && pinButton.state == .off,
+                    "history starts unpinned in a new app session"))
+    pinned.panel.open(fromShortcut: true)
+    pinned.panel.receive(clips, total: clips.count, offset: 0)
+    pinned.panel.shortcutPressed(1)
+    pinButton.performClick(nil)
+    results.append((pinned.panel.isPinned && pinButton.accessibilityLabel() == "Открепить окно истории",
+                    "the anchor exposes its active state and unpin action"))
+    pinned.panel.window.resignKey()
+    pinned.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: pinned.panel.window))
+    pinned.panel.window.onFlagsChanged?([])
+    flushMainQueue()
+    results.append((pinned.panel.window.isVisible && pinned.confirmations.isEmpty && pinned.panel.selected?.id == 2,
+                    "pinning and blur retain the window and cancel quick-copy before modifier release"))
+    pinned.panel.window.resignKey()
+    pinned.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: pinned.panel.window))
+    let beforeRefocus = pinned.requests.count
+    pinned.panel.shortcutPressed(1)
+    pinned.panel.window.onFlagsChanged?([])
+    flushMainQueue()
+    // The harness prohibits application activation. Verify the responder target
+    // and preserved state; native activation is checked in the running app.
+    results.append((pinned.panel.window.firstResponder === pinned.cards && pinned.panel.selected?.id == 2
+                    && pinned.requests.count == beforeRefocus && pinned.confirmations.isEmpty,
+                    "the global shortcut targets the pinned list without querying, moving, or copying"))
+    let down = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                               windowNumber: pinned.panel.window.windowNumber, context: nil,
+                               characters: "\u{f701}", charactersIgnoringModifiers: "\u{f701}", isARepeat: false, keyCode: 125)!
+    pinned.panel.window.sendEvent(down)
+    results.append((pinned.panel.selected?.id == 3 && pinned.confirmations.isEmpty,
+                    "arrow navigation still changes selection with the anchor enabled"))
+    escape(pinned)
+    results.append((!pinned.panel.window.isVisible && pinned.confirmations.isEmpty && pinned.panel.isPinned,
+                    "Escape explicitly closes pinned history without copying and retains its session setting"))
+    pinned.panel.open()
+    pinned.panel.receive(clips, total: clips.count, offset: 0)
+    flushMainQueue()
+    pinned.enter()
+    pinned.panel.closeAfterConfirmation()
+    results.append((!pinned.panel.window.isVisible && pinned.confirmations == [3],
+                    "explicit copy still closes pinned history after confirmation"))
+    pinned.panel.open()
+    pinned.panel.receive(clips, total: clips.count, offset: 0)
+    flushMainQueue()
+    pinButton.performClick(nil)
+    pinned.panel.window.resignKey()
+    pinned.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: pinned.panel.window))
+    flushMainQueue()
+    results.append((!pinned.panel.isPinned && !pinned.panel.window.isVisible,
+                    "unpinning restores automatic dismissal on focus loss"))
+
+    let secret = ClipSummary(id: 1, date: Date(), kind: .text, title: "Secret title",
+                             text: "Secret body", source: "Panel Fixture App", byteCount: 11, isConcealed: true)
+    let masked = harness([secret])
+    let maskPin = descendants(of: masked.panel.window.contentView!).compactMap { $0 as? NSButton }
+        .first { $0.identifier?.rawValue == "history.pin" }!
+    maskPin.performClick(nil)
+    var revealedToken = 0
+    masked.panel.onReveal = { _, token in revealedToken = token }
+    func revealSecret() {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
+                                    windowNumber: masked.panel.window.windowNumber, context: nil,
+                                    characters: "h", charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4)!
+        masked.panel.window.sendEvent(event)
+    }
+    func visibleSecretText() -> [String] {
+        descendants(of: masked.panel.window.contentView!).compactMap { $0 as? NSTextField }.map(\.stringValue)
+    }
+    revealSecret()
+    masked.panel.showConcealedText("Secret body", id: 1, token: revealedToken)
+    results.append((visibleSecretText().contains { $0.contains("Secret body") },
+                    "the pinned fixture can reveal a concealed record through its explicit action"))
+    masked.panel.window.resignKey()
+    masked.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: masked.panel.window))
+    flushMainQueue()
+    results.append((masked.panel.window.isVisible && visibleSecretText().contains("••••••••")
+                    && !visibleSecretText().contains { $0.contains("Secret body") },
+                    "pinned history remasks revealed content when keyboard focus leaves"))
+    revealSecret()
+    let delayedToken = revealedToken
+    NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+    masked.panel.showConcealedText("Secret body", id: 1, token: delayedToken)
+    results.append((masked.panel.window.isVisible && !visibleSecretText().contains { $0.contains("Secret body") },
+                    "app deactivation invalidates a late reveal response without hiding pinned history"))
     return results
 }
 for (passed, message) in selectionLifecycleChecks() { check(passed, message) }

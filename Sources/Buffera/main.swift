@@ -1,6 +1,9 @@
 import AppKit
 
-if CommandLine.arguments.contains("--chat-ui-smoke-test") {
+if CommandLine.arguments.contains("--features-ui-smoke-test") {
+    do { try runFeatureSettingsSmokeTest(); print("PASS: feature settings, preparation controls and layout") }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--chat-ui-smoke-test") {
     do { try runHistoryChatSmokeTest(); print("PASS: history chat layout, input, sources and cancellation") }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else if CommandLine.arguments.contains("--ocr-smoke-test") {

@@ -36,11 +36,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var sidebarWidth: NSLayoutConstraint!
     private var bodyMinimumHeight: NSLayoutConstraint!
     private var presentationToken = 0
+    private var focusToken = 0
     private var changingFrame = false
     private var isClosing = false
     private let thumbnails = NSCache<NSNumber, NSImage>()
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
+    private let pinButton = NSButton()
     private let scope = NSSegmentedControl(labels: ["История", "Избранное"], trackingMode: .selectOne, target: nil, action: nil)
     private let nearbyBack = NSButton(title: "Назад в историю", target: nil, action: nil)
     private var nearbyState: NearbyHistoryState?
@@ -79,6 +81,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var commitWhenLoaded = false
     private var pendingMoveDelta = 0
     private var previousApp: NSRunningApplication?
+    private var appActivationObserver: NSObjectProtocol?
     var request: ((SearchFilter, Int, Int) -> Void)?
     var requestNearby: ((Int64, Int) -> Void)?
     var onNavigate: (() -> Void)?
@@ -103,6 +106,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isConfirmingCopyTransform: Bool { copyTransformSourceID != nil && confirming }
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isShowingNearby: Bool { nearbyState != nil }
+    var isPinned: Bool { pinButton.state == .on }
     var searchMode: HistorySearchMode { semanticSearch.state == .on ? .automatic : .literal }
     var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
@@ -140,15 +144,28 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cards.onSelect = { [weak self] _ in self?.updateSelection() }
         cards.onActivate = { [weak self] _ in self?.confirm() }
         cards.onNeedMore = { [weak self] in self?.loadMore() }
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationDidResignActive),
+                                               name: NSApplication.didResignActiveNotification, object: NSApp)
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let self, self.isPinned, self.window.isVisible, !self.isClosing,
+                  let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            self.previousApp = app
+        }
         configureAppearance()
         if appearance.mode != .floating { positionDockedWindow() }
+    }
+
+    deinit {
+        if let appActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver) }
     }
 
     func open(fromShortcut: Bool = false) {
         cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
-        if let frontmost = NSWorkspace.shared.frontmostApplication,
-           frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = frontmost }
+        rememberPreviousApp()
         presentationToken += 1; isClosing = false
         window.permitsOffscreenFrame = false
         let token = presentationToken
@@ -161,32 +178,50 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let targetFrame = window.frame
         let animate = appearance.mode != .floating && !window.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if animate { window.permitsOffscreenFrame = true; window.setFrame(hiddenFrame(for: targetFrame), display: false) }
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
+        focusHistoryWindow(token: token)
         if animate {
             animateFrame(to: targetFrame, duration: 0.18, token: token) { [weak self] in
                 guard let self, token == self.presentationToken else { return }
                 self.window.permitsOffscreenFrame = false
             }
         }
-        window.makeFirstResponder(cards)
-        // Activation completes asynchronously when invoked by a global hotkey.
-        // Reassert key status once AppKit has switched the active application.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.window.isVisible, token == self.presentationToken, !self.isClosing,
-                  self.window.attachedSheet == nil else { return }
-            self.window.makeKeyAndOrderFront(nil)
-            self.window.makeFirstResponder(self.cards)
-        }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
         refresh(preservingSelection: true)
         if fromShortcut { recordShortcutPress() }
     }
 
+    private func rememberPreviousApp() {
+        if let frontmost = NSWorkspace.shared.frontmostApplication,
+           frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = frontmost }
+    }
+
+    private func focusHistoryWindow(token: Int) {
+        focusToken += 1
+        let focus = focusToken
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        window.makeFirstResponder(cards)
+        // Activation completes asynchronously when invoked by a global hotkey.
+        // Reassert key status once AppKit has switched the active application.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window.isVisible, token == self.presentationToken, focus == self.focusToken, !self.isClosing,
+                  self.window.attachedSheet == nil else { return }
+            self.window.makeKeyAndOrderFront(nil)
+            self.window.makeFirstResponder(self.cards)
+        }
+    }
+
     func shortcutPressed(_ delta: Int, isRepeat: Bool = false) {
         guard !isRepeat, isAvailableForShortcut, !confirming, !commitWhenLoaded,
               !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
+        if isPinned, !window.isKeyWindow, !shortcutGesture.isActive {
+            cancelShortcutGesture()
+            rememberPreviousApp()
+            presentationToken += 1
+            focusHistoryWindow(token: presentationToken)
+            return
+        }
         // Only the hold that opened this presentation can enable quick selection.
         // Once released, later shortcuts navigate the persistent window.
         if shortcutGesture.isActive { recordShortcutPress() }
@@ -407,7 +442,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         searchFallbackReason = reason
         semanticSearch.toolTip = reason ?? (searchMode == .literal
             ? "Все слова запроса должны встретиться в записи."
-            : "По словам и по смыслу, когда модель поиска включена. Пустой запрос показывает историю.")
+            : "По словам и по смыслу, когда «Поиск по смыслу» включён в настройках. Пустой запрос показывает историю.")
     }
 
     /// OCR and embeddings update the search index without changing a card's displayed content.
@@ -519,15 +554,36 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         closeIfUnfocused()
     }
 
+    @objc private func applicationDidResignActive(_ notification: Notification) {
+        guard isPinned, window.isVisible, !isClosing else { return }
+        focusToken += 1
+        cancelShortcutGesture()
+        dismissPreview()
+        remaskConcealedText()
+    }
+
+    private func remaskConcealedText() {
+        let revealedRow = revealed.flatMap { value in rows.firstIndex(where: { $0.id == value.id }) }
+        invalidateReveal()
+        commandHeld = false
+        if let revealedRow { cards.reloadCard(at: revealedRow) }
+        updateVisibleCards()
+    }
+
     private func closeIfUnfocused() {
         // Filter menus, calendar popovers and save sheets can own keyboard input.
         if !window.isKeyWindow, window.attachedSheet == nil, !filters.isPresenting,
-           !cardMenuTracking, !preview.isShown { cancelShortcutGesture() }
+           !cardMenuTracking, !preview.isShown {
+            focusToken += 1
+            cancelShortcutGesture()
+            if isPinned { remaskConcealedText() }
+        }
         let token = presentationToken
         DispatchQueue.main.async { [weak self] in
             guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
                   !self.cardMenuTracking, !self.preview.isShown else { return }
+            guard !self.isPinned else { return }
             self.close(restoreFocus: false)
         }
     }
@@ -542,7 +598,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         updateSelection()
     }
 
-    private func invalidateReveal() { revealToken += 1; revealed = nil; revealing = false }
+    private func invalidateReveal() {
+        if let id = revealed?.id, let row = rows.firstIndex(where: { $0.id == id }) {
+            // Collection-view reloads may keep an outgoing cell in the view tree.
+            // Remove plaintext before replacing it, including accessibility text.
+            cards.card(at: row)?.hideConcealedContent()
+        }
+        revealToken += 1; revealed = nil; revealing = false
+    }
 
     private func keepOnScreen() {
         let frame = window.frame
@@ -1012,6 +1075,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func updateVisibleCards() {
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
+        pinButton.isEnabled = !confirming && !commitWhenLoaded
         for index in cards.visibleIndices() where rows.indices.contains(index) {
             if let card = cards.card(at: index) { configure(card, row: index) }
         }
@@ -1175,7 +1239,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         semanticSearch.action = #selector(searchModeChanged)
         semanticSearch.identifier = NSUserInterfaceItemIdentifier("history.searchMode")
         semanticSearch.setAccessibilityLabel(semanticSearch.title)
-        semanticSearch.toolTip = "Дополнять совпадения текста похожими по смыслу записями. Требуется включённая модель поиска."
+        semanticSearch.toolTip = "Дополнять совпадения текста похожими по смыслу записями. Включите «Поиск по смыслу» в настройках."
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor; status.lineBreakMode = .byTruncatingTail
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -1187,9 +1251,23 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.toolTip = "Назад в историю · Esc"
         nearbyBack.setAccessibilityLabel("Назад в историю")
         nearbyBack.isHidden = true
-        root.addArrangedSubview(semanticSearch)
+        let chatButton = NSButton(title: "Спросить", target: self, action: #selector(showChat))
+        chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
+        chatButton.font = .systemFont(ofSize: 12)
+        chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
+        chatButton.imagePosition = .imageLeading
+        chatButton.toolTip = "Спросить Buffera о том, что вы копировали"
+        chatButton.setAccessibilityLabel("Спросить Buffera")
+        chatButton.identifier = NSUserInterfaceItemIdentifier("history.chat")
+        let searchOptionsSpacer = NSView()
+        searchOptionsSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        searchOptionsSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let searchOptionsRow = NSStackView(views: [semanticSearch, searchOptionsSpacer, chatButton])
+        searchOptionsRow.spacing = 8; searchOptionsRow.distribution = .fill; searchOptionsRow.alignment = .centerY
+        root.addArrangedSubview(searchOptionsRow)
+        searchOptionsRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
         root.setCustomSpacing(6, after: searchRow)
-        root.setCustomSpacing(8, after: semanticSearch)
+        root.setCustomSpacing(8, after: searchOptionsRow)
         let scopeRow = NSStackView(views: [scope, nearbyBack, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
         scope.widthAnchor.constraint(equalToConstant: 210).isActive = true
         root.addArrangedSubview(scopeRow)
@@ -1208,17 +1286,54 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor; hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         hint.stringValue = "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
-        let chatButton = NSButton(title: "Чат", target: self, action: #selector(showChat))
-        chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
-        chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
-        chatButton.imagePosition = .imageLeading
-        chatButton.toolTip = "Чат по истории"
-        chatButton.setAccessibilityLabel("Чат по истории")
-        chatButton.identifier = NSUserInterfaceItemIdentifier("history.chat")
-        let footer = NSStackView(views: [hint, chatButton])
+        pinButton.setButtonType(.toggle)
+        pinButton.bezelStyle = .texturedRounded; pinButton.controlSize = .small
+        pinButton.image = Self.anchorImage()
+        pinButton.imagePosition = .imageOnly
+        pinButton.target = self; pinButton.action = #selector(togglePinned)
+        pinButton.identifier = NSUserInterfaceItemIdentifier("history.pin")
+        pinButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        updatePinButton()
+        let footer = NSStackView(views: [hint, pinButton])
         footer.spacing = 8; footer.distribution = .fill
         root.addArrangedSubview(footer)
         footer.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+    }
+
+    @objc private func togglePinned() {
+        cancelShortcutGesture()
+        updatePinButton()
+        if !isPinned { closeIfUnfocused() }
+    }
+
+    private func updatePinButton() {
+        let label = isPinned ? "Открепить окно истории" : "Закрепить окно истории"
+        pinButton.toolTip = isPinned
+            ? "Открепить окно: скрывать при переходе в другое приложение"
+            : "Закрепить окно: оставить открытым при переходе в другое приложение"
+        pinButton.setAccessibilityLabel(label)
+        pinButton.contentTintColor = isPinned ? .controlAccentColor : nil
+    }
+
+    private static func anchorImage() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.labelColor.setStroke()
+            let ring = NSBezierPath(ovalIn: NSRect(x: 7, y: 12, width: 4, height: 4))
+            ring.lineWidth = 1.5; ring.stroke()
+            let path = NSBezierPath()
+            path.lineWidth = 1.5; path.lineCapStyle = .round; path.lineJoinStyle = .round
+            path.move(to: NSPoint(x: 9, y: 12)); path.line(to: NSPoint(x: 9, y: 2.5))
+            path.move(to: NSPoint(x: 5, y: 10)); path.line(to: NSPoint(x: 13, y: 10))
+            path.move(to: NSPoint(x: 2, y: 7))
+            path.curve(to: NSPoint(x: 9, y: 2.5), controlPoint1: NSPoint(x: 2, y: 4), controlPoint2: NSPoint(x: 5, y: 2.5))
+            path.curve(to: NSPoint(x: 16, y: 7), controlPoint1: NSPoint(x: 13, y: 2.5), controlPoint2: NSPoint(x: 16, y: 4))
+            path.move(to: NSPoint(x: 1, y: 5)); path.line(to: NSPoint(x: 2, y: 7)); path.line(to: NSPoint(x: 4, y: 6))
+            path.move(to: NSPoint(x: 14, y: 6)); path.line(to: NSPoint(x: 16, y: 7)); path.line(to: NSPoint(x: 17, y: 5))
+            path.stroke()
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     @objc private func showChat() { onShowChat?() }

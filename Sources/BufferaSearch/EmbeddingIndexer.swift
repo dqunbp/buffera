@@ -27,7 +27,7 @@ public struct EmbeddingIndexStatus: Sendable {
     public let canRetry: Bool
 
     public static let disabled = EmbeddingIndexStatus(
-        message: "Включите модель, чтобы подготовить поиск по смыслу.", fraction: nil, canRetry: false)
+        message: "Включите «Поиск по смыслу» в настройках, чтобы подготовить историю.", fraction: nil, canRetry: false)
 }
 
 /// Owns a separate SQLite connection. No database transaction spans model inference.

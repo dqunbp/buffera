@@ -7,7 +7,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     var onStop: (() -> Void)?
     var onNewConversation: (() -> Void)?
     var onOpenSource: ((Int64) -> Void)?
-    var onShowModels: (() -> Void)?
+    var onShowFeatures: (() -> Void)?
 
     private let transcript = NSScrollView()
     private let messages = NSStackView()
@@ -19,7 +19,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     private let welcome = NSStackView()
     private var currentResponse: ChatMessageView?
     private var enabled = false
-    private var unavailableMessage = "Скачайте и включите локального помощника в настройках моделей."
+    private var unavailableMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
     private var statusMessage = ""
     private var busy = false
     private var stopping = false
@@ -28,7 +28,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         let window = ChatPanel(contentRect: NSRect(x: 0, y: 0, width: 700, height: 650),
                                styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                backing: .buffered, defer: false)
-        window.title = "Чат по истории"
+        window.title = "Спросить Buffera"
         window.minSize = NSSize(width: 520, height: 460)
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
@@ -64,7 +64,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
 
     func setAvailability(enabled: Bool, message: String? = nil) {
         self.enabled = enabled
-        unavailableMessage = message ?? "Скачайте и включите локального помощника в настройках моделей."
+        unavailableMessage = message ?? "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
         updateControls()
     }
 
@@ -194,15 +194,19 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         onNewConversation?()
     }
 
-    @objc private func showModels() { onShowModels?() }
+    @objc private func showFeatures() { onShowFeatures?() }
 
     private func build() {
         guard let root = window?.contentView else { return }
-        let heading = NSTextField(labelWithString: "Ответы по вашей истории")
+        let heading = NSTextField(labelWithString: "Локальный ИИ-помощник")
         heading.font = .systemFont(ofSize: 16, weight: .semibold)
-        let subtitle = NSTextField(labelWithString: "Обработка на этом Mac")
+        let subtitle = NSTextField(labelWithString: "LLM с доступом к истории буфера обмена")
         subtitle.font = .systemFont(ofSize: 11)
         subtitle.textColor = .secondaryLabelColor
+        for label in [heading, subtitle] {
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.lineBreakMode = .byTruncatingTail
+        }
         let identity = NSStackView(views: [heading, subtitle])
         identity.orientation = .vertical
         identity.alignment = .leading
@@ -215,7 +219,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         newConversation.action = #selector(startNewConversation)
         newConversation.toolTip = "Очистить разговор · ⌘N"
         newConversation.identifier = NSUserInterfaceItemIdentifier("chat.new")
-        let models = NSButton(title: "Модели…", target: self, action: #selector(showModels))
+        let models = NSButton(title: "Настройки…", target: self, action: #selector(showFeatures))
         models.bezelStyle = .rounded
         models.controlSize = .small
         models.identifier = NSUserInterfaceItemIdentifier("chat.models")
@@ -246,9 +250,9 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         welcome.orientation = .vertical
         welcome.alignment = .leading
         welcome.spacing = 10
-        let welcomeTitle = NSTextField(labelWithString: "Что нужно найти?")
+        let welcomeTitle = NSTextField(labelWithString: "Что вы хотите узнать?")
         welcomeTitle.font = .systemFont(ofSize: 22, weight: .semibold)
-        let welcomeText = ChatWrappingLabel("Спросите о сохранённых текстах, ссылках или тексте на картинках. В ответе можно открыть записи, на которые он ссылается.")
+        let welcomeText = ChatWrappingLabel("Здесь работает языковая модель на вашем Mac. Она умеет искать в истории буфера обмена, читать найденные записи и отвечать со ссылками на них. Можно задавать уточняющие вопросы; скрытые записи ей недоступны.")
         welcomeText.textColor = .secondaryLabelColor
         let example = ChatWrappingLabel("Например: «Найди команду для запуска проекта, которую я копировал вчера».")
         example.textColor = .secondaryLabelColor
@@ -290,7 +294,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         composer.textContainer?.widthTracksTextView = true
         composer.textContainer?.containerSize = NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude)
         composer.identifier = NSUserInterfaceItemIdentifier("chat.input")
-        composer.setAccessibilityLabel("Сообщение в чат")
+        composer.setAccessibilityLabel("Вопрос к Buffera")
         composer.onSend = { [weak self] in
             guard let self, !self.busy else { return }
             self.performAction()

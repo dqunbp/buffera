@@ -140,7 +140,7 @@ public actor HybridSearchService {
                                              limit: limit, offset: offset, semanticIDs: candidates)
             guard page.modelMatched else {
                 return try literal(store, filter: filter, limit: limit, offset: offset,
-                                   reason: "Индекс обновляется для выбранной модели. Пока ищем по словам.",
+                                   reason: "История готовится для поиска по смыслу. Пока ищем по словам.",
                                    progress: progress)
             }
             pageKey = key; pageIdentity = semantic.identity; semanticIDs = page.semanticIDs
@@ -177,8 +177,8 @@ private enum SearchFailure: LocalizedError {
     case invalidEmbedding, modelChanged
     var errorDescription: String? {
         switch self {
-        case .invalidEmbedding: return "Модель не вернула вектор запроса. Пока ищем по словам."
-        case .modelChanged: return "Модель поиска выключена или изменена. Пока ищем по словам."
+        case .invalidEmbedding: return "Не удалось выполнить поиск по смыслу. Пока ищем по словам."
+        case .modelChanged: return "Поиск по смыслу выключен или ещё не готов. Пока ищем по словам."
         }
     }
 }

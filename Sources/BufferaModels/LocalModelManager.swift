@@ -7,6 +7,7 @@ public final class LocalModelManager: @unchecked Sendable {
         let descriptor: LocalModelDescriptor
         var state: ModelState = .notDownloaded
         var received: Int64 = 0
+        // The feature preference is independent of download/verification readiness.
         var enabled = false
         var error: String?
         var generation = UUID()
@@ -64,9 +65,7 @@ public final class LocalModelManager: @unchecked Sendable {
             } else if partialSize > 0 {
                 entry.state = .paused
                 entry.received = min(partialSize, descriptor.byteCount)
-                entry.enabled = false
             } else {
-                entry.enabled = false
                 if receipt?.revision == descriptor.revision && receipt?.sha256 == descriptor.sha256 {
                     if let state = receipt?.state, [.downloading, .paused, .verifying].contains(state) {
                         entry.state = .paused
@@ -102,74 +101,77 @@ public final class LocalModelManager: @unchecked Sendable {
         }
     }
 
+    /// Downloads or resumes the required files without changing the feature preference.
     public func download(_ role: ModelRole) {
         queue.async { [weak self] in
-            guard let self, !self.stopped, let entry = self.entries[role],
-                  entry.state != .downloading, entry.state != .verifying,
-                  entry.state != .downloaded else { return }
-            do {
-                try self.prepareDirectory(entry)
-                if try ModelStorage.fileSize(self.fileURL(entry)) > 0 {
-                    entry.generation = UUID()
-                    self.verify(entry, at: self.fileURL(entry))
-                    return
-                }
-                let partial = self.partialURL(entry)
-                let size = try ModelStorage.fileSize(partial)
-                if size > entry.descriptor.byteCount {
-                    try FileManager.default.removeItem(at: partial)
-                    entry.received = 0
-                } else {
-                    entry.received = size
-                }
-                entry.error = nil
-                entry.enabled = false
-                entry.generation = UUID()
-                if entry.received == entry.descriptor.byteCount {
-                    self.verify(entry, at: partial)
-                    return
-                }
-                if let free = try self.rootURL.resourceValues(
-                    forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-                ).volumeAvailableCapacityForImportantUsage,
-                   free < entry.descriptor.byteCount - entry.received + 16 * 1024 * 1024 {
-                    throw ModelStorageError.insufficientSpace
-                }
-                entry.state = .downloading
-                try self.persist()
-                let generation = entry.generation
-                let download = ModelFileDownload(
-                    descriptor: entry.descriptor, partialURL: partial, offset: entry.received,
-                    queue: self.queue,
-                    onProgress: { [weak self, weak entry] bytes in
-                        guard let self, let entry, entry.generation == generation else { return }
-                        entry.received = bytes
-                        if Date().timeIntervalSince(entry.lastNotification) >= 0.1 {
-                            entry.lastNotification = Date()
-                            self.publish()
-                        }
-                    },
-                    onComplete: { [weak self, weak entry] error in
-                        guard let self, let entry, entry.generation == generation else { return }
-                        entry.download = nil
-                        if let error { self.fail(entry, error) }
-                        else { self.verify(entry, at: partial) }
-                    }
-                )
-                entry.download = download
-                download.start()
-                self.publish()
-            } catch { self.fail(entry, error) }
+            guard let self, !self.stopped, let entry = self.entries[role] else { return }
+            self.startDownload(entry)
         }
+    }
+
+    private func startDownload(_ entry: Entry) {
+        guard entry.state != .downloading, entry.state != .verifying,
+              entry.state != .downloaded else { return }
+        do {
+            try prepareDirectory(entry)
+            if try ModelStorage.fileSize(fileURL(entry)) > 0 {
+                entry.generation = UUID()
+                verify(entry, at: fileURL(entry))
+                return
+            }
+            let partial = partialURL(entry)
+            let size = try ModelStorage.fileSize(partial)
+            if size > entry.descriptor.byteCount {
+                try FileManager.default.removeItem(at: partial)
+                entry.received = 0
+            } else {
+                entry.received = size
+            }
+            entry.error = nil
+            entry.generation = UUID()
+            if entry.received == entry.descriptor.byteCount {
+                verify(entry, at: partial)
+                return
+            }
+            if let free = try rootURL.resourceValues(
+                forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+            ).volumeAvailableCapacityForImportantUsage,
+               free < entry.descriptor.byteCount - entry.received + 16 * 1024 * 1024 {
+                throw ModelStorageError.insufficientSpace
+            }
+            entry.state = .downloading
+            try persist()
+            let generation = entry.generation
+            let download = ModelFileDownload(
+                descriptor: entry.descriptor, partialURL: partial, offset: entry.received,
+                queue: queue,
+                onProgress: { [weak self, weak entry] bytes in
+                    guard let self, let entry, entry.generation == generation else { return }
+                    entry.received = bytes
+                    if Date().timeIntervalSince(entry.lastNotification) >= 0.1 {
+                        entry.lastNotification = Date()
+                        self.publish()
+                    }
+                },
+                onComplete: { [weak self, weak entry] error in
+                    guard let self, let entry, entry.generation == generation else { return }
+                    entry.download = nil
+                    if let error { self.fail(entry, error) }
+                    else { self.verify(entry, at: partial) }
+                }
+            )
+            entry.download = download
+            download.start()
+            publish()
+        } catch { fail(entry, error) }
     }
 
     public func pause(_ role: ModelRole) {
         queue.async { [weak self] in
-            guard let self, let entry = self.entries[role],
+            guard let self, !self.stopped, let entry = self.entries[role],
                   entry.state == .downloading || entry.state == .verifying else { return }
             self.cancel(entry)
             entry.state = .paused
-            entry.enabled = false
             entry.error = nil
             self.saveAndPublish(entry)
         }
@@ -177,7 +179,7 @@ public final class LocalModelManager: @unchecked Sendable {
 
     public func remove(_ role: ModelRole) {
         queue.async { [weak self] in
-            guard let self, let entry = self.entries[role] else { return }
+            guard let self, !self.stopped, let entry = self.entries[role] else { return }
             self.cancel(entry)
             entry.enabled = false
             do {
@@ -197,16 +199,20 @@ public final class LocalModelManager: @unchecked Sendable {
         }
     }
 
+    /// Enabling a feature prepares its files as needed; readiness remains state-gated.
     public func setEnabled(_ enabled: Bool, for role: ModelRole) {
         queue.async { [weak self] in
-            guard let self, let entry = self.entries[role] else { return }
-            guard !enabled || entry.state == .downloaded else {
-                entry.error = ModelStorageError.notDownloaded.localizedDescription
-                self.publish()
-                return
-            }
+            guard let self, !self.stopped, let entry = self.entries[role] else { return }
             entry.enabled = enabled
             entry.error = nil
+            if enabled && ![.downloaded, .downloading, .verifying].contains(entry.state) {
+                self.startDownload(entry)
+                return
+            }
+            if !enabled && [.downloading, .verifying].contains(entry.state) {
+                self.cancel(entry)
+                entry.state = .paused
+            }
             self.saveAndPublish(entry)
         }
     }
@@ -309,8 +315,7 @@ public final class LocalModelManager: @unchecked Sendable {
         catch {
             cancel(entry)
             entry.state = .failed
-            entry.enabled = false
-            entry.error = "Не удалось сохранить состояние модели: \(error.localizedDescription)"
+            entry.error = "Не удалось сохранить состояние функции: \(error.localizedDescription)"
         }
         publish()
     }
@@ -318,7 +323,6 @@ public final class LocalModelManager: @unchecked Sendable {
     private func fail(_ entry: Entry, _ error: Error) {
         cancel(entry)
         entry.state = .failed
-        entry.enabled = false
         entry.error = error.localizedDescription
         saveAndPublish(entry)
     }

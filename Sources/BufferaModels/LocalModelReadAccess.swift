@@ -31,13 +31,13 @@ public enum EmbeddingRuntimeError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: return "Модель поиска ещё не скачана или не прошла проверку."
-        case .disabled: return "Поиск по смыслу выключен в настройках моделей."
+        case .unavailable: return "Поиск по смыслу ещё не готов: нужные файлы не скачаны или не прошли проверку."
+        case .disabled: return "«Поиск по смыслу» выключен в настройках."
         case .invalidInput: return "Текст запроса слишком длинный или пустой."
         case .invalidResponse: return "Движок поиска вернул некорректный ответ."
         case .runtimeMissing: return "Движок поиска недоступен. Пересоберите или обновите Buffera."
         case .stopped: return "Поиск по смыслу остановлен."
-        case .timedOut: return "Вычисление эмбеддинга заняло слишком много времени."
+        case .timedOut: return "Поиск по смыслу занял слишком много времени."
         case .worker(let message): return message
         }
     }

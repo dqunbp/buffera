@@ -42,8 +42,12 @@ public struct LocalModelSnapshot: Sendable {
     public let state: ModelState
     public let receivedBytes: Int64
     public let totalBytes: Int64
+    /// The user has enabled the feature, including while its files are being prepared.
     public let isEnabled: Bool
     public let errorMessage: String?
+
+    /// Runtimes may start only after verified files and the feature preference agree.
+    public var isReadyForUse: Bool { isEnabled && state == .downloaded }
 
     public var progress: Double {
         guard totalBytes > 0 else { return 0 }
@@ -96,14 +100,14 @@ enum ModelStorageError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidDescriptor: return "Некорректное описание модели."
-        case .unsafeFile: return "Каталог модели содержит неожиданную ссылку или файл."
+        case .invalidDescriptor: return "Не удалось определить, какие файлы нужны. Обновите Buffera."
+        case .unsafeFile: return "В папке скачивания обнаружен неожиданный файл или ссылка."
         case .invalidResponse: return "Сервер вернул некорректный ответ."
         case .invalidRange: return "Сервер вернул неверный диапазон файла. Повторите загрузку."
         case .unexpectedSize: return "Размер скачанного файла не совпадает с ожидаемым."
-        case .checksum: return "Проверка файла не пройдена. Скачайте модель заново."
-        case .insufficientSpace: return "Недостаточно свободного места для модели."
-        case .notDownloaded: return "Сначала скачайте и проверьте модель."
+        case .checksum: return "Проверка файла не пройдена. Повторите скачивание."
+        case .insufficientSpace: return "Недостаточно свободного места для скачивания."
+        case .notDownloaded: return "Нужные файлы ещё не скачаны и не проверены."
         case .http(let status): return "Сервер загрузки вернул ошибку \(status)."
         }
     }

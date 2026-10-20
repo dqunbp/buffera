@@ -37,12 +37,14 @@ server.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
 server.arguments = ["-u", "-c", #"""
 import http.server, json, sys, time
 payload = bytes(range(256)) * 4096
+attempts = {}
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args): pass
     def do_GET(self):
         requested = self.headers.get("Range")
         with open(sys.argv[1], "a") as f: f.write(json.dumps({"path":self.path,"range":requested})+"\n")
-        if self.path == "/error":
+        attempts[self.path] = attempts.get(self.path, 0) + 1
+        if self.path == "/error" or (self.path == "/retry" and attempts[self.path] == 1):
             self.send_error(503)
             return
         start = int(requested.split("=")[1].split("-")[0]) if requested else 0
@@ -115,15 +117,16 @@ do {
     let manager = try LocalModelManager(rootURL: root("complete"), descriptors: [descriptor()])
     check(manager.snapshots.first?.state == .notDownloaded, "initial state is not downloaded")
     check(manager.modelURL(for: .embedding) == nil, "incomplete models have no usable path")
-    manager.setEnabled(true, for: .embedding)
-    check(waitFor(manager) { $0.errorMessage != nil && !$0.isEnabled }, "cannot enable before verified download")
+    check(manager.snapshots.first?.isReadyForUse == false, "missing files are not ready for inference")
     manager.download(.embedding)
     check(waitFor(manager) { $0.state == .downloaded }, "real HTTP download completes and verifies")
     let file = manager.modelURL(for: .embedding)
     check(file.flatMap { try? Data(contentsOf: $0) } == fullPayload, "downloaded bytes match fixture")
     check(!FileManager.default.fileExists(atPath: partial(root("complete")).path), "verified file atomically leaves partial path")
+    check(manager.snapshots.first?.isEnabled == false && manager.snapshots.first?.isReadyForUse == false,
+          "downloading files alone does not turn on the feature")
     manager.setEnabled(true, for: .embedding)
-    check(waitFor(manager) { $0.isEnabled }, "verified model can be enabled")
+    check(waitFor(manager) { $0.isReadyForUse }, "verified model can be enabled")
     manager.setEnabled(false, for: .embedding)
     check(waitFor(manager) { !$0.isEnabled && $0.state == .downloaded }, "disable preserves downloaded file")
     manager.setEnabled(true, for: .embedding)
@@ -136,6 +139,96 @@ do {
     check(restored.modelURL(for: .embedding) == nil && !(FileManager.default.fileExists(atPath: file!.path)),
           "delete removes model bytes and usable path")
     restored.shutdown()
+}
+
+do {
+    let directory = root("enable-feature")
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor("slow")])
+    let access = LocalModelReadAccess(rootURL: directory, descriptor: descriptor("slow"))
+    manager.setEnabled(true, for: .embedding)
+    check(waitFor(manager) { $0.state == .downloading && $0.receivedBytes > 32768 && $0.isEnabled },
+          "enabling a missing feature starts the download and keeps its toggle on")
+    check(manager.snapshots[0].isReadyForUse == false && (try? access.enabledEmbedding()) == nil,
+          "requested feature is unavailable to runtimes until its files are verified")
+    manager.setEnabled(false, for: .embedding)
+    check(waitFor(manager) { $0.state == .paused && !$0.isEnabled },
+          "disabling an in-flight feature pauses its download and clears preference")
+    let pausedBytes = manager.snapshots[0].receivedBytes
+    Thread.sleep(forTimeInterval: 0.08)
+    check(manager.snapshots[0].receivedBytes == pausedBytes && !manager.snapshots[0].isReadyForUse,
+          "late download callbacks cannot reactivate a disabled feature")
+    manager.setEnabled(true, for: .embedding)
+    check(waitFor(manager) { $0.isReadyForUse }, "re-enabling resumes files and activates automatically after verification")
+    check((try? access.enabledEmbedding())?.fileURL == manager.modelURL(for: .embedding),
+          "read-only runtime access accepts only the completed enabled feature")
+    check(requests().contains { ($0["path"] as? String) == "/slow" &&
+        ($0["range"] as? String) == "bytes=\(pausedBytes)-" }, "feature resume reuses the saved file offset")
+    manager.shutdown()
+}
+
+do {
+    let directory = root("feature-paused-restart")
+    let first = try LocalModelManager(rootURL: directory, descriptors: [descriptor("slow")])
+    first.setEnabled(true, for: .embedding)
+    _ = waitFor(first) { $0.state == .downloading && $0.receivedBytes > 32768 }
+    first.pause(.embedding)
+    check(waitFor(first) { $0.state == .paused && $0.isEnabled && !$0.isReadyForUse },
+          "pausing a download retains the requested feature preference")
+    first.shutdown()
+    let second = try LocalModelManager(rootURL: directory, descriptors: [descriptor("slow")])
+    check(second.snapshots[0].state == .paused && second.snapshots[0].isEnabled && !second.snapshots[0].isReadyForUse,
+          "restart preserves a paused feature preference without claiming readiness")
+    let requestCount = requests().count
+    Thread.sleep(forTimeInterval: 0.08)
+    check(requests().count == requestCount, "restart does not unexpectedly restart paused downloads")
+    second.download(.embedding)
+    check(waitFor(second) { $0.isReadyForUse }, "resuming a paused feature activates it automatically")
+    second.shutdown()
+}
+
+do {
+    let directory = root("feature-retry")
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor("retry")])
+    let access = LocalModelReadAccess(rootURL: directory, descriptor: descriptor("retry"))
+    manager.setEnabled(true, for: .embedding)
+    check(waitFor(manager) { $0.state == .failed && $0.isEnabled && !$0.isReadyForUse && $0.errorMessage != nil },
+          "download failure stays visible without losing the requested feature preference")
+    check((try? access.enabledEmbedding()) == nil, "failed downloads remain unavailable to runtime readers")
+    manager.download(.embedding)
+    check(waitFor(manager) { $0.isReadyForUse && $0.errorMessage == nil },
+          "retry completes the same feature activation without another toggle")
+    manager.shutdown()
+}
+
+do {
+    let directory = root("legacy-enabled")
+    let file = partial(directory).deletingPathExtension()
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fullPayload.write(to: file)
+    let legacyReceipt: [String: Any] = ["embedding": ["revision": revision, "sha256": expectedHash,
+                                                   "state": "downloaded", "enabled": true]]
+    try JSONSerialization.data(withJSONObject: legacyReceipt).write(to: directory.appendingPathComponent("state.json"))
+    let before = requests().count
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+    check(waitFor(manager) { $0.isReadyForUse }, "existing enabled receipts retain feature activation after verification")
+    check(requests().count == before, "legacy enabled files are reused without downloading again")
+    manager.shutdown()
+}
+
+do {
+    let directory = root("disable-startup-verification")
+    let file = partial(directory).deletingPathExtension()
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fullPayload.write(to: file)
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+    manager.setEnabled(false, for: .embedding)
+    check(waitFor(manager) { !$0.isEnabled && [.paused, .downloaded].contains($0.state) },
+          "disable during startup verification retains files and never activates the feature")
+    let before = requests().count
+    manager.setEnabled(true, for: .embedding)
+    check(waitFor(manager) { $0.isReadyForUse }, "re-enabling verifies retained final files after startup cancellation")
+    check(requests().count == before, "cancelled verification restarts locally without a second download")
+    manager.shutdown()
 }
 
 do {
@@ -212,14 +305,14 @@ do {
     let manager = try LocalModelManager(rootURL: root("parallel"), descriptors: [
         descriptor("slow"), descriptor("slow", role: .assistant)
     ])
-    manager.download(.embedding)
-    manager.download(.assistant)
+    manager.setEnabled(true, for: .embedding)
+    manager.setEnabled(true, for: .assistant)
     check(waitFor(manager) { $0.receivedBytes > 16000 && $0.state == .downloading } &&
           waitFor(manager, role: .assistant) { $0.receivedBytes > 16000 && $0.state == .downloading },
           "two model roles download independently")
     manager.remove(.embedding)
-    check(waitFor(manager) { $0.state == .notDownloaded }, "remove cancels an active download")
-    check(waitFor(manager, role: .assistant) { $0.state == .downloaded }, "removing one role does not cancel another")
+    check(waitFor(manager) { $0.state == .notDownloaded && !$0.isEnabled && !$0.isReadyForUse }, "remove cancels an active download and disables the feature")
+    check(waitFor(manager, role: .assistant) { $0.isReadyForUse }, "removing one role does not cancel another feature activation")
     Thread.sleep(forTimeInterval: 0.1)
     check(manager.snapshots.first { $0.descriptor.role == .embedding }?.state == .notDownloaded &&
           !FileManager.default.fileExists(atPath: root("parallel").appendingPathComponent("embedding").path),
@@ -240,8 +333,10 @@ do {
     let directory = root("state-error")
     let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
     try FileManager.default.createDirectory(at: directory.appendingPathComponent("state.json"), withIntermediateDirectories: true)
-    manager.download(.embedding)
-    check(waitFor(manager) { $0.state == .failed && $0.errorMessage != nil }, "state persistence failure prevents download readiness")
+    manager.setEnabled(true, for: .embedding)
+    check(waitFor(manager) { $0.state == .failed && $0.errorMessage != nil && !$0.isReadyForUse }, "state persistence failure prevents download readiness")
+    check((try? LocalModelReadAccess(rootURL: directory, descriptor: descriptor()).enabledEmbedding()) == nil,
+          "failed receipt writes never expose a ready feature to readers")
     manager.shutdown()
 }
 

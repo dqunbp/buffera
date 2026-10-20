@@ -15,23 +15,19 @@ final class ModelSettingsView: NSView {
         self.manager = manager
         super.init(frame: .zero)
 
-        let introduction = modelParagraph(
-            "Модель поиска находит записи по смыслу. Локальный помощник отвечает на вопросы по истории и показывает найденные записи. Обе модели работают на этом Mac и включаются независимо."
-        )
         let content = NSStackView()
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 12
-        content.addArrangedSubview(introduction)
         if manager == nil {
-            let unavailable = modelParagraph(unavailableMessage ?? "Не удалось открыть хранилище моделей.")
+            let unavailable = modelParagraph(unavailableMessage ?? "Не удалось открыть скачанные файлы.")
             unavailable.textColor = .systemRed
             content.addArrangedSubview(unavailable)
             unavailable.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
 
         #if !arch(arm64)
-        let unsupported = modelParagraph("Локальные модели пока доступны только на Mac с Apple Silicon.")
+        let unsupported = modelParagraph("Эти функции пока доступны только на Mac с Apple Silicon.")
         unsupported.textColor = .systemOrange
         content.addArrangedSubview(unsupported)
         unsupported.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -40,7 +36,7 @@ final class ModelSettingsView: NSView {
         for snapshot in manager?.snapshots ?? [] {
             let card = ModelCardView(snapshot: snapshot)
             let role = snapshot.descriptor.role
-            card.onDownload = { [weak manager] in manager?.download(role) }
+            card.onDownload = { [weak manager] in manager?.setEnabled(true, for: role) }
             card.onPause = { [weak manager] in manager?.pause(role) }
             card.onRemove = { [weak self] in
                 self?.onWillDisableOrRemove?(role)
@@ -57,10 +53,8 @@ final class ModelSettingsView: NSView {
             content.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
-        introduction.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-
         let note = modelParagraph(
-            "Выключение останавливает обработку и освобождает память. Скачанные файлы остаются на диске; «Удалить» убирает их отдельно. Скрытые записи не индексируются."
+            "Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются."
         )
         content.addArrangedSubview(note)
         note.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -127,8 +121,8 @@ private final class ModelCardView: NSBox {
 
     private var snapshot: LocalModelSnapshot
     private var isChecking = false
-    private let enabled = NSButton(checkboxWithTitle: "Использовать модель", target: nil, action: nil)
-    private let modelName = NSTextField(labelWithString: "")
+    private let enabled = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    private let modelName = modelParagraph("")
     private let status = modelParagraph("")
     private let progress = NSProgressIndicator()
     private let primary = NSButton()
@@ -138,6 +132,10 @@ private final class ModelCardView: NSBox {
     private let indexStatus = modelParagraph("")
     private let indexProgress = NSProgressIndicator()
     private let retryIndex = NSButton()
+    private var indexHasProgress = false
+    private var indexCanRetry = false
+    private let details = NSStackView()
+    private let disclosure = NSButton(title: "Подробнее", target: nil, action: nil)
 
     init(snapshot: LocalModelSnapshot) {
         self.snapshot = snapshot
@@ -150,23 +148,17 @@ private final class ModelCardView: NSBox {
 
         let prefix = "models.\(snapshot.descriptor.role.rawValue)"
         identifier = NSUserInterfaceItemIdentifier(prefix)
-        let title = NSTextField(labelWithString: snapshot.descriptor.role == .embedding
-                                ? "Поиск по смыслу" : "Локальный помощник")
-        title.font = .systemFont(ofSize: 13, weight: .semibold)
-        enabled.font = .systemFont(ofSize: 11)
+        let isSearch = snapshot.descriptor.role == .embedding
+        enabled.title = isSearch ? "Поиск по смыслу" : "Спросить Buffera"
+        enabled.font = .systemFont(ofSize: 13, weight: .semibold)
         enabled.target = self
         enabled.action = #selector(changeEnabled)
         enabled.identifier = NSUserInterfaceItemIdentifier("\(prefix).enabled")
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let heading = NSStackView(views: [title, spacer, enabled])
-        heading.orientation = .horizontal
-        heading.alignment = .centerY
-        heading.spacing = 8
+        let description = modelParagraph(isSearch
+            ? "Находите записи, даже если не помните точные слова. Для поиска по смыслу используется отдельная модель на вашем Mac."
+            : "Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы.")
 
         modelName.font = .systemFont(ofSize: 11)
-        modelName.lineBreakMode = .byTruncatingTail
-        modelName.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         modelName.identifier = NSUserInterfaceItemIdentifier("\(prefix).name")
         status.identifier = NSUserInterfaceItemIdentifier("\(prefix).status")
         progress.style = .bar
@@ -175,17 +167,23 @@ private final class ModelCardView: NSBox {
         progress.isIndeterminate = false
         progress.controlSize = .small
         progress.identifier = NSUserInterfaceItemIdentifier("\(prefix).progress")
-        progress.setAccessibilityLabel("Загрузка \(snapshot.descriptor.title)")
+        progress.setAccessibilityLabel("Скачивание модели \(snapshot.descriptor.title)")
         configure(primary, action: #selector(primaryAction), identifier: "\(prefix).download")
         configure(remove, action: #selector(removeModel), identifier: "\(prefix).remove")
-        remove.title = "Удалить"
+        remove.title = "Удалить модель"
+        remove.toolTip = "Выключить функцию и удалить скачанную модель с этого Mac"
         configure(check, action: #selector(checkModel), identifier: "\(prefix).check")
         check.toolTip = "Проверить русский и английский текст и код на встроенных примерах"
         let license = NSButton(title: "Лицензия", target: self, action: #selector(showLicense))
         license.bezelStyle = .inline
         license.font = .systemFont(ofSize: 11)
         license.identifier = NSUserInterfaceItemIdentifier("\(prefix).license")
-        let actions = NSStackView(views: [primary, check, remove, license])
+        disclosure.bezelStyle = .inline
+        disclosure.font = .systemFont(ofSize: 11)
+        disclosure.target = self
+        disclosure.action = #selector(toggleDetails)
+        disclosure.identifier = NSUserInterfaceItemIdentifier("\(prefix).details")
+        let actions = NSStackView(views: [primary, remove, disclosure])
         actions.orientation = .horizontal
         actions.alignment = .centerY
         actions.spacing = 8
@@ -206,8 +204,16 @@ private final class ModelCardView: NSBox {
         retryIndex.title = "Повторить обработку"
         retryIndex.isHidden = true
 
-        let stack = NSStackView(views: [heading, modelName, status, progress, actions, checkStatus,
-                                      indexStatus, indexProgress, retryIndex])
+        let technicalActions = NSStackView(views: [check, license])
+        technicalActions.orientation = .horizontal
+        technicalActions.spacing = 8
+        details.orientation = .vertical
+        details.alignment = .leading
+        details.spacing = 8
+        for view in [technicalActions, checkStatus] { details.addArrangedSubview(view) }
+        details.isHidden = true
+        let stack = NSStackView(views: [enabled, description, modelName, status, progress,
+                                      indexStatus, indexProgress, retryIndex, actions, details])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -220,9 +226,10 @@ private final class ModelCardView: NSBox {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
-        for view in [heading, modelName, status, progress, checkStatus, indexStatus, indexProgress] {
+        for view in [description, modelName, status, progress, indexStatus, indexProgress, details] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
+        checkStatus.widthAnchor.constraint(equalTo: details.widthAnchor).isActive = true
         update(snapshot)
     }
 
@@ -237,10 +244,17 @@ private final class ModelCardView: NSBox {
         }
         let total = modelByteCount(snapshot.totalBytes)
         let received = modelByteCount(snapshot.receivedBytes)
-        modelName.stringValue = "\(snapshot.descriptor.title) · \(total)"
+        modelName.stringValue = "Модель: \(snapshot.descriptor.title) · \(total)"
         modelName.toolTip = snapshot.descriptor.summary
         enabled.state = snapshot.isEnabled ? .on : .off
-        enabled.isEnabled = snapshot.state == .downloaded && platformSupported
+        // A missing model requires an explicit download action with its size in view.
+        // During preparation the requested-on switch remains available to stop it.
+        enabled.isEnabled = platformSupported && (snapshot.state == .downloaded || snapshot.isEnabled)
+        enabled.toolTip = snapshot.isEnabled
+            ? "Выключение остановит обработку и сохранит скачанную модель"
+            : snapshot.state == .downloaded
+                ? "Включить функцию с уже скачанной моделью"
+                : "Для включения сначала скачайте указанную модель"
         primary.isHidden = snapshot.state == .downloaded
         primary.isEnabled = snapshot.totalBytes > 0 && platformSupported
         remove.isHidden = snapshot.state == .notDownloaded
@@ -255,29 +269,34 @@ private final class ModelCardView: NSBox {
         status.textColor = .secondaryLabelColor
         switch snapshot.state {
         case .notDownloaded:
-            status.stringValue = "Не скачана"
-            primary.title = "Скачать · \(total)"
+            status.stringValue = "Модель ещё не скачана"
+            primary.title = "Скачать модель и включить"
         case .downloading:
-            status.stringValue = "Загружено \(received) из \(total)"
+            status.stringValue = "Скачивание модели · \(received) из \(total). После проверки функция включится."
             primary.title = "Пауза"
         case .paused:
-            status.stringValue = "На паузе · \(received) из \(total)"
-            primary.title = "Продолжить"
+            status.stringValue = snapshot.isEnabled
+                ? "Скачивание на паузе · \(received) из \(total)"
+                : "Выключено · сохранено \(received) из \(total)"
+            primary.title = snapshot.isEnabled ? "Продолжить" : "Включить и продолжить"
         case .verifying:
-            status.stringValue = "Проверяем скачанные файлы"
+            status.stringValue = "Проверяем скачанную модель"
             primary.title = "Проверка файлов…"
             primary.isEnabled = false
         case .downloaded:
-            status.stringValue = snapshot.isEnabled ? "Готова к работе" : "Скачана · выключена"
+            status.stringValue = snapshot.isEnabled
+                ? "Модель скачана · функция включена"
+                : "Модель скачана · функция выключена"
         case .failed:
-            status.stringValue = snapshot.errorMessage ?? "Не удалось загрузить модель"
+            status.stringValue = snapshot.errorMessage ?? "Не удалось подготовить функцию"
             status.textColor = .systemRed
-            primary.title = snapshot.receivedBytes > 0 ? "Продолжить" : "Повторить загрузку"
+            primary.title = snapshot.isEnabled ? "Повторить" : "Включить и повторить"
         }
         if let error = snapshot.errorMessage, snapshot.state != .failed {
             status.stringValue += "\n\(error)"
             status.textColor = .systemRed
         }
+        updateIndexVisibility()
         updateCheckButton()
     }
 
@@ -292,17 +311,23 @@ private final class ModelCardView: NSBox {
     func updateIndex(status: String, progress: Double?, canRetry: Bool) {
         guard snapshot.descriptor.role == .embedding else { return }
         indexStatus.stringValue = status
-        indexStatus.isHidden = status.isEmpty
-        indexProgress.isHidden = progress == nil
+        indexHasProgress = progress != nil
+        indexCanRetry = canRetry
         if let progress { indexProgress.doubleValue = max(0, min(1, progress)) }
-        retryIndex.isHidden = !canRetry
-        retryIndex.isEnabled = snapshot.state == .downloaded && snapshot.isEnabled && platformSupported
+        updateIndexVisibility()
+    }
+
+    private func updateIndexVisibility() {
+        indexStatus.isHidden = indexStatus.stringValue.isEmpty || !snapshot.isReadyForUse
+        indexProgress.isHidden = !indexHasProgress || !snapshot.isReadyForUse
+        retryIndex.isHidden = !indexCanRetry || !snapshot.isReadyForUse
+        retryIndex.isEnabled = snapshot.isReadyForUse && platformSupported
     }
 
     private func updateCheckButton() {
         check.isHidden = snapshot.state != .downloaded && !isChecking
-        check.title = isChecking ? "Остановить проверку" : "Проверить модель"
-        check.isEnabled = platformSupported && (isChecking || (snapshot.state == .downloaded && snapshot.isEnabled))
+        check.title = isChecking ? "Остановить проверку" : "Проверить работу"
+        check.isEnabled = platformSupported && (isChecking || snapshot.isReadyForUse)
     }
 
     private var platformSupported: Bool {
@@ -327,6 +352,10 @@ private final class ModelCardView: NSBox {
     }
 
     @objc private func changeEnabled() { onSetEnabled?(enabled.state == .on) }
+    @objc private func toggleDetails() {
+        details.isHidden.toggle()
+        disclosure.title = details.isHidden ? "Подробнее" : "Скрыть подробности"
+    }
     @objc private func removeModel() { onRemove?() }
     @objc private func retryIndexing() { onRetryIndex?() }
     @objc private func checkModel() {

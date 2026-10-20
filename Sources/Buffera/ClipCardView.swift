@@ -113,7 +113,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         return formatter
     }()
     private var clip: ClipSummary
-    private let isRevealed: Bool
+    private var isRevealed: Bool
     private let onAction: (ClipCardAction) -> Void
     private let thumbnailView = NSImageView()
     private let contentText = ClipCardView.makeContentText()
@@ -207,6 +207,14 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     func setSelected(_ selected: Bool) {
         self.selected = selected
         updateAppearance()
+    }
+
+    func hideConcealedContent() {
+        guard clip.isConcealed, isRevealed else { return }
+        isRevealed = false
+        contentText.stringValue = Self.shownText(for: clip, revealedText: nil)
+        contentText.setAccessibilityLabel("Скрытая запись")
+        for (action, button) in buttons { configureButton(button, for: action) }
     }
 
     func setNearbyAnchor(_ value: Bool) {

@@ -19,7 +19,7 @@ final class SettingsWindow: NSWindowController {
          mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
                                              mcpAccess: mcpAccess, bundleURL: bundleURL)
-        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 510),
+        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Настройки \(BrandIdentity.name)"
         window.isReleasedWhenClosed = false
@@ -30,6 +30,13 @@ final class SettingsWindow: NSWindowController {
             window.center()
         } else if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }) {
             window.center()
+        }
+        // Older saved frames predate the always-visible model names and sizes.
+        if window.contentLayoutRect.height < 590 {
+            let top = window.frame.maxY
+            window.setContentSize(NSSize(width: 620, height: 590))
+            let bottom = window.screen?.visibleFrame.minY ?? 0
+            window.setFrameOrigin(NSPoint(x: window.frame.minX, y: max(bottom, top - window.frame.height)))
         }
         super.init(window: window)
         window.contentViewController = settings
@@ -58,9 +65,9 @@ final class SettingsWindow: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    func showModels() {
+    func showFeatures() {
         show()
-        settings.showModels()
+        settings.showFeatures()
     }
 
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
@@ -108,7 +115,7 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSPopUpButton()
     private var countValues = HistoryLimits.countChoices
     private var byteValues = HistoryLimits.byteChoices
-    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты", "Модели"], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты", "Поиск и ответы"], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let body = NSView()
     private var pages: [NSView] = []
@@ -131,7 +138,7 @@ private final class SettingsContentController: NSViewController {
 
     func refreshMCPAccess() { mcp.refresh() }
     func refreshModels() { models.refresh() }
-    func showModels() {
+    func showFeatures() {
         _ = view
         tabs.selectedSegment = 4
         presentPage(4)
@@ -145,7 +152,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 510))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 590))
         let icon = NSImageView(image: BrandIdentity.appIcon(size: 64))
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.setAccessibilityLabel(BrandIdentity.name)
@@ -164,7 +171,7 @@ private final class SettingsContentController: NSViewController {
         tabs.controlSize = .regular
         tabs.target = self; tabs.action = #selector(changeTab)
         tabs.setAccessibilityLabel("Раздел настроек")
-        for index in 0..<tabs.segmentCount { tabs.setWidth(100, forSegment: index) }
+        for index in 0..<tabs.segmentCount { tabs.setWidth(index == 4 ? 130 : 92, forSegment: index) }
         tabs.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(tabs)
         body.translatesAutoresizingMaskIntoConstraints = false

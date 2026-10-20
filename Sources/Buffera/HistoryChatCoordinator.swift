@@ -6,7 +6,7 @@ import BufferaModels
 /// A generation number prevents cancelled turns from updating a newer window.
 final class HistoryChatCoordinator {
     var onOpenSource: ((Int64) -> Void)?
-    var onShowModels: (() -> Void)?
+    var onShowFeatures: (() -> Void)?
     private let session: ChatSession
     private var controller: HistoryChatWindow?
     private var responseTask: Task<Void, Never>?
@@ -17,7 +17,7 @@ final class HistoryChatCoordinator {
     private var answer = ""
     private var sourceIDs = Set<Int64>()
     private var enabled = false
-    private var availabilityMessage = "Скачайте и включите модель чата в настройках."
+    private var availabilityMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
 
     init(databaseURL: URL, modelRootURL: URL) {
         session = ChatSession(databaseURL: databaseURL, modelRootURL: modelRootURL)
@@ -30,7 +30,7 @@ final class HistoryChatCoordinator {
             window.onStop = { [weak self] in self?.stop() }
             window.onNewConversation = { [weak self] in self?.reset() }
             window.onOpenSource = { [weak self] in self?.onOpenSource?($0) }
-            window.onShowModels = { [weak self] in self?.onShowModels?() }
+            window.onShowFeatures = { [weak self] in self?.onShowFeatures?() }
             controller = window
         }
         controller?.setAvailability(enabled: enabled, message: enabled ? nil : availabilityMessage)
@@ -38,15 +38,27 @@ final class HistoryChatCoordinator {
     }
 
     func modelsChanged(_ snapshots: [LocalModelSnapshot]) {
-        enabled = snapshots.contains {
-            $0.descriptor.role == .assistant && $0.state == .downloaded && $0.isEnabled
+        let assistant = snapshots.first { $0.descriptor.role == .assistant }
+        let wasEnabled = enabled
+        enabled = assistant?.isReadyForUse == true
+        availabilityMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
+        if let assistant {
+            switch assistant.state {
+            case .downloading:
+                availabilityMessage = "Скачивается модель \(assistant.descriptor.title) · \(Int(assistant.progress * 100))%. После проверки можно будет задать вопрос."
+            case .verifying:
+                availabilityMessage = "Проверяем скачанную модель."
+            case .paused:
+                availabilityMessage = "Подготовка модели на паузе. Продолжите её в настройках."
+            case .failed:
+                availabilityMessage = "Не удалось подготовить модель. Повторите попытку в настройках."
+            case .notDownloaded:
+                break
+            case .downloaded:
+                availabilityMessage = "Включите «Спросить Buffera» в настройках, чтобы задать вопрос."
+            }
         }
-        if snapshots.contains(where: { $0.descriptor.role == .assistant && $0.state == .downloaded }) {
-            availabilityMessage = "Включите модель чата в настройках, чтобы задать вопрос."
-        } else {
-            availabilityMessage = "Скачайте и включите модель чата в настройках."
-        }
-        if !enabled { stop() }
+        if wasEnabled && !enabled { stop() }
         controller?.setAvailability(enabled: enabled, message: enabled ? nil : availabilityMessage)
     }
 

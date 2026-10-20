@@ -61,8 +61,8 @@ public enum ChatRuntimeError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: return "Модель помощника ещё не скачана или не прошла проверку."
-        case .disabled: return "Локальный помощник выключен в настройках моделей."
+        case .unavailable: return "Buffera ещё не готова отвечать: нужные файлы не скачаны или не прошли проверку."
+        case .disabled: return "«Спросить Buffera» выключено в настройках."
         case .invalidInput: return "Не удалось подготовить сообщения для помощника."
         case .contextTooLong: return "В запросе слишком много текста для локального помощника."
         case .invalidResponse: return "Движок помощника вернул некорректный ответ."
