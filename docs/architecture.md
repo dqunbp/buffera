@@ -1,6 +1,6 @@
 # Границы первой версии
 
-Минимальная система — macOS 14; значение согласовано в SwiftPM и метаданных пакета приложения. Встроенные модели пока не подключены; первый этап их поддержки рассчитан на Apple Silicon.
+Минимальная система — macOS 14; значение согласовано в SwiftPM и метаданных пакета приложения. На Apple Silicon подключены загрузка, управление и проверка локальных моделей; смысловой поиск и чат пока отложены.
 
 ```mermaid
 flowchart LR
@@ -26,6 +26,11 @@ flowchart LR
   ReadOnly --> DB
   Appearance --> Access[MCPAccess / mcp-access.json]
   Reader --> Access
+  Appearance --> Models[LocalModelManager]
+  Models --> ModelFiles[Models / GGUF files]
+  Appearance --> Probe[ModelProbeController]
+  Probe --> Helper[BufferaModelProbe / llama.cpp / Metal]
+  ModelFiles --> Helper
 ```
 
 `BufferaCore` содержит сериализуемый контракт содержимого, SQLite, общее декодирование текста `ClipboardText` и разрешение `MCPAccess`. `HistoryStore` используется только на одной последовательной очереди; все SQL-параметры связаны через prepared statements. Отдельная таблица payloads не загружается при поиске. Транзакция включает вставку, дедупликацию и применение лимитов. Уникальный хеш учитывает границы элементов, типы и бинарные данные. Идентификаторы не переиспользуются, в том числе для имён экспорта.

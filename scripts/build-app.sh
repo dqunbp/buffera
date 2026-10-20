@@ -9,6 +9,9 @@ APP="$PWD/dist/Buffera.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Buffera "$APP/Contents/MacOS/Buffera"
 cp .build/release/BufferaMCP "$APP/Contents/MacOS/BufferaMCP"
+if [[ "$(uname -m)" == arm64 ]]; then
+  zsh scripts/prepare-model-runtime.sh "$APP"
+fi
 swiftc Sources/Buffera/BrandIdentity.swift scripts/generate-app-icon.swift \
   -o .build/generate-app-icon
 .build/generate-app-icon "$PWD/.build/Buffera.iconset"

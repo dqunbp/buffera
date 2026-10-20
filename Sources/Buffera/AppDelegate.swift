@@ -1,5 +1,6 @@
 import AppKit
 import BufferaCore
+import BufferaModels
 import UniformTypeIdentifiers
 import os
 
@@ -12,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
     private var settings: SettingsWindow?
+    private var modelManager: LocalModelManager?
+    private var modelStorageError: String?
+    private let modelProbe = ModelProbeController()
     private var imageTextIndexer: ImageTextIndexer?
     private var copyTransformService: CopyTransformService?
     private var generation = 0
@@ -60,6 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenu()
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }
+        do {
+            let manager = try LocalModelManager(rootURL: folder.appendingPathComponent("Models", isDirectory: true))
+            manager.onChange = { [weak self] snapshots in self?.settings?.updateModels(snapshots) }
+            modelManager = manager
+        } catch { modelStorageError = error.localizedDescription; showError(error) }
+        modelProbe.onChange = { [weak self] role, status, running in
+            self?.settings?.updateModelCheck(role: role, status: status, running: running)
+        }
         copyTransformService = CopyTransformService(store: store, storageQueue: work)
         panel = HistoryPanel()
         connectPanel()
@@ -116,6 +128,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboard.paused = true
         clipboardSession.stop()
         imageTextIndexer?.stop()
+        modelManager?.shutdown()
+        modelProbe.shutdown()
     }
 
     private func connectPanel() {
@@ -354,7 +368,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if settings == nil {
-            let controller = SettingsWindow(mcpAccess: MCPAccess(directory: folder))
+            let controller = SettingsWindow(modelManager: modelManager, modelError: modelStorageError,
+                                            mcpAccess: MCPAccess(directory: folder))
+            controller.onCheckModel = { [weak self] role in
+                guard let self, let url = self.modelManager?.modelURL(for: role) else { return }
+                self.modelProbe.check(role, modelURL: url)
+            }
+            controller.onCancelModelCheck = { [weak self] role in self?.modelProbe.cancel(role) }
+            controller.onWillDisableOrRemoveModel = { [weak self] role in self?.modelProbe.cancel(role) }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onRevealData = { [weak self] in self?.revealData() }
             controller.onCopyMCPConfiguration = { [weak self] configuration in

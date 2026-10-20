@@ -14,7 +14,8 @@ let package = Package(
     targets: [
         .systemLibrary(name: "CSQLite"),
         .target(name: "BufferaCore", dependencies: ["CSQLite"]),
-        .executableTarget(name: "Buffera", dependencies: ["BufferaCore"],
+        .target(name: "BufferaModels"),
+        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels"],
                           linkerSettings: [.linkedFramework("Carbon")]),
         .target(name: "BufferaMCPKit", dependencies: [
             "BufferaCore", .product(name: "MCP", package: "swift-sdk")
@@ -22,6 +23,7 @@ let package = Package(
         .executableTarget(name: "BufferaMCP", dependencies: ["BufferaMCPKit"]),
         .executableTarget(name: "BufferaMCPChecks", dependencies: ["BufferaMCPKit", "BufferaCore", "CSQLite"],
                     path: "Tests/BufferaMCPTests"),
-        .executableTarget(name: "BufferaChecks", dependencies: ["BufferaCore"], path: "Tests/BufferaCoreTests")
+        .executableTarget(name: "BufferaChecks", dependencies: ["BufferaCore"], path: "Tests/BufferaCoreTests"),
+        .executableTarget(name: "BufferaModelChecks", dependencies: ["BufferaModels"], path: "Tests/BufferaModelTests")
     ]
 )

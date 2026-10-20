@@ -1,5 +1,6 @@
 import AppKit
 import BufferaCore
+import BufferaModels
 
 /// A retained settings window, independent of the history panel's focus/lifetime.
 final class SettingsWindow: NSWindowController {
@@ -7,11 +8,16 @@ final class SettingsWindow: NSWindowController {
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
+    var onCheckModel: ((ModelRole) -> Void)?
+    var onCancelModelCheck: ((ModelRole) -> Void)?
+    var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
 
     private let settings: SettingsContentController
 
-    init(mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
-        settings = SettingsContentController(mcpAccess: mcpAccess, bundleURL: bundleURL)
+    init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
+         mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
+        settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
+                                             mcpAccess: mcpAccess, bundleURL: bundleURL)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 510),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Настройки \(BrandIdentity.name)"
@@ -33,6 +39,9 @@ final class SettingsWindow: NSWindowController {
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
             try copy(configuration)
         }
+        settings.onCheckModel = { [weak self] role in self?.onCheckModel?(role) }
+        settings.onCancelModelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
+        settings.onWillDisableOrRemoveModel = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -41,12 +50,17 @@ final class SettingsWindow: NSWindowController {
         settings.updateAppearance(HistoryAppearance.load())
         settings.updateLimits(HistoryLimits.load())
         settings.refreshMCPAccess()
+        settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
 
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
+    func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
+    func updateModelCheck(role: ModelRole, status: String, running: Bool) {
+        settings.updateModelCheck(role: role, status: status, running: running)
+    }
 }
 
 private final class SettingsPanel: NSWindow {
@@ -67,8 +81,12 @@ private final class SettingsContentController: NSViewController {
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
+    var onCheckModel: ((ModelRole) -> Void)?
+    var onCancelModelCheck: ((ModelRole) -> Void)?
+    var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
 
     private let mcp: MCPSettingsView
+    private let models: ModelSettingsView
     private var appearance = HistoryAppearance.load()
     private var limits = HistoryLimits.load()
     private let mode = NSPopUpButton()
@@ -79,23 +97,32 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSPopUpButton()
     private var countValues = HistoryLimits.countChoices
     private var byteValues = HistoryLimits.byteChoices
-    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты"], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты", "Модели"], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let body = NSView()
     private var pages: [NSView] = []
 
-    init(mcpAccess: MCPAccess, bundleURL: URL) {
+    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL) {
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
+        models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
         mcp.onCopyConfiguration = { [weak self] configuration in
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
             try copy(configuration)
         }
+        models.onCheck = { [weak self] role in self?.onCheckModel?(role) }
+        models.onCancelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
+        models.onWillDisableOrRemove = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func refreshMCPAccess() { mcp.refresh() }
+    func refreshModels() { models.refresh() }
+    func updateModels(_ snapshots: [LocalModelSnapshot]) { models.update(snapshots) }
+    func updateModelCheck(role: ModelRole, status: String, running: Bool) {
+        models.updateCheck(role: role, status: status, running: running)
+    }
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 510))
@@ -117,7 +144,7 @@ private final class SettingsContentController: NSViewController {
         tabs.controlSize = .regular
         tabs.target = self; tabs.action = #selector(changeTab)
         tabs.setAccessibilityLabel("Раздел настроек")
-        for index in 0..<tabs.segmentCount { tabs.setWidth(112, forSegment: index) }
+        for index in 0..<tabs.segmentCount { tabs.setWidth(100, forSegment: index) }
         tabs.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(tabs)
         body.translatesAutoresizingMaskIntoConstraints = false
@@ -138,7 +165,7 @@ private final class SettingsContentController: NSViewController {
             footer.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), historyPage(), keyboardPage(), mcp]
+        pages = [appearancePage(), historyPage(), keyboardPage(), mcp, models]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)
@@ -333,7 +360,9 @@ private final class SettingsContentController: NSViewController {
             page.leadingAnchor.constraint(equalTo: body.leadingAnchor),
             page.trailingAnchor.constraint(equalTo: body.trailingAnchor),
             page.topAnchor.constraint(equalTo: body.topAnchor),
-            page.bottomAnchor.constraint(lessThanOrEqualTo: body.bottomAnchor)
+            page === models
+                ? page.bottomAnchor.constraint(equalTo: body.bottomAnchor)
+                : page.bottomAnchor.constraint(lessThanOrEqualTo: body.bottomAnchor)
         ])
     }
 
