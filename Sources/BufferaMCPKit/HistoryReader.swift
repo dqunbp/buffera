@@ -1,0 +1,252 @@
+import Foundation
+import BufferaCore
+
+/// Bounded metadata shared by all MCP history results. IDs are strings to preserve Int64 precision.
+public struct HistoryItem: Codable, Sendable, Equatable {
+    public let id: String
+    public let copiedAt: String
+    public let kind: String
+    public let title: String
+    public let snippet: String
+    public let snippetTruncated: Bool
+    public let source: String
+    public let byteCount: Int
+    public let isFavorite: Bool
+    public let isRemote: Bool
+
+    init(_ clip: ClipSummary) {
+        id = String(clip.id)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        copiedAt = formatter.string(from: clip.date)
+        kind = clip.kind.rawValue
+        title = boundedPrefix(clip.title[...], characters: 240, bytes: 1_024).text
+        let preview = boundedPrefix(clip.text[...], characters: 600, bytes: 4_096)
+        snippet = preview.text
+        snippetTruncated = preview.endIndex != clip.text.endIndex
+        source = boundedPrefix(clip.source[...], characters: 240, bytes: 1_024).text
+        byteCount = clip.byteCount
+        isFavorite = clip.isFavorite
+        isRemote = clip.isRemote
+    }
+}
+
+public struct HistorySearchResult: Codable, Sendable, Equatable {
+    public let items: [HistoryItem]
+    public let total: Int
+    public let offset: Int
+    public let nextOffset: Int?
+}
+
+public enum HistoryContentKind: String, Codable, Sendable {
+    case text
+    case cachedOCR
+    case filePaths
+    case unavailableOCR
+    case unsupported
+}
+
+public struct HistoryReadResult: Codable, Sendable, Equatable {
+    public let item: HistoryItem
+    public let text: String
+    public let contentKind: HistoryContentKind
+    /// Character offsets count Swift Characters (extended grapheme clusters), not bytes.
+    public let offset: Int
+    public let totalCharacters: Int
+    public let nextOffset: Int?
+    /// Whether the source text is complete. Use nextOffset to determine whether more chunks remain.
+    public let isComplete: Bool
+    public let note: String?
+}
+
+public struct HistoryNeighborsResult: Codable, Sendable, Equatable {
+    public let anchorID: String
+    /// Newest capture first, including the anchor. Before means older; after means newer.
+    public let items: [HistoryItem]
+}
+
+public enum HistoryReaderError: LocalizedError, Equatable {
+    case disabled
+    case missing
+    case invalidArgument(String)
+    case unreadableContent
+    case oversizedCharacter
+    case storageUnavailable
+
+    public var errorDescription: String? {
+        switch self {
+        case .disabled:
+            return "Доступ через MCP выключен. Включите его в настройках Buffera."
+        case .missing:
+            return "Запись недоступна. Найдите актуальную запись в истории Buffera."
+        case .invalidArgument(let description):
+            return description
+        case .unreadableContent:
+            return "Не удалось прочитать полное содержимое записи. Попробуйте скопировать источник заново."
+        case .oversizedCharacter:
+            return "Один символ текста превышает лимит ответа 128 КиБ. Его нельзя передать без разрыва символа."
+        case .storageUnavailable:
+            return "Не удалось открыть историю для чтения. Запустите актуальную Buffera и проверьте путь к истории."
+        }
+    }
+}
+
+/// Serial, read-only access to history. Every request checks the on-disk grant and opens a fresh connection.
+public actor HistoryReader {
+    private let directory: URL
+
+    public init(directory: URL = MCPAccess.defaultDirectory) {
+        self.directory = directory
+    }
+
+    public func search(filter: SearchFilter, limit: Int = 20, offset: Int = 0) throws -> HistorySearchResult {
+        try validate(limit, in: 1...50, name: "limit")
+        try validate(offset, in: 0...100_000, name: "offset")
+        return try withAccess { store in
+            var visibleFilter = filter
+            visibleFilter.concealedOnly = false
+            visibleFilter.excludesConcealed = true
+            return try store.withReadSnapshot {
+                let clips = try store.search(visibleFilter, limit: limit, offset: offset)
+                let total = try store.count(visibleFilter)
+                let end = offset + clips.count
+                return HistorySearchResult(items: clips.map(HistoryItem.init), total: total, offset: offset,
+                                           nextOffset: end < total ? end : nil)
+            }
+        }
+    }
+
+    public func read(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {
+        try validateID(id)
+        try validate(limit, in: 1...32_000, name: "limit")
+        guard offset >= 0 else { throw HistoryReaderError.invalidArgument("offset должен быть не меньше 0.") }
+        return try withAccess { store in
+            let content = try store.visibleContent(id: id)
+            let decoded = try decode(content)
+            let total = decoded.text.count
+            guard offset <= total else {
+                throw HistoryReaderError.invalidArgument("offset превышает длину текста (\(total) символов).")
+            }
+            let start = decoded.text.index(decoded.text.startIndex, offsetBy: offset)
+            let chunk = boundedPrefix(decoded.text[start...], characters: limit, bytes: 128 * 1_024)
+            guard chunk.characters > 0 || offset == total else { throw HistoryReaderError.oversizedCharacter }
+            let next = offset + chunk.characters
+            let result = HistoryReadResult(
+                item: HistoryItem(content.summary), text: chunk.text,
+                contentKind: decoded.kind, offset: offset, totalCharacters: total,
+                nextOffset: next < total ? next : nil, isComplete: decoded.isComplete, note: decoded.note
+            )
+            // Decoding may take time. Check a new SQLite snapshot before releasing any content.
+            guard try !store.summary(id: id).isConcealed else { throw HistoryReaderError.missing }
+            return result
+        }
+    }
+
+    public func nearby(id: Int64, before: Int = 10, after: Int = 10) throws -> HistoryNeighborsResult {
+        try validateID(id)
+        try validate(before, in: 0...20, name: "before")
+        try validate(after, in: 0...20, name: "after")
+        return try withAccess { store in
+            let clips = try store.nearby(anchorID: id, before: before, after: after, includeConcealed: false)
+            return HistoryNeighborsResult(anchorID: String(id), items: clips.map(HistoryItem.init))
+        }
+    }
+
+    private func withAccess<T>(_ body: (HistoryStore) throws -> T) throws -> T {
+        let access = MCPAccess(directory: directory)
+        guard access.isEnabled() else { throw HistoryReaderError.disabled }
+        do {
+            let store = try HistoryStore(url: access.databaseURL, mode: .readOnly)
+            let result = try body(store)
+            guard access.isEnabled() else { throw HistoryReaderError.disabled }
+            return result
+        } catch {
+            // Revocation also takes precedence over an in-flight storage or decoding failure.
+            guard access.isEnabled() else { throw HistoryReaderError.disabled }
+            switch error {
+            case let readerError as HistoryReaderError: throw readerError
+            case HistoryError.missing: throw HistoryReaderError.missing
+            case HistoryError.invalidPayload, is DecodingError: throw HistoryReaderError.unreadableContent
+            default: throw HistoryReaderError.storageUnavailable
+            }
+        }
+    }
+
+    private struct DecodedContent {
+        let text: String
+        let kind: HistoryContentKind
+        let isComplete: Bool
+        let note: String?
+    }
+
+    private func decode(_ content: VisibleClipContent) throws -> DecodedContent {
+        switch content.summary.kind {
+        case .text, .link:
+            let payload = try requiredPayload(content)
+            let items = try payload.items.map { item in
+                guard let text = ClipboardText.decode(item) else { throw HistoryReaderError.unreadableContent }
+                return text
+            }
+            return DecodedContent(text: items.joined(separator: "\n"), kind: .text, isComplete: true, note: nil)
+        case .file:
+            let payload = try requiredPayload(content)
+            let paths = try payload.items.map { item in
+                guard let representation = item.first(where: { $0.type == "public.file-url" }),
+                      let rawURL = String(data: representation.data, encoding: .utf8),
+                      let url = URL(string: rawURL), url.isFileURL, !url.path.isEmpty else {
+                    throw HistoryReaderError.unreadableContent
+                }
+                return url.path
+            }
+            return DecodedContent(text: paths.joined(separator: "\n"), kind: .filePaths, isComplete: true,
+                                  note: "Только пути из буфера обмена. Содержимое файлов не читается.")
+        case .image:
+            guard let text = content.imageText else {
+                return DecodedContent(text: "", kind: .unavailableOCR, isComplete: false,
+                                      note: "Готового OCR нет. MCP не запускает распознавание и не передаёт изображение.")
+            }
+            let complete = text.count < 200_000
+            return DecodedContent(text: text, kind: .cachedOCR, isComplete: complete,
+                                  note: complete ? "Сохранённый результат OCR."
+                                      : "Сохранённый OCR достиг лимита 200000 символов и может быть обрезан.")
+        case .other:
+            return DecodedContent(text: "", kind: .unsupported, isComplete: false,
+                                  note: "Для этого типа записи доступны только метаданные.")
+        }
+    }
+
+    private func requiredPayload(_ content: VisibleClipContent) throws -> ClipPayload {
+        guard let payload = content.payload, !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else {
+            throw HistoryReaderError.unreadableContent
+        }
+        return payload
+    }
+
+    private func validate(_ value: Int, in range: ClosedRange<Int>, name: String) throws {
+        guard range.contains(value) else {
+            throw HistoryReaderError.invalidArgument("\(name) должен быть от \(range.lowerBound) до \(range.upperBound).")
+        }
+    }
+
+    private func validateID(_ id: Int64) throws {
+        guard id > 0 else { throw HistoryReaderError.invalidArgument("id должен быть положительным целым числом.") }
+    }
+}
+
+/// Bound both user-perceived characters and UTF-8 bytes without splitting a grapheme cluster.
+private func boundedPrefix(_ value: Substring, characters maximumCharacters: Int,
+                           bytes maximumBytes: Int) -> (text: String, characters: Int, endIndex: String.Index) {
+    var end = value.startIndex
+    var characters = 0
+    var bytes = 0
+    while end < value.endIndex, characters < maximumCharacters {
+        let next = value.index(after: end)
+        let size = value[end..<next].utf8.count
+        guard size <= maximumBytes - bytes else { break }
+        bytes += size
+        characters += 1
+        end = next
+    }
+    return (String(value[..<end]), characters, end)
+}

@@ -354,9 +354,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if settings == nil {
-            let controller = SettingsWindow()
+            let controller = SettingsWindow(mcpAccess: MCPAccess(directory: folder))
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onRevealData = { [weak self] in self?.revealData() }
+            controller.onCopyMCPConfiguration = { [weak self] configuration in
+                guard let self else { throw MCPSettingsError.copyUnavailable }
+                try self.clipboard.restore(ClipPayload(items: [[Representation(
+                    type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
+            }
             settings = controller
         }
         if panel?.window.isVisible == true { panel.close(restoreFocus: false) }

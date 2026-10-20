@@ -21,6 +21,14 @@ func checkThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStrin
 }
 
 let checks: [(String, (HistoryStoreTests) -> () throws -> Void)] = [
+    ("Read-only open never creates or migrates history", HistoryStoreTests.testReadOnlyDoesNotCreateOrMigrateHistory),
+    ("Read-only connection rejects writes and sees writer commits", HistoryStoreTests.testReadOnlyRejectsWritesAndSeesNewWriterCommits),
+    ("Read snapshots stay coherent across commits and recover after errors", HistoryStoreTests.testReadSnapshotIsCoherentAcrossConcurrentCommitsAndEndsAfterFailure),
+    ("Visible search excludes concealed rows before pagination", HistoryStoreTests.testVisibleSearchFiltersConcealedRowsBeforePagination),
+    ("Visible nearby skips hidden neighbors and rejects hidden anchors", HistoryStoreTests.testVisibleNearbySkipsHiddenNeighborsAndRejectsHiddenAnchor),
+    ("Visible content limits payload access and returns only completed OCR", HistoryStoreTests.testVisibleContentReturnsOnlyEligiblePayloadAndCompletedOCR),
+    ("Shared text decoder preserves complete plaintext and representation priority", HistoryStoreTests.testSharedTextDecoderPreservesFullPlainTextAndPrefersItOverRTF),
+    ("Shared text decoder falls back to RTF and keeps items separate", HistoryStoreTests.testSharedTextDecoderFallsBackToRTFAndPreservesItemBoundaries),
     ("Plain text retains complete content and transforms bound UTF-8 bytes", HistoryStoreTests.testPlainTextPreservesCompleteContentAndTransformByteLimit),
     ("JSON formatting preserves number precision, duplicate keys and string lexemes", HistoryStoreTests.testJSONFormattingPreservesNumbersKeysAndStringLexemes),
     ("JSON rejects invalid syntax and bounds nesting and expanded output", HistoryStoreTests.testJSONRejectsInvalidSyntaxAndBoundsDepthAndOutput),

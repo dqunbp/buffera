@@ -1,8 +1,8 @@
 import Foundation
 
-// swiftc -module-cache-path .build/ModuleCache Sources/Buffera/HistoryLimits.swift Tests/SettingsChecks/main.swift -o .build/settings-checks/checks
+// swiftc -module-cache-path .build/ModuleCache Sources/Buffera/HistoryLimits.swift Sources/BufferaCore/MCPAccess.swift Tests/SettingsChecks/main.swift -o .build/settings-checks/checks
 // .build/settings-checks/checks
-// Isolated defaults only: this does not open UI or touch the real application's preferences.
+// Isolated defaults and temporary files only: no UI or real application preferences.
 var checks = 0
 func check(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else { fatalError(message) }
@@ -42,4 +42,55 @@ check(extreme.maxCount >= 10_000 && extreme.maxCount <= 100_000 && extreme.maxBy
 var changing = HistoryLimits()
 changing.maxCount = .max; changing.maxBytes = .min
 check(changing.maxCount == 100_000 && changing.maxBytes == 1_000_000_000, "mutations retain bounded limits")
+
+let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("BufferaMCPSettings-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: temporary) }
+let access = MCPAccess(directory: temporary.appendingPathComponent("data"))
+let permissionURL = access.directory.appendingPathComponent("mcp-access.json")
+check(!access.isEnabled(), "MCP access defaults to disabled without a permission file")
+check(!FileManager.default.fileExists(atPath: access.directory.path), "reading disabled access does not create a directory")
+check(access.databaseURL == access.directory.appendingPathComponent("history.sqlite"), "MCP and app share the configured database location")
+try access.setEnabled(true)
+check(access.isEnabled(), "explicit opt-in enables access")
+let helperAccess = MCPAccess(directory: access.directory)
+check(helperAccess.isEnabled(), "another access instance observes saved opt-in")
+let permissions = try FileManager.default.attributesOfItem(atPath: permissionURL.path)[.posixPermissions] as? NSNumber
+check(permissions?.intValue == 0o600, "published permission file is readable and writable only by its owner")
+try access.setEnabled(false)
+check(!helperAccess.isEnabled(), "already constructed helper observes revocation on its next read")
+try access.setEnabled(true)
+check(helperAccess.isEnabled(), "already constructed helper observes a subsequent explicit opt-in")
+for invalid in ["", "{", "{}", "{\"version\":2,\"enabled\":true}", "{\"version\":1,\"enabled\":1}",
+                "{\"version\":1,\"enabled\":\"true\"}", "{\"enabled\":true}", "null"] {
+    try Data(invalid.utf8).write(to: permissionURL)
+    check(!helperAccess.isEnabled(), "missing, malformed or unknown permission state fails closed")
+}
+try Data(repeating: 32, count: 4097).write(to: permissionURL)
+check(!helperAccess.isEnabled(), "oversized permission files fail closed")
+try access.setEnabled(true)
+try FileManager.default.removeItem(at: permissionURL)
+check(!helperAccess.isEnabled(), "removing the permission file revokes access immediately")
+try FileManager.default.createDirectory(at: permissionURL, withIntermediateDirectories: false)
+check(!helperAccess.isEnabled(), "a directory at the permission path cannot grant access")
+do {
+    try access.setEnabled(true)
+    fatalError("publishing over a directory should fail")
+} catch {
+    check(!helperAccess.isEnabled(), "failed permission publication leaves access disabled")
+}
+let remaining = try FileManager.default.contentsOfDirectory(atPath: access.directory.path)
+check(remaining == ["mcp-access.json"], "failed atomic publication cleans its temporary file")
+try FileManager.default.removeItem(at: permissionURL)
+for value in [true, false, true, false] {
+    try access.setEnabled(value)
+    let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: permissionURL)) as? [String: Any]
+    check(saved?["enabled"] as? Bool == value, "each published permission is a complete JSON document")
+}
+let executable = URL(fileURLWithPath: "/tmp/Agent \"demo\"/Приложение.app/Contents/MacOS/BufferaMCP")
+let configuration = try MCPAccess.configuration(executableURL: executable)
+let object = try JSONSerialization.jsonObject(with: Data(configuration.utf8)) as? [String: Any]
+let servers = object?["mcpServers"] as? [String: [String: Any]]
+check(servers?["buffera"]?["command"] as? String == executable.path, "config safely preserves an absolute executable path with spaces and quotes")
+check((servers?["buffera"]?["args"] as? [String]) == [], "stdio config has no implicit arguments or shell command")
+check(!access.isEnabled(), "generating connection configuration never enables access")
 print("PASS \(checks) settings persistence checks")

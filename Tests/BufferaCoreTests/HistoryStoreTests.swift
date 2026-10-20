@@ -1101,6 +1101,140 @@ final class HistoryStoreTests {
         try check(try store.search(SearchFilter())[0].isConcealed)
     }
 
+    func testReadOnlyDoesNotCreateOrMigrateHistory() throws {
+        let absent = directory.appendingPathComponent("missing/history.sqlite")
+        try checkThrows(try HistoryStore(url: absent, mode: .readOnly))
+        try check(!FileManager.default.fileExists(atPath: absent.deletingLastPathComponent().path))
+
+        let url = directory.appendingPathComponent("history.sqlite")
+        let id = try insert("read-only version fixture")
+        for version in [0, 5, 7] {
+            try withRawDatabase(at: url) { db in
+                try checkEqual(sqlite3_exec(db, "PRAGMA user_version=\(version)", nil, nil, nil), SQLITE_OK)
+            }
+            try checkThrows(try HistoryStore(url: url, mode: .readOnly))
+            try checkEqual(try rawSchemaVersion(at: url), version)
+            try checkEqual(try store.payload(id: id), payload("read-only version fixture"))
+        }
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=6", nil, nil, nil), SQLITE_OK)
+        }
+        let reader = try HistoryStore(url: url, mode: .readOnly)
+        try checkEqual(try reader.summary(id: id).text, "read-only version fixture")
+    }
+
+    func testReadOnlyRejectsWritesAndSeesNewWriterCommits() throws {
+        let first = try insert("first read-only record", time: 1)
+        let reader = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"), mode: .readOnly)
+        try checkEqual(try reader.count(), 1)
+        try checkThrows(try reader.delete(id: first))
+        try checkThrows(try reader.markUsed(id: first))
+        try checkThrows(try reader.setFavorite(id: first, isFavorite: true))
+        try checkThrows(try reader.conceal(id: first))
+        try checkThrows(try reader.insert(payload: payload("forbidden"), kind: .text,
+                                         title: "forbidden", text: "forbidden", source: "Test"))
+        try checkEqual(try reader.count(), 1)
+        let second = try insert("second read-only record", time: 2)
+        try checkEqual(try reader.search(SearchFilter()).map(\.id), [second, first])
+        try checkEqual(try reader.summary(id: first).date, Date(timeIntervalSince1970: 1))
+        try check(!reader.summary(id: first).isFavorite)
+        try check(!reader.summary(id: first).isConcealed)
+    }
+
+    func testReadSnapshotIsCoherentAcrossConcurrentCommitsAndEndsAfterFailure() throws {
+        let first = try insert("snapshot first", time: 1)
+        let reader = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"), mode: .readOnly)
+        var second: Int64 = 0
+        try reader.withReadSnapshot {
+            try checkEqual(try reader.search(SearchFilter()).map(\.id), [first])
+            second = try insert("snapshot second", time: 2)
+            try checkEqual(try reader.count(), 1)
+            try checkEqual(try reader.nearby(anchorID: first).map(\.id), [first])
+            try checkEqual(try reader.withReadSnapshot { try reader.visibleContent(id: first).summary.id }, first)
+        }
+        try checkEqual(try reader.search(SearchFilter()).map(\.id), [second, first])
+        try checkThrows(try reader.withReadSnapshot {
+            _ = try reader.count()
+            throw CheckFailure(description: "Expected snapshot rollback")
+        })
+        try store.delete(id: second)
+        try checkEqual(try reader.count(), 1)
+        try checkEqual(try reader.nearby(anchorID: first).map(\.id), [first])
+    }
+
+    func testVisibleSearchFiltersConcealedRowsBeforePagination() throws {
+        let first = try insert("visible row first", time: 1)
+        let hidden = try insert("visible row hidden", time: 2)
+        let third = try insert("visible row third", time: 3)
+        try store.conceal(id: hidden)
+        var filter = SearchFilter(); filter.excludesConcealed = true
+        try checkEqual(try store.search(filter, limit: 1).map(\.id), [third])
+        try checkEqual(try store.search(filter, limit: 1, offset: 1).map(\.id), [first])
+        try checkEqual(try store.count(filter), 2)
+        filter.query = "скрытая"
+        try checkEqual(try store.search(filter).count, 0)
+        filter.query = ""; filter.concealedOnly = true
+        try checkEqual(try store.count(filter), 0)
+        filter.excludesConcealed = false
+        try checkEqual(try store.search(filter).map(\.id), [hidden])
+    }
+
+    func testVisibleNearbySkipsHiddenNeighborsAndRejectsHiddenAnchor() throws {
+        let older = try insert("nearby visible older", time: 1)
+        let hiddenOlder = try insert("nearby hidden older", time: 2)
+        let anchor = try insert("nearby visible anchor", time: 3)
+        let hiddenNewer = try insert("nearby hidden newer", time: 4)
+        let newer = try insert("nearby visible newer", time: 5)
+        try store.conceal(id: hiddenOlder); try store.conceal(id: hiddenNewer)
+        try checkEqual(try store.nearby(anchorID: anchor, before: 1, after: 1, includeConcealed: false).map(\.id),
+                       [newer, anchor, older])
+        try checkEqual(try store.nearby(anchorID: anchor, before: 1, after: 1).map(\.id),
+                       [hiddenNewer, anchor, hiddenOlder])
+        do {
+            _ = try store.nearby(anchorID: hiddenOlder, includeConcealed: false)
+            throw CheckFailure(description: "Expected hidden anchor to be missing")
+        } catch HistoryError.missing { }
+        try checkEqual(try store.nearby(anchorID: anchor, includeConcealed: false).count, 3)
+    }
+
+    func testVisibleContentReturnsOnlyEligiblePayloadAndCompletedOCR() throws {
+        let text = try insert("complete text payload", time: 1)
+        let link = try insert("https://example.test", time: 2, kind: .link)
+        let file = try insert("/tmp/fixture.txt", time: 3, kind: .file)
+        let other = try insert("opaque payload fixture", time: 4, kind: .other)
+        let image = try insertImage("image bytes")
+        let pending = try insertImage("pending image bytes")
+        let empty = try insertImage("empty image bytes")
+        let failed = try insertImage("failed image bytes")
+        try store.completeImageText(id: image, text: "Completed recognition")
+        try store.completeImageText(id: empty, text: "")
+        try store.failImageText(id: failed)
+        for id in [text, link, file] {
+            let content = try store.visibleContent(id: id)
+            try checkEqual(content.summary.id, id)
+            try checkEqual(content.payload, try store.payload(id: id))
+            try checkEqual(content.imageText, nil)
+        }
+        try checkEqual(try store.visibleContent(id: image).imageText, "Completed recognition")
+        try checkEqual(try store.visibleContent(id: empty).imageText, "")
+        for id in [pending, failed, other] { try checkEqual(try store.visibleContent(id: id).imageText, nil) }
+        // Missing binary payloads do not affect metadata/OCR reads for image and other records.
+        try withRawDatabase(at: directory.appendingPathComponent("history.sqlite")) { db in
+            try checkEqual(sqlite3_exec(db, "DELETE FROM payloads WHERE clip_id IN (\(image),\(other))", nil, nil, nil), SQLITE_OK)
+        }
+        for id in [image, pending, empty, failed, other] {
+            try checkEqual(try store.visibleContent(id: id).payload, nil)
+        }
+        try store.conceal(id: text); try store.conceal(id: image)
+        for id in [text, image, 999_999] {
+            do {
+                _ = try store.visibleContent(id: id)
+                throw CheckFailure(description: "Expected concealed or absent content to be missing")
+            } catch HistoryError.missing { }
+        }
+        try checkEqual(try store.payload(id: text), payload("complete text payload"))
+    }
+
     private func withRawDatabase(at url: URL, _ body: (OpaquePointer) throws -> Void) throws {
         var db: OpaquePointer?
         let status = sqlite3_open(url.path, &db)

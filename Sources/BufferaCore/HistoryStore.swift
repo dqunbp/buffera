@@ -3,25 +3,44 @@ import CSQLite
 
 /// Confined to one serial queue by the application. No AppKit objects cross this boundary.
 public final class HistoryStore {
+    public enum OpenMode { case readWrite, readOnly }
+
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private static let schemaVersion = 6
     private static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
     private static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
         SearchFilter.normalize(concealedTitle + " " + source)
     }
 
-    public init(url: URL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
-                                               attributes: [.posixPermissions: 0o700])
-        guard sqlite3_open(url.path, &db) == SQLITE_OK else {
-            let error = failure(); sqlite3_close(db); db = nil; throw error
+    public init(url: URL, mode: OpenMode = .readWrite) throws {
+        if mode == .readWrite {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                                   attributes: [.posixPermissions: 0o700])
+        }
+        let flags = mode == .readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+        guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK else {
+            let error: HistoryError = mode == .readOnly
+                ? .database("Не удалось открыть историю для чтения. Сначала запустите Buffera и проверьте путь к истории.")
+                : failure()
+            sqlite3_close(db); db = nil; throw error
         }
         do {
             sqlite3_busy_timeout(db, 3000)
-            try execute("PRAGMA journal_mode=WAL")
-            try execute("PRAGMA foreign_keys=ON")
-            try migrate()
+            if mode == .readOnly {
+                let version = try schemaVersion()
+                guard version == Self.schemaVersion else {
+                    let recovery = version < Self.schemaVersion
+                        ? "Запустите Buffera, чтобы обновить историю."
+                        : "Обновите Buffera и подключённый MCP."
+                    throw HistoryError.database("Неподдерживаемая версия истории \(version); требуется \(Self.schemaVersion). \(recovery)")
+                }
+            } else {
+                try execute("PRAGMA journal_mode=WAL")
+                try execute("PRAGMA foreign_keys=ON")
+                try migrate()
+            }
         } catch { sqlite3_close(db); db = nil; throw error }
     }
 
@@ -31,7 +50,7 @@ public final class HistoryStore {
         try execute("BEGIN IMMEDIATE")
         do {
             let version = try schemaVersion()
-            guard version <= 6 else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
+            guard version <= Self.schemaVersion else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
             if version < 2 {
                 try execute("""
                 CREATE TABLE IF NOT EXISTS clips (
@@ -89,6 +108,21 @@ public final class HistoryStore {
         defer { sqlite3_finalize(statement) }
         guard sqlite3_step(statement) == SQLITE_ROW else { throw failure() }
         return Int(sqlite3_column_int(statement, 0))
+    }
+
+    /// Keeps related reads on one SQLite snapshot. Nested readers share the caller's transaction.
+    /// The store remains confined to its owning serial queue.
+    public func withReadSnapshot<T>(_ body: () throws -> T) throws -> T {
+        guard sqlite3_get_autocommit(db) != 0 else { return try body() }
+        try execute("BEGIN")
+        do {
+            let result = try body()
+            try execute("COMMIT")
+            return result
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
     }
 
     @discardableResult
@@ -149,26 +183,61 @@ public final class HistoryStore {
 
     /// Nearest captures across the whole history, newest first. Counts on either side are clamped to 0...100.
     /// "Before" means older captures; "after" means newer captures. Equal dates are ordered by ID.
-    public func nearby(anchorID: Int64, before: Int = 10, after: Int = 10) throws -> [ClipSummary] {
-        let statement = try prepare("SELECT \(Self.summaryColumns) FROM clips WHERE id=?")
-        defer { sqlite3_finalize(statement) }
-        try bind([.integer(anchorID)], to: statement)
-        let status = sqlite3_step(statement)
-        if status == SQLITE_DONE { throw HistoryError.missing }
-        guard status == SQLITE_ROW else { throw failure() }
-        let anchor = summary(statement)
-        // Preserve SQLite's exact timestamp for the cursor, without a Foundation Date round trip.
-        let cursor: [Value] = [.number(sqlite3_column_double(statement, 1)), .integer(anchorID)]
-        guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
-        let older = try summaries("""
-            SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)<(?,?)
-            ORDER BY date DESC,id DESC LIMIT ?
-            """, bindings: cursor + [.integer(Int64(max(0, min(100, before))))])
-        let newer = try summaries("""
-            SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)>(?,?)
-            ORDER BY date ASC,id ASC LIMIT ?
-            """, bindings: cursor + [.integer(Int64(max(0, min(100, after))))])
-        return newer.reversed() + [anchor] + older
+    public func nearby(anchorID: Int64, before: Int = 10, after: Int = 10,
+                       includeConcealed: Bool = true) throws -> [ClipSummary] {
+        try withReadSnapshot {
+            let visibility = includeConcealed ? "" : " AND is_concealed=0"
+            let statement = try prepare("SELECT \(Self.summaryColumns) FROM clips WHERE id=?\(visibility)")
+            defer { sqlite3_finalize(statement) }
+            try bind([.integer(anchorID)], to: statement)
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { throw HistoryError.missing }
+            guard status == SQLITE_ROW else { throw failure() }
+            let anchor = summary(statement)
+            // Preserve SQLite's exact timestamp for the cursor, without a Foundation Date round trip.
+            let cursor: [Value] = [.number(sqlite3_column_double(statement, 1)), .integer(anchorID)]
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            let older = try summaries("""
+                SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)<(?,?)\(visibility)
+                ORDER BY date DESC,id DESC LIMIT ?
+                """, bindings: cursor + [.integer(Int64(max(0, min(100, before))))])
+            let newer = try summaries("""
+                SELECT \(Self.summaryColumns) FROM clips WHERE (date,id)>(?,?)\(visibility)
+                ORDER BY date ASC,id ASC LIMIT ?
+                """, bindings: cursor + [.integer(Int64(max(0, min(100, after))))])
+            return newer.reversed() + [anchor] + older
+        }
+    }
+
+    /// Reads only visible content. Images expose cached OCR; binary image/other payloads are not loaded.
+    public func visibleContent(id: Int64) throws -> VisibleClipContent {
+        let record: (ClipSummary, Data?, String?) = try withReadSnapshot {
+            let columns = Self.summaryColumns.split(separator: ",").map { "clips.\($0)" }.joined(separator: ",")
+            let statement = try prepare("""
+                SELECT \(columns),payloads.data,clip_ocr.status,clip_ocr.text
+                FROM clips
+                LEFT JOIN payloads ON payloads.clip_id=clips.id AND clips.kind IN ('text','link','file')
+                LEFT JOIN clip_ocr ON clip_ocr.clip_id=clips.id AND clips.kind='image'
+                WHERE clips.id=? AND clips.is_concealed=0
+                """)
+            defer { sqlite3_finalize(statement) }
+            try bind([.integer(id)], to: statement)
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { throw HistoryError.missing }
+            guard status == SQLITE_ROW else { throw failure() }
+            let clip = summary(statement)
+            var data: Data?
+            if [.text, .link, .file].contains(clip.kind) {
+                guard let bytes = sqlite3_column_blob(statement, 10) else { throw HistoryError.invalidPayload }
+                data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 10)))
+            }
+            let imageText = clip.kind == .image && string(statement, 11) == "complete" ? string(statement, 12) : nil
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            return (clip, data, imageText)
+        }
+        // Release the read transaction before property-list decoding.
+        let payload = try record.1.map { try PropertyListDecoder().decode(ClipPayload.self, from: $0) }
+        return VisibleClipContent(summary: record.0, payload: payload, imageText: record.2)
     }
 
     private func summaries(_ sql: String, bindings: [Value]) throws -> [ClipSummary] {
@@ -428,6 +497,7 @@ public final class HistoryStore {
         if filter.favoritesOnly { clauses.append("is_favorite=1") }
         if filter.remoteOnly { clauses.append("is_remote=1") }
         if filter.concealedOnly { clauses.append("is_concealed=1") }
+        if filter.excludesConcealed { clauses.append("is_concealed=0") }
         if let from = filter.from { clauses.append("date>=?"); bindings.append(.number(from.timeIntervalSince1970)) }
         if let until = filter.until { clauses.append("date<?"); bindings.append(.number(until.timeIntervalSince1970)) }
         return (clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND "), bindings)

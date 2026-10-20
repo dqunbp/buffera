@@ -164,13 +164,7 @@ final class ClipboardService {
 
     /// Plain text and RTF are alternative representations of one clipboard item.
     static func text(in representations: [Representation]) -> String? {
-        if let text = representations.first(where: { $0.type == NSPasteboard.PasteboardType.string.rawValue })
-            .flatMap({ String(data: $0.data, encoding: .utf8) }), !text.isEmpty { return text }
-        guard let rtf = representations.first(where: { $0.type == NSPasteboard.PasteboardType.rtf.rawValue }),
-              let text = try? NSAttributedString(data: rtf.data,
-                  options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil).string,
-              !text.isEmpty else { return nil }
-        return text
+        ClipboardText.decode(representations)
     }
 
     func restore(_ payload: ClipPayload) throws {

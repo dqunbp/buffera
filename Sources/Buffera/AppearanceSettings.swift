@@ -1,14 +1,17 @@
 import AppKit
+import BufferaCore
 
 /// A retained settings window, independent of the history panel's focus/lifetime.
 final class SettingsWindow: NSWindowController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onRevealData: (() -> Void)?
+    var onCopyMCPConfiguration: ((String) throws -> Void)?
 
-    private let settings = SettingsContentController()
+    private let settings: SettingsContentController
 
-    init() {
+    init(mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
+        settings = SettingsContentController(mcpAccess: mcpAccess, bundleURL: bundleURL)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 510),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Настройки \(BrandIdentity.name)"
@@ -26,6 +29,10 @@ final class SettingsWindow: NSWindowController {
         settings.onAppearanceChange = { [weak self] value in self?.onAppearanceChange?(value) }
         settings.onLimitsChange = { [weak self] value in self?.onLimitsChange?(value) }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
+        settings.onCopyMCPConfiguration = { [weak self] configuration in
+            guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
+            try copy(configuration)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -33,6 +40,7 @@ final class SettingsWindow: NSWindowController {
     func show() {
         settings.updateAppearance(HistoryAppearance.load())
         settings.updateLimits(HistoryLimits.load())
+        settings.refreshMCPAccess()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -58,7 +66,9 @@ private final class SettingsContentController: NSViewController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onRevealData: (() -> Void)?
+    var onCopyMCPConfiguration: ((String) throws -> Void)?
 
+    private let mcp: MCPSettingsView
     private var appearance = HistoryAppearance.load()
     private var limits = HistoryLimits.load()
     private let mode = NSPopUpButton()
@@ -69,10 +79,23 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSPopUpButton()
     private var countValues = HistoryLimits.countChoices
     private var byteValues = HistoryLimits.byteChoices
-    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши"], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты"], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let body = NSView()
     private var pages: [NSView] = []
+
+    init(mcpAccess: MCPAccess, bundleURL: URL) {
+        mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
+        super.init(nibName: nil, bundle: nil)
+        mcp.onCopyConfiguration = { [weak self] configuration in
+            guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
+            try copy(configuration)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func refreshMCPAccess() { mcp.refresh() }
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 510))
@@ -115,7 +138,7 @@ private final class SettingsContentController: NSViewController {
             footer.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), historyPage(), keyboardPage()]
+        pages = [appearancePage(), historyPage(), keyboardPage(), mcp]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)

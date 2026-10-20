@@ -4,9 +4,11 @@ cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache"
 swift build -c release --product Buffera --cache-path "$PWD/.build/cache" "$@"
+swift build -c release --product BufferaMCP --cache-path "$PWD/.build/cache" "$@"
 APP="$PWD/dist/Buffera.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Buffera "$APP/Contents/MacOS/Buffera"
+cp .build/release/BufferaMCP "$APP/Contents/MacOS/BufferaMCP"
 swiftc Sources/Buffera/BrandIdentity.swift scripts/generate-app-icon.swift \
   -o .build/generate-app-icon
 .build/generate-app-icon "$PWD/.build/Buffera.iconset"
@@ -32,6 +34,7 @@ PLIST
 # Finder / file-provider metadata on an existing local bundle invalidates strict signing.
 xattr -dr com.apple.FinderInfo "$APP" 2>/dev/null || true
 find "$APP" -name '._*' -type f -delete
+codesign --force --sign - "$APP/Contents/MacOS/BufferaMCP"
 codesign --force --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 printf 'Built %s\n' "$APP"

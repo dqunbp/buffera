@@ -80,11 +80,25 @@ public struct SearchFilter {
     public var favoritesOnly = false
     public var remoteOnly = false
     public var concealedOnly = false
+    public var excludesConcealed = false
     public var from: Date?
     public var until: Date? // Exclusive upper bound.
     public init() {}
     public static func normalize(_ string: String) -> String {
         string.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "ru_RU"))
+    }
+}
+
+/// A visible record read consistently with its text payload or already-completed image OCR.
+public struct VisibleClipContent {
+    public let summary: ClipSummary
+    public let payload: ClipPayload?
+    public let imageText: String?
+
+    public init(summary: ClipSummary, payload: ClipPayload?, imageText: String?) {
+        self.summary = summary
+        self.payload = payload
+        self.imageText = imageText
     }
 }
 
