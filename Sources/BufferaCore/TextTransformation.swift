@@ -6,9 +6,9 @@ public enum TextTransformationError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .noText: return "В записи нет текста для преобразования."
-        case .tooLarge: return "Текст или результат больше 2 МБ. Его можно скопировать без оформления."
+        case .tooLarge: return "Текст или результат больше 2 МБ. Его можно скопировать без форматирования."
         case .invalidJSON: return "Не удалось форматировать: текст не является корректным JSON."
-        case .jsonTooDeep: return "В JSON больше 128 уровней вложенности. Его можно скопировать без оформления."
+        case .jsonTooDeep: return "В JSON больше 128 уровней вложенности. Его можно скопировать без форматирования."
         case .invalidURL: return "Нужна одна полная ссылка, начинающаяся с http:// или https://."
         case .signedURL: return "У ссылки есть подпись. Удаление параметров может сделать её недействительной."
         }
@@ -21,7 +21,7 @@ public enum TextTransformation: String, CaseIterable {
 
     public var title: String {
         switch self {
-        case .plainText: return "Без оформления"
+        case .plainText: return "Без форматирования"
         case .formatJSON: return "Форматировать JSON"
         case .unwrapLines: return "Убрать переносы строк"
         case .removeDuplicateLines: return "Убрать повторяющиеся строки"

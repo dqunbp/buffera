@@ -53,7 +53,7 @@ check(transformRequests == 1 && transformMenu.items.count == 1
       && transformMenu.items[0].title == "Проверяем варианты…" && !transformMenu.items[0].isEnabled,
       "unknown applicability requests content and shows only a disabled loading item")
 transformCard.setCopyTransformOperations([.text(.plainText), .text(.formatJSON)])
-check(transformItem.submenu === transformMenu && transformMenu.items.map(\.title) == ["Без оформления", "Форматировать JSON"],
+check(transformItem.submenu === transformMenu && transformMenu.items.map(\.title) == ["Без форматирования", "Форматировать JSON"],
       "prepared operations update the existing submenu in place")
 transformMenu.performActionForItem(at: 1)
 check(chosenTransforms == [.text(.formatJSON)] && transformCardActions.isEmpty,
