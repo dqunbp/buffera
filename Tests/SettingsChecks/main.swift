@@ -15,7 +15,7 @@ let defaults = UserDefaults(suiteName: suite)!
 defer { defaults.removePersistentDomain(forName: suite) }
 check(HistoryLimits.load(from: defaults) == HistoryLimits(maxCount: 50_000, maxBytes: 5_000_000_000),
       "absent preferences keep existing defaults")
-for (count, bytes) in zip(HistoryLimits.countChoices, HistoryLimits.byteChoices) {
+for (count, bytes) in zip(HistoryLimits.countChoices, [1, 5, 20].map { $0 * HistoryLimits.bytesPerGigabyte }) {
     let expected = HistoryLimits(maxCount: count, maxBytes: bytes)
     expected.save(to: defaults)
     check(HistoryLimits.load(from: defaults) == expected, "each settings choice round-trips through existing keys")

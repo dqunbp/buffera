@@ -7,6 +7,7 @@ import BufferaModels
 final class SettingsWindow: NSWindowController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
     var onCheckModel: ((ModelRole) -> Void)?
@@ -17,12 +18,16 @@ final class SettingsWindow: NSWindowController {
     var onContinueEmbeddingPreparation: (() -> Void)?
 
     private let settings: SettingsContentController
+    private let limitsDefaults: UserDefaults
 
     init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
          mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL,
-         languageDefaults: UserDefaults = .standard, frameAutosaveName: String? = "BufferaSettingsWindow") {
+         languageDefaults: UserDefaults = .standard, limitsDefaults: UserDefaults = .standard,
+         launchLanguage: LanguagePreference = L10n.preference, frameAutosaveName: String? = "BufferaSettingsWindow") {
+        self.limitsDefaults = limitsDefaults
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
-                                             mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults)
+                                             mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults,
+                                             limitsDefaults: limitsDefaults, launchLanguage: launchLanguage)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
@@ -48,6 +53,7 @@ final class SettingsWindow: NSWindowController {
         super.init(window: window)
         window.contentViewController = settings
         settings.onAppearanceChange = { [weak self] value in self?.onAppearanceChange?(value) }
+        settings.onRestart = { [weak self] in self?.onRestart?() }
         settings.onLimitsChange = { [weak self] value in self?.onLimitsChange?(value) }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
         settings.onCopyMCPConfiguration = { [weak self] configuration in
@@ -68,7 +74,8 @@ final class SettingsWindow: NSWindowController {
 
     func show() {
         settings.updateAppearance(HistoryAppearance.load())
-        settings.updateLimits(HistoryLimits.load())
+        settings.updateLimits(HistoryLimits.load(from: limitsDefaults))
+        settings.refreshLanguage()
         settings.refreshMCPAccess()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
@@ -111,6 +118,7 @@ private final class SettingsPanel: NSWindow {
 private final class SettingsContentController: NSViewController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
     var onCheckModel: ((ModelRole) -> Void)?
@@ -123,24 +131,30 @@ private final class SettingsContentController: NSViewController {
     private let mcp: MCPSettingsView
     private let models: ModelSettingsView
     private var appearance = HistoryAppearance.load()
-    private var limits = HistoryLimits.load()
+    private var limits: HistoryLimits
+    private let limitsDefaults: UserDefaults
     private let mode = NSPopUpButton()
     private let columns = NSPopUpButton()
     private let rows = NSPopUpButton()
     private let language = NSPopUpButton()
     private let languageDefaults: UserDefaults
+    private let launchLanguage: LanguagePreference
+    private let restartNotice = NSStackView()
     private let sidebar = NSButton(checkboxWithTitle: L10n.text("Показывать боковую панель с фильтрами"), target: nil, action: nil)
     private let count = NSPopUpButton()
-    private let bytes = NSPopUpButton()
+    private let bytes = NSSlider()
+    private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
-    private var byteValues = HistoryLimits.byteChoices
     private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), L10n.text("Агенты"), L10n.text("Поиск и ответы")], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let body = NSView()
     private var pages: [NSView] = []
 
     init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL,
-         languageDefaults: UserDefaults) {
+         languageDefaults: UserDefaults, limitsDefaults: UserDefaults, launchLanguage: LanguagePreference) {
+        self.limitsDefaults = limitsDefaults
+        self.limits = HistoryLimits.load(from: limitsDefaults)
+        self.launchLanguage = launchLanguage
         self.languageDefaults = languageDefaults
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
@@ -242,13 +256,16 @@ private final class SettingsContentController: NSViewController {
         guard isViewLoaded else { return }
         // Preserve valid custom values from earlier versions rather than changing them on an unrelated edit.
         countValues = Array(Set(HistoryLimits.countChoices + [value.maxCount])).sorted()
-        byteValues = Array(Set(HistoryLimits.byteChoices + [value.maxBytes])).sorted()
         count.removeAllItems(); count.addItems(withTitles: countValues.map { $0.formatted(.number.locale(L10n.locale)) })
-        bytes.removeAllItems(); bytes.addItems(withTitles: byteValues.map {
-            L10n.text("\((Double($0) / 1_000_000_000).formatted(.number.locale(L10n.locale))) ГБ")
-        })
         count.selectItem(at: countValues.firstIndex(of: value.maxCount) ?? 0)
-        bytes.selectItem(at: byteValues.firstIndex(of: value.maxBytes) ?? 0)
+        bytes.doubleValue = Double(value.maxBytes) / Double(HistoryLimits.bytesPerGigabyte)
+        byteValue.stringValue = L10n.text("\((Double(value.maxBytes) / Double(HistoryLimits.bytesPerGigabyte)).formatted(.number.locale(L10n.locale))) ГБ")
+        bytes.setAccessibilityValueDescription(byteValue.stringValue)
+    }
+
+    func refreshLanguage() {
+        language.selectItem(at: LanguagePreference.allCases.firstIndex(of: .load(from: languageDefaults)) ?? 0)
+        restartNotice.isHidden = LanguagePreference.load(from: languageDefaults) == launchLanguage
     }
 
     private func appearancePage() -> NSView {
@@ -274,15 +291,42 @@ private final class SettingsContentController: NSViewController {
         let tip = info(symbol: "sidebar.left", title: L10n.text("У каждого вида — своё место"),
                        text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель выезжает у выбранного края экрана."))
         let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» следует предпочитаемым языкам macOS; если русский и английский отсутствуют, используется английский."))
-        let page = vertical([grid, languageNote, sidebar, note, tip], spacing: 12)
+        let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
+        restart.bezelStyle = .rounded
+        restart.identifier = NSUserInterfaceItemIdentifier("settings.restart")
+        restartNotice.identifier = NSUserInterfaceItemIdentifier("settings.restartNotice")
+        restartNotice.orientation = .horizontal
+        restartNotice.alignment = .centerY
+        restartNotice.spacing = 10
+        restartNotice.addArrangedSubview(paragraph(L10n.text("Язык изменится после перезапуска")))
+        restartNotice.addArrangedSubview(restart)
+        refreshLanguage()
+        let page = vertical([grid, languageNote, restartNotice, sidebar, note, tip], spacing: 12)
         for child in [grid, languageNote, note, tip] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 
     private func historyPage() -> NSView {
-        configure(count, label: L10n.text("Лимит записей"), action: #selector(limitsChanged))
-        configure(bytes, label: L10n.text("Лимит объёма истории"), action: #selector(limitsChanged))
-        let grid = form([[label(L10n.text("Количество записей")), count], [label(L10n.text("Объём истории")), bytes]])
+        configure(count, label: L10n.text("Лимит записей"), action: #selector(countLimitChanged))
+        count.identifier = NSUserInterfaceItemIdentifier("settings.countLimit")
+        bytes.minValue = Double(HistoryLimits.byteRange.lowerBound / HistoryLimits.bytesPerGigabyte)
+        bytes.maxValue = Double(HistoryLimits.byteRange.upperBound / HistoryLimits.bytesPerGigabyte)
+        bytes.numberOfTickMarks = Int(bytes.maxValue - bytes.minValue) + 1
+        bytes.allowsTickMarkValuesOnly = true
+        bytes.isContinuous = true
+        bytes.target = self; bytes.action = #selector(byteLimitChanged)
+        bytes.identifier = NSUserInterfaceItemIdentifier("settings.byteLimit")
+        bytes.setAccessibilityLabel(L10n.text("Лимит объёма истории"))
+        byteValue.identifier = NSUserInterfaceItemIdentifier("settings.byteLimitValue")
+        byteValue.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        byteValue.alignment = .right
+        byteValue.setContentHuggingPriority(.required, for: .horizontal)
+        byteValue.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let sizeControl = NSStackView(views: [bytes, byteValue])
+        sizeControl.orientation = .horizontal; sizeControl.alignment = .centerY; sizeControl.spacing = 10
+        sizeControl.widthAnchor.constraint(equalToConstant: 232).isActive = true
+        bytes.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
+        let grid = form([[label(L10n.text("Количество записей")), count], [label(L10n.text("Объём истории")), sizeControl]])
         let note = paragraph(L10n.text("При следующем копировании старые записи сверх лимита будут удалены. Избранное сохраняется и не входит в эти лимиты."))
         let ocr = info(symbol: "text.viewfinder", title: L10n.text("Текст на картинках тоже находится"),
                        text: L10n.text("Распознавание работает в фоне на Mac. Русский и английский текст участвуют в обычном поиске; скрытые записи пропускаются."))
@@ -434,7 +478,10 @@ private final class SettingsContentController: NSViewController {
         let choices = LanguagePreference.allCases
         guard choices.indices.contains(language.indexOfSelectedItem) else { return }
         choices[language.indexOfSelectedItem].save(to: languageDefaults)
+        refreshLanguage()
     }
+
+    @objc private func restartApp() { onRestart?() }
 
     @objc private func appearanceChanged() {
         let modes = HistoryAppearance.Mode.allCases
@@ -447,12 +494,20 @@ private final class SettingsContentController: NSViewController {
         onAppearanceChange?(next)
     }
 
-    @objc private func limitsChanged() {
-        guard countValues.indices.contains(count.indexOfSelectedItem), byteValues.indices.contains(bytes.indexOfSelectedItem) else { return }
-        let next = HistoryLimits(maxCount: countValues[count.indexOfSelectedItem], maxBytes: byteValues[bytes.indexOfSelectedItem])
+    @objc private func countLimitChanged() {
+        guard countValues.indices.contains(count.indexOfSelectedItem) else { return }
+        saveLimits(HistoryLimits(maxCount: countValues[count.indexOfSelectedItem], maxBytes: limits.maxBytes))
+    }
+
+    @objc private func byteLimitChanged() {
+        saveLimits(HistoryLimits(maxCount: limits.maxCount,
+                                 maxBytes: Int(bytes.doubleValue.rounded()) * HistoryLimits.bytesPerGigabyte))
+    }
+
+    private func saveLimits(_ next: HistoryLimits) {
         guard limits != next else { return }
-        limits = next
-        next.save()
+        updateLimits(next)
+        next.save(to: limitsDefaults)
         onLimitsChange?(next)
     }
 

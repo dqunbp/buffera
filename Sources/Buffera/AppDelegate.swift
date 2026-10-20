@@ -171,7 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, !self.hotKeys.isRegistered else { return }
             self.registerShortcuts()
         }
-        open()
+        if CommandLine.arguments.contains("--show-settings") { showSettings() }
+        else { open() }
         imageTextIndexer?.start()
     }
 
@@ -596,6 +597,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.updateBackgroundPreparation()
             }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
+            controller.onRestart = { [weak self] in
+                guard let self else { return }
+                do {
+                    try AppRelaunch.schedule()
+                    self.quit()
+                } catch { self.showError(error, alert: true) }
+            }
             controller.onRevealData = { [weak self] in self?.revealData() }
             controller.onCopyMCPConfiguration = { [weak self] configuration in
                 guard let self else { throw MCPSettingsError.copyUnavailable }
