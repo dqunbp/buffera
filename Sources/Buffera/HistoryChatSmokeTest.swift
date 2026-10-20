@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaChat
 import BufferaCore
@@ -61,7 +62,7 @@ func runHistoryChatSmokeTest() throws {
     try check(sent.count == 2, "Command+Enter did not submit")
 
     chat.beginResponse(question: "Найди команду")
-    try check(!input.isEditable && send.title == "Остановить", "Streaming controls remained in send mode")
+    try check(!input.isEditable && send.title == L10n.text("Остановить"), "Streaming controls remained in send mode")
     input.keyDown(with: try key(36))
     try check(stops == 0 && sent.count == 2, "Enter during streaming unexpectedly stopped or resubmitted")
     chat.updateResponse(text: "Команда: swift build [3].\nПовторить её можно из папки проекта.")
@@ -76,7 +77,7 @@ func runHistoryChatSmokeTest() throws {
         title: "Сборка проекта", copiedAt: Date(timeIntervalSince1970: 1_800_000_000),
         application: "Terminal")
     chat.finishResponse(sources: [source])
-    try check(input.isEditable && send.title == "Отправить", "Completed response did not restore composer")
+    try check(input.isEditable && send.title == L10n.text("Отправить"), "Completed response did not restore composer")
     let sourceButton = try control("chat.source.\(source.id)", as: NSButton.self)
     sourceButton.performClick(nil)
     try check(opened == [source.id], "Source action lost precision or did not use its typed ID")

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaCore
 import BufferaModels
@@ -26,11 +27,11 @@ public enum EmbeddingIndexPauseReason: Sendable, Equatable {
 
     public var message: String {
         switch self {
-        case .battery: return "Подготовка на паузе: Mac работает от аккумулятора."
-        case .lowPowerMode: return "Подготовка на паузе: включён режим энергосбережения."
-        case .thermalPressure: return "Подготовка на паузе: Mac нужно остыть."
-        case .foregroundChat: return "Подготовка на паузе, пока Buffera отвечает на вопрос."
-        case .powerSourceUnknown: return "Подготовка на паузе: не удалось определить источник питания."
+        case .battery: return L10n.text("Подготовка на паузе: Mac работает от аккумулятора.")
+        case .lowPowerMode: return L10n.text("Подготовка на паузе: включён режим энергосбережения.")
+        case .thermalPressure: return L10n.text("Подготовка на паузе: Mac нужно остыть.")
+        case .foregroundChat: return L10n.text("Подготовка на паузе, пока Buffera отвечает на вопрос.")
+        case .powerSourceUnknown: return L10n.text("Подготовка на паузе: не удалось определить источник питания.")
         }
     }
 }
@@ -49,7 +50,7 @@ public struct EmbeddingIndexStatus: Sendable {
     }
 
     public static let disabled = EmbeddingIndexStatus(
-        message: "Включите «Поиск по смыслу» в настройках, чтобы подготовить историю.", fraction: nil, canRetry: false)
+        message: L10n.text("Включите «Поиск по смыслу» в настройках, чтобы подготовить историю."), fraction: nil, canRetry: false)
 }
 
 /// Owns a separate SQLite connection. No database transaction spans model inference.
@@ -150,7 +151,7 @@ public actor EmbeddingIndexer {
                                               dimensions: EmbeddingConfiguration.dimensions)
         }
         if store == nil { store = try HistoryStore(url: databaseURL) }
-        guard let store else { throw HistoryError.database("Не удалось открыть историю для поиска.") }
+        guard let store else { throw HistoryError.database(L10n.text("Не удалось открыть историю для поиска.")) }
         if try store.embeddingIndexIdentity() != identity {
             try store.configureEmbeddingIndex(identity)
         }
@@ -221,18 +222,18 @@ public actor EmbeddingIndexer {
         let message: String
         let effectivePause = progress.pending > 0 ? pauseReason : nil
         if let effectivePause {
-            message = "\(effectivePause.message) Готово: \(progress.complete) из \(progress.total), осталось: \(progress.pending)."
+            message = L10n.text("\(effectivePause.message) Готово: \(progress.complete) из \(progress.total), осталось: \(progress.pending).")
         } else if progress.pending > 0 {
-            message = "Подготовлено \(progress.complete) из \(progress.total) записей"
+            message = L10n.text("Подготовлено \(progress.complete) из \(progress.total) записей")
         } else if progress.failed > 0 {
-            message = "Готово: \(progress.complete). Не удалось обработать: \(progress.failed)"
+            message = L10n.text("Готово: \(progress.complete). Не удалось обработать: \(progress.failed)")
         } else if progress.total == 0 {
-            message = "Пока нет текста для поиска по смыслу."
+            message = L10n.text("Пока нет текста для поиска по смыслу.")
         } else {
-            message = "Поиск по смыслу готов: \(progress.complete) записей"
+            message = L10n.text("Поиск по смыслу готов: \(progress.complete) записей")
         }
         let suffix = progress.truncated > 0
-            ? ". Длинных записей обработано частично: \(progress.truncated)" : ""
+            ? L10n.text(". Длинных записей обработано частично: \(progress.truncated)") : ""
         onProgress(EmbeddingIndexStatus(message: message + suffix,
             fraction: progress.pending > 0 && progress.total > 0
                 ? Double(progress.complete) / Double(progress.total) : nil,
@@ -242,7 +243,7 @@ public actor EmbeddingIndexer {
     private func report(_ error: Error) {
         blocked = true
         if ownsRuntime { runtime.unload() }
-        onProgress(EmbeddingIndexStatus(message: "Индексация приостановлена: \(error.localizedDescription)",
+        onProgress(EmbeddingIndexStatus(message: L10n.text("Индексация приостановлена: \(error.localizedDescription)"),
                                         fraction: nil, canRetry: true))
     }
 }

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 /// One-time identity migration, completed before any history or settings are opened.
@@ -67,11 +68,11 @@ enum LegacyMigration {
         var errorDescription: String? {
             switch self {
             case .conflictingHistories:
-                return "Найдены две папки истории: \(previousAppName) и \(currentAppName). Они сохранены без изменений; перед запуском нужно выбрать, какую историю использовать."
+                return L10n.text("Найдены две папки истории: \(previousAppName) и \(currentAppName). Они сохранены без изменений; перед запуском нужно выбрать, какую историю использовать.")
             case .invalidDirectory(let url):
-                return "Не удалось перенести историю: \(url.path) должен быть обычной папкой, а не файлом или ссылкой."
+                return L10n.text("Не удалось перенести историю: \(url.path) должен быть обычной папкой, а не файлом или ссылкой.")
             case .preferencesWriteFailed:
-                return "Не удалось сохранить перенесённые настройки \(currentAppName). Повторите запуск."
+                return L10n.text("Не удалось сохранить перенесённые настройки \(currentAppName). Повторите запуск.")
             }
         }
     }

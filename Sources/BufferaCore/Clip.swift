@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import CryptoKit
 
@@ -33,11 +34,11 @@ public enum ClipKind: String, CaseIterable, Codable, Sendable {
     case text, link, image, file, other
     public var label: String {
         switch self {
-        case .text: return "Текст"
-        case .link: return "Ссылка"
-        case .image: return "Картинка"
-        case .file: return "Файлы"
-        case .other: return "Данные"
+        case .text: return L10n.text("Текст")
+        case .link: return L10n.text("Ссылка")
+        case .image: return L10n.text("Картинка")
+        case .file: return L10n.text("Файлы")
+        case .other: return L10n.text("Данные")
         }
     }
     public var symbol: String {
@@ -62,6 +63,18 @@ public struct ClipSummary: Identifiable, Sendable {
     public let isConcealed: Bool
     public let isFavorite: Bool
     public let isRemote: Bool
+
+    /// Translate generated labels only; user content and persisted titles stay intact.
+    public var displayTitle: String {
+        if isConcealed { return L10n.text("Скрытая запись") }
+        if kind == .image && title == "Картинка" { return kind.label }
+        if kind == .other && title.hasPrefix("Данные: ") {
+            let format = String(title.dropFirst("Данные: ".count))
+            let name = format == "неизвестный формат" ? L10n.text("неизвестный формат") : format
+            return L10n.text("Данные: \(name)")
+        }
+        return title
+    }
 
     public init(id: Int64, date: Date, kind: ClipKind, title: String, text: String,
                 source: String, byteCount: Int, isConcealed: Bool = false, isFavorite: Bool = false,
@@ -107,9 +120,9 @@ public enum HistoryError: LocalizedError {
     case database(String), missing, invalidPayload
     public var errorDescription: String? {
         switch self {
-        case .database(let message): return "Ошибка истории: \(message)"
-        case .missing: return "Запись уже отсутствует в истории."
-        case .invalidPayload: return "Не удалось прочитать содержимое записи."
+        case .database(let message): return L10n.text("Ошибка истории: \(message)")
+        case .missing: return L10n.text("Запись уже отсутствует в истории.")
+        case .invalidPayload: return L10n.text("Не удалось прочитать содержимое записи.")
         }
     }
 }

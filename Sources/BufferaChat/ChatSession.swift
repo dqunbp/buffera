@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaCore
 import BufferaModels
@@ -128,7 +129,7 @@ public actor ChatSession {
         var executedPlans: Set<String> = []
         var fallback = false
 
-        onEvent(.status("Ищу подходящие записи…"))
+        onEvent(.status(L10n.text("Ищу подходящие записи…")))
         planning: for decision in 0..<4 {
             try check(id)
             try reader.validate(ids: observedIDs)
@@ -163,7 +164,7 @@ public actor ChatSession {
                 switch plan {
                 case .finish: break planning
                 case .search(let filter, let limit, let offset):
-                    onEvent(.status("Ищу подходящие записи…"))
+                    onEvent(.status(L10n.text("Ищу подходящие записи…")))
                     let page = try await reader.search(filter, limit: limit, offset: offset)
                     let rows = page.rows
                     try check(id)
@@ -175,7 +176,7 @@ public actor ChatSession {
                                                     document: nil, error: nil, searchQuery: page.query))
                 case .read(let clipID, let offset, let limit):
                     guard knownIDs.contains(clipID) else { throw ChatPlanError.invalid }
-                    onEvent(.status("Читаю найденное…"))
+                    onEvent(.status(L10n.text("Читаю найденное…")))
                     let remaining = 24_000 - evidence.reduce(0) { $0 + $1.text.utf8.count }
                     guard remaining > 0 else { break planning }
                     let number = numbers[clipID] ?? numbers.count + 1
@@ -187,7 +188,7 @@ public actor ChatSession {
                     observations.append(Observation(tool: "read_clip", items: nil, document: document, error: nil))
                 case .neighbors(let anchor, let before, let after):
                     guard knownIDs.contains(anchor) else { throw ChatPlanError.invalid }
-                    onEvent(.status("Смотрю соседние копирования…"))
+                    onEvent(.status(L10n.text("Смотрю соседние копирования…")))
                     let rows = try reader.neighbors(id: anchor, before: before, after: after)
                     neighborAnchors.insert(anchor)
                     candidates = rows.map(\.id)
@@ -214,7 +215,7 @@ public actor ChatSession {
             candidates = previousSources.map(\.id)
         }
         if fallback && candidates.isEmpty {
-            onEvent(.status("Ищу по вашему вопросу…"))
+            onEvent(.status(L10n.text("Ищу по вашему вопросу…")))
             var filter = SearchFilter()
             filter.query = chatPrefix(question, characters: 1000, bytes: 4000)
             let page = try await reader.search(filter, limit: 6)
@@ -254,7 +255,7 @@ public actor ChatSession {
         onEvent(.sources(sources))
         let gate = ChatStreamGuard(reader: reader, ids: usedIDs)
         let runtime = runtime
-        onEvent(.status(evidence.isEmpty ? "Подходящих записей не найдено…" : "Готовлю ответ…"))
+        onEvent(.status(evidence.isEmpty ? L10n.text("Подходящих записей не найдено…") : L10n.text("Готовлю ответ…")))
         var answer: ChatGeneration?
         var budget = 24_000
         var bounded = evidence

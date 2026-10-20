@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
@@ -6,12 +7,12 @@ enum CopyTransformError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unavailable: return "Преобразование недоступно для этой записи."
-        case .noText: return "В записи нет текста для преобразования."
-        case .unreadableText: return "Не удалось прочитать весь текст записи. Исходное содержимое сохранено."
-        case .noImageText: return "На изображении не найден текст."
-        case .imageTextTooLong: return "Распознанный текст достиг ограничения в 200 000 символов. Нельзя гарантировать копирование целиком."
-        case .cancelled: return "Копирование отменено."
+        case .unavailable: return L10n.text("Преобразование недоступно для этой записи.")
+        case .noText: return L10n.text("В записи нет текста для преобразования.")
+        case .unreadableText: return L10n.text("Не удалось прочитать весь текст записи. Исходное содержимое сохранено.")
+        case .noImageText: return L10n.text("На изображении не найден текст.")
+        case .imageTextTooLong: return L10n.text("Распознанный текст достиг ограничения в 200 000 символов. Нельзя гарантировать копирование целиком.")
+        case .cancelled: return L10n.text("Копирование отменено.")
         }
     }
 }

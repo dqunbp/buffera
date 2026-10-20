@@ -12,7 +12,7 @@ struct ChatHistoryItem: Encodable, Sendable {
 
     init(_ summary: ClipSummary) {
         id = String(summary.id)
-        title = chatPrefix(summary.title, characters: 160, bytes: 640)
+        title = chatPrefix(summary.displayTitle, characters: 160, bytes: 640)
         copiedAt = ISO8601DateFormatter().string(from: summary.date)
         application = chatPrefix(summary.source, characters: 128, bytes: 512)
         kind = summary.kind.rawValue
@@ -115,7 +115,7 @@ struct ChatHistoryReader: Sendable {
                             truncated: !decoded.isComplete || offset > 0 || next < decoded.text.count,
                             nextOffset: next < decoded.text.count ? next : nil, note: decoded.note,
                             source: ChatSource(number: number, id: id,
-                                title: chatPrefix(current.title, characters: 160, bytes: 640),
+                                title: chatPrefix(current.displayTitle, characters: 160, bytes: 640),
                                 copiedAt: current.date, application: current.source))
     }
 

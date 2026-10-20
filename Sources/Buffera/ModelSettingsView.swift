@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaModels
 
@@ -22,14 +23,14 @@ final class ModelSettingsView: NSView {
         content.alignment = .leading
         content.spacing = 12
         if manager == nil {
-            let unavailable = modelParagraph(unavailableMessage ?? "Не удалось открыть скачанные файлы.")
+            let unavailable = modelParagraph(unavailableMessage ?? L10n.text("Не удалось открыть скачанные файлы."))
             unavailable.textColor = .systemRed
             content.addArrangedSubview(unavailable)
             unavailable.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
 
         #if !arch(arm64)
-        let unsupported = modelParagraph("Эти функции пока доступны только на Mac с Apple Silicon.")
+        let unsupported = modelParagraph(L10n.text("Эти функции пока доступны только на Mac с Apple Silicon."))
         unsupported.textColor = .systemOrange
         content.addArrangedSubview(unsupported)
         unsupported.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -60,7 +61,7 @@ final class ModelSettingsView: NSView {
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
         let note = modelParagraph(
-            "Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются."
+            L10n.text("Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются.")
         )
         content.addArrangedSubview(note)
         note.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -147,13 +148,13 @@ private final class ModelCardView: NSBox {
     private let retryIndex = NSButton()
     private let continuePreparation = NSButton()
     private let onlyOnExternalPower = NSButton(
-        checkboxWithTitle: "Готовить историю для поиска по смыслу только при питании от сети",
+        checkboxWithTitle: L10n.text("Готовить историю для поиска по смыслу только при питании от сети"),
         target: nil, action: nil)
     private var indexHasProgress = false
     private var indexCanRetry = false
     private var indexCanContinueNow = false
     private let details = NSStackView()
-    private let disclosure = NSButton(title: "Подробнее", target: nil, action: nil)
+    private let disclosure = NSButton(title: L10n.text("Подробнее"), target: nil, action: nil)
 
     init(snapshot: LocalModelSnapshot) {
         self.snapshot = snapshot
@@ -167,17 +168,17 @@ private final class ModelCardView: NSBox {
         let prefix = "models.\(snapshot.descriptor.role.rawValue)"
         identifier = NSUserInterfaceItemIdentifier(prefix)
         let isSearch = snapshot.descriptor.role == .embedding
-        enabled.title = isSearch ? "Поиск по смыслу" : "Спросить Buffera"
+        enabled.title = isSearch ? L10n.text("Поиск по смыслу") : L10n.text("Спросить Buffera")
         enabled.font = .systemFont(ofSize: 13, weight: .semibold)
         enabled.target = self
         enabled.action = #selector(changeEnabled)
         enabled.identifier = NSUserInterfaceItemIdentifier("\(prefix).enabled")
         let description = modelParagraph(isSearch
-            ? "Находите записи, даже если не помните точные слова. Для поиска по смыслу используется отдельная модель на вашем Mac."
-            : "Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы.")
+            ? L10n.text("Находите записи, даже если не помните точные слова. Для поиска по смыслу используется отдельная модель на вашем Mac.")
+            : L10n.text("Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы."))
         let energyNote = modelParagraph(isSearch
-            ? "Подготовка истории расходует заряд. Поиск по уже подготовленным записям доступен и от аккумулятора."
-            : "Локальные ответы расходуют заряд и могут нагревать Mac. Обработка начинается после вашего вопроса.")
+            ? L10n.text("Подготовка истории расходует заряд. Поиск по уже подготовленным записям доступен и от аккумулятора.")
+            : L10n.text("Локальные ответы расходуют заряд и могут нагревать Mac. Обработка начинается после вашего вопроса."))
         energyNote.identifier = NSUserInterfaceItemIdentifier("\(prefix).energyNote")
         onlyOnExternalPower.font = .systemFont(ofSize: 11)
         onlyOnExternalPower.cell?.wraps = true
@@ -187,7 +188,7 @@ private final class ModelCardView: NSBox {
         onlyOnExternalPower.action = #selector(changeExternalPowerPreference)
         onlyOnExternalPower.identifier = NSUserInterfaceItemIdentifier("\(prefix).onlyOnExternalPower")
         onlyOnExternalPower.isHidden = !isSearch
-        onlyOnExternalPower.toolTip = "Влияет на фоновую подготовку истории. Поиск и ответы по вашему запросу доступны при любом питании."
+        onlyOnExternalPower.toolTip = L10n.text("Влияет на фоновую подготовку истории. Поиск и ответы по вашему запросу доступны при любом питании.")
 
         modelName.font = .systemFont(ofSize: 11)
         modelName.identifier = NSUserInterfaceItemIdentifier("\(prefix).name")
@@ -198,14 +199,14 @@ private final class ModelCardView: NSBox {
         progress.isIndeterminate = false
         progress.controlSize = .small
         progress.identifier = NSUserInterfaceItemIdentifier("\(prefix).progress")
-        progress.setAccessibilityLabel("Скачивание модели \(snapshot.descriptor.title)")
+        progress.setAccessibilityLabel(L10n.text("Скачивание модели \(snapshot.descriptor.title)"))
         configure(primary, action: #selector(primaryAction), identifier: "\(prefix).download")
         configure(remove, action: #selector(removeModel), identifier: "\(prefix).remove")
-        remove.title = "Удалить модель"
-        remove.toolTip = "Выключить функцию и удалить скачанную модель с этого Mac"
+        remove.title = L10n.text("Удалить модель")
+        remove.toolTip = L10n.text("Выключить функцию и удалить скачанную модель с этого Mac")
         configure(check, action: #selector(checkModel), identifier: "\(prefix).check")
-        check.toolTip = "Проверить русский и английский текст и код на встроенных примерах"
-        let license = NSButton(title: "Лицензия", target: self, action: #selector(showLicense))
+        check.toolTip = L10n.text("Проверить русский и английский текст и код на встроенных примерах")
+        let license = NSButton(title: L10n.text("Лицензия"), target: self, action: #selector(showLicense))
         license.bezelStyle = .inline
         license.font = .systemFont(ofSize: 11)
         license.identifier = NSUserInterfaceItemIdentifier("\(prefix).license")
@@ -230,14 +231,14 @@ private final class ModelCardView: NSBox {
         indexProgress.isIndeterminate = false
         indexProgress.isHidden = true
         indexProgress.identifier = NSUserInterfaceItemIdentifier("\(prefix).indexProgress")
-        indexProgress.setAccessibilityLabel("Подготовка истории для поиска по смыслу")
+        indexProgress.setAccessibilityLabel(L10n.text("Подготовка истории для поиска по смыслу"))
         configure(retryIndex, action: #selector(retryIndexing), identifier: "\(prefix).retryIndex")
-        retryIndex.title = "Повторить обработку"
+        retryIndex.title = L10n.text("Повторить обработку")
         retryIndex.isHidden = true
         configure(continuePreparation, action: #selector(continueIndexPreparation),
                   identifier: "\(prefix).continuePreparation")
-        continuePreparation.title = "Продолжить сейчас"
-        continuePreparation.toolTip = "Продолжить на аккумуляторе до следующего подключения к сети или перезапуска Buffera"
+        continuePreparation.title = L10n.text("Продолжить сейчас")
+        continuePreparation.toolTip = L10n.text("Продолжить на аккумуляторе до следующего подключения к сети или перезапуска Buffera")
         continuePreparation.isHidden = true
 
         let technicalActions = NSStackView(views: [check, license])
@@ -282,17 +283,17 @@ private final class ModelCardView: NSBox {
         }
         let total = modelByteCount(snapshot.totalBytes)
         let received = modelByteCount(snapshot.receivedBytes)
-        modelName.stringValue = "Модель: \(snapshot.descriptor.title) · \(total)"
+        modelName.stringValue = L10n.text("Модель: \(snapshot.descriptor.title) · \(total)")
         modelName.toolTip = snapshot.descriptor.summary
         enabled.state = snapshot.isEnabled ? .on : .off
         // A missing model requires an explicit download action with its size in view.
         // During preparation the requested-on switch remains available to stop it.
         enabled.isEnabled = platformSupported && (snapshot.state == .downloaded || snapshot.isEnabled)
         enabled.toolTip = snapshot.isEnabled
-            ? "Выключение остановит обработку и сохранит скачанную модель"
+            ? L10n.text("Выключение остановит обработку и сохранит скачанную модель")
             : snapshot.state == .downloaded
-                ? "Включить функцию с уже скачанной моделью"
-                : "Для включения сначала скачайте указанную модель"
+                ? L10n.text("Включить функцию с уже скачанной моделью")
+                : L10n.text("Для включения сначала скачайте указанную модель")
         primary.isHidden = snapshot.state == .downloaded
         primary.isEnabled = snapshot.totalBytes > 0 && platformSupported
         remove.isHidden = snapshot.state == .notDownloaded
@@ -307,28 +308,28 @@ private final class ModelCardView: NSBox {
         status.textColor = .secondaryLabelColor
         switch snapshot.state {
         case .notDownloaded:
-            status.stringValue = "Модель ещё не скачана"
-            primary.title = "Скачать модель и включить"
+            status.stringValue = L10n.text("Модель ещё не скачана")
+            primary.title = L10n.text("Скачать модель и включить")
         case .downloading:
-            status.stringValue = "Скачивание модели · \(received) из \(total). После проверки функция включится."
-            primary.title = "Пауза"
+            status.stringValue = L10n.text("Скачивание модели · \(received) из \(total). После проверки функция включится.")
+            primary.title = L10n.text("Пауза")
         case .paused:
             status.stringValue = snapshot.isEnabled
-                ? "Скачивание на паузе · \(received) из \(total)"
-                : "Выключено · сохранено \(received) из \(total)"
-            primary.title = snapshot.isEnabled ? "Продолжить" : "Включить и продолжить"
+                ? L10n.text("Скачивание на паузе · \(received) из \(total)")
+                : L10n.text("Выключено · сохранено \(received) из \(total)")
+            primary.title = snapshot.isEnabled ? L10n.text("Продолжить") : L10n.text("Включить и продолжить")
         case .verifying:
-            status.stringValue = "Проверяем скачанную модель"
-            primary.title = "Проверка файлов…"
+            status.stringValue = L10n.text("Проверяем скачанную модель")
+            primary.title = L10n.text("Проверка файлов…")
             primary.isEnabled = false
         case .downloaded:
             status.stringValue = snapshot.isEnabled
-                ? "Модель скачана · функция включена"
-                : "Модель скачана · функция выключена"
+                ? L10n.text("Модель скачана · функция включена")
+                : L10n.text("Модель скачана · функция выключена")
         case .failed:
-            status.stringValue = snapshot.errorMessage ?? "Не удалось подготовить функцию"
+            status.stringValue = snapshot.errorMessage.map(L10n.diagnostic) ?? L10n.text("Не удалось подготовить функцию")
             status.textColor = .systemRed
-            primary.title = snapshot.isEnabled ? "Повторить" : "Включить и повторить"
+            primary.title = snapshot.isEnabled ? L10n.text("Повторить") : L10n.text("Включить и повторить")
         }
         if let error = snapshot.errorMessage, snapshot.state != .failed {
             status.stringValue += "\n\(error)"
@@ -372,7 +373,7 @@ private final class ModelCardView: NSBox {
 
     private func updateCheckButton() {
         check.isHidden = snapshot.state != .downloaded && !isChecking
-        check.title = isChecking ? "Остановить проверку" : "Проверить работу"
+        check.title = isChecking ? L10n.text("Остановить проверку") : L10n.text("Проверить работу")
         check.isEnabled = platformSupported && (isChecking || snapshot.state == .downloaded)
     }
 
@@ -400,7 +401,7 @@ private final class ModelCardView: NSBox {
     @objc private func changeEnabled() { onSetEnabled?(enabled.state == .on) }
     @objc private func toggleDetails() {
         details.isHidden.toggle()
-        disclosure.title = details.isHidden ? "Подробнее" : "Скрыть подробности"
+        disclosure.title = details.isHidden ? L10n.text("Подробнее") : L10n.text("Скрыть подробности")
     }
     @objc private func removeModel() { onRemove?() }
     @objc private func retryIndexing() { onRetryIndex?() }
@@ -424,12 +425,12 @@ private func modelParagraph(_ text: String) -> NSTextField {
 }
 
 private func modelByteCount(_ count: Int64) -> String {
-    let units: [(Int64, String)] = [(1_000_000_000, "ГБ"), (1_000_000, "МБ"), (1_000, "КБ")]
+    let units: [(Int64, String)] = [(1_000_000_000, L10n.text("ГБ")), (1_000_000, L10n.text("МБ")), (1_000, L10n.text("КБ"))]
     for (divisor, suffix) in units where count >= divisor {
         let value = (Double(count) / Double(divisor)).formatted(
-            .number.locale(Locale(identifier: "ru_RU")).precision(.fractionLength(0...2))
+            .number.locale(L10n.locale).precision(.fractionLength(0...2))
         )
         return "\(value) \(suffix)"
     }
-    return "\(count) Б"
+    return L10n.text("\(count) Б")
 }

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 public enum TextTransformationError: LocalizedError, Equatable {
@@ -5,12 +6,12 @@ public enum TextTransformationError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .noText: return "В записи нет текста для преобразования."
-        case .tooLarge: return "Текст или результат больше 2 МБ. Его можно скопировать без форматирования."
-        case .invalidJSON: return "Не удалось форматировать: текст не является корректным JSON."
-        case .jsonTooDeep: return "В JSON больше 128 уровней вложенности. Его можно скопировать без форматирования."
-        case .invalidURL: return "Нужна одна полная ссылка, начинающаяся с http:// или https://."
-        case .signedURL: return "У ссылки есть подпись. Удаление параметров может сделать её недействительной."
+        case .noText: return L10n.text("В записи нет текста для преобразования.")
+        case .tooLarge: return L10n.text("Текст или результат больше 2 МБ. Его можно скопировать без форматирования.")
+        case .invalidJSON: return L10n.text("Не удалось форматировать: текст не является корректным JSON.")
+        case .jsonTooDeep: return L10n.text("В JSON больше 128 уровней вложенности. Его можно скопировать без форматирования.")
+        case .invalidURL: return L10n.text("Нужна одна полная ссылка, начинающаяся с http:// или https://.")
+        case .signedURL: return L10n.text("У ссылки есть подпись. Удаление параметров может сделать её недействительной.")
         }
     }
 }
@@ -21,21 +22,21 @@ public enum TextTransformation: String, CaseIterable {
 
     public var title: String {
         switch self {
-        case .plainText: return "Без форматирования"
-        case .formatJSON: return "Форматировать JSON"
-        case .unwrapLines: return "Убрать переносы строк"
-        case .removeDuplicateLines: return "Убрать повторяющиеся строки"
-        case .removeTrackingParameters: return "Убрать метки из ссылки"
+        case .plainText: return L10n.text("Без форматирования")
+        case .formatJSON: return L10n.text("Форматировать JSON")
+        case .unwrapLines: return L10n.text("Убрать переносы строк")
+        case .removeDuplicateLines: return L10n.text("Убрать повторяющиеся строки")
+        case .removeTrackingParameters: return L10n.text("Убрать метки из ссылки")
         }
     }
 
     public var detail: String {
         switch self {
-        case .plainText: return "Обычный текст без шрифтов, цветов и другого оформления."
-        case .formatJSON: return "Отступы в JSON; числа, значения и порядок ключей сохраняются."
-        case .unwrapLines: return "Соединяет строки пробелами, сохраняя разделение на абзацы."
-        case .removeDuplicateLines: return "Оставляет первое появление каждой строки. Регистр, пробелы и пустые строки сохраняются."
-        case .removeTrackingParameters: return "Удаляет utm_* и известные рекламные метки, сохраняя остальные параметры ссылки."
+        case .plainText: return L10n.text("Обычный текст без шрифтов, цветов и другого оформления.")
+        case .formatJSON: return L10n.text("Отступы в JSON; числа, значения и порядок ключей сохраняются.")
+        case .unwrapLines: return L10n.text("Соединяет строки пробелами, сохраняя разделение на абзацы.")
+        case .removeDuplicateLines: return L10n.text("Оставляет первое появление каждой строки. Регистр, пробелы и пустые строки сохраняются.")
+        case .removeTrackingParameters: return L10n.text("Удаляет utm_* и известные рекламные метки, сохраняя остальные параметры ссылки.")
         }
     }
 

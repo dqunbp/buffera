@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 import ImageIO
@@ -12,7 +13,7 @@ enum ClipPreviewContent {
         switch kind {
         case .text, .link:
             guard let text = ClipboardService.revealedText(payload), !text.isEmpty else {
-                return .unavailable("В этой записи нет текста для просмотра.")
+                return .unavailable(L10n.text("В этой записи нет текста для просмотра."))
             }
             return .text(limited(text))
         case .image:
@@ -27,7 +28,7 @@ enum ClipPreviewContent {
                       ] as CFDictionary) else { continue }
                 return .image(NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)))
             }
-            return .unavailable("Не удалось показать картинку. Исходные данные сохранены в истории.")
+            return .unavailable(L10n.text("Не удалось показать картинку. Исходные данные сохранены в истории."))
         case .file:
             let paths = payload.items.compactMap { representations -> String? in
                 guard let representation = representations.first(where: { $0.type == NSPasteboard.PasteboardType.fileURL.rawValue }),
@@ -35,7 +36,7 @@ enum ClipPreviewContent {
                       let url = URL(string: value), url.isFileURL else { return nil }
                 return url.path
             }
-            return paths.isEmpty ? .unavailable("Пути к файлам недоступны для просмотра.") : .text(limited(paths.joined(separator: "\n\n")))
+            return paths.isEmpty ? .unavailable(L10n.text("Пути к файлам недоступны для просмотра.")) : .text(limited(paths.joined(separator: "\n\n")))
         case .other:
             let representations = payload.items.flatMap { $0 }
             let formats = Dictionary(grouping: representations, by: \.type).sorted { $0.key < $1.key }
@@ -43,16 +44,16 @@ enum ClipPreviewContent {
                 let bytes = values.reduce(0) { $0 + $1.data.count }
                 return "\(String(type.prefix(180))) · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))"
             }
-            guard !lines.isEmpty else { return .unavailable("В записи нет данных для просмотра.") }
-            let extra = formats.count > 40 ? "\n… и ещё \(formats.count - 40) форматов" : ""
-            return .text("Форматы записи\n\n" + lines.joined(separator: "\n") + extra)
+            guard !lines.isEmpty else { return .unavailable(L10n.text("В записи нет данных для просмотра.")) }
+            let extra = formats.count > 40 ? L10n.text("\n… и ещё \(formats.count - 40) форматов") : ""
+            return .text(L10n.text("Форматы записи\n\n") + lines.joined(separator: "\n") + extra)
         }
     }
 
     private static func limited(_ text: String) -> String {
         let prefix = text.prefix(500_000)
         guard prefix.endIndex != text.endIndex else { return text }
-        return String(prefix) + "\n\n— Показаны первые 500 000 символов. Копируется запись целиком. —"
+        return String(prefix) + L10n.text("\n\n— Показаны первые 500 000 символов. Копируется запись целиком. —")
     }
 }
 
@@ -157,7 +158,7 @@ private final class PreviewViewController: NSViewController {
         title.font = .systemFont(ofSize: 13, weight: .semibold)
         title.lineBreakMode = .byTruncatingTail
         title.maximumNumberOfLines = 1
-        let hint = NSTextField(labelWithString: "Пробел — закрыть   ↵ — выбрать   ↑↓ — перейти")
+        let hint = NSTextField(labelWithString: L10n.text("Пробел — закрыть   ↵ — выбрать   ↑↓ — перейти"))
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
         hint.lineBreakMode = .byTruncatingTail
@@ -182,7 +183,7 @@ private final class PreviewViewController: NSViewController {
             text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
             text.textContainer?.widthTracksTextView = true
             text.textContainer?.containerSize = NSSize(width: size.width - 32, height: CGFloat.greatestFiniteMagnitude)
-            text.setAccessibilityLabel("Содержимое записи")
+            text.setAccessibilityLabel(L10n.text("Содержимое записи"))
             scroll.documentView = text
             textView = text
             body = scroll
@@ -191,7 +192,7 @@ private final class PreviewViewController: NSViewController {
             imageView.image = image
             imageView.imageScaling = .scaleProportionallyUpOrDown
             imageView.imageAlignment = .alignCenter
-            imageView.setAccessibilityLabel("Просмотр картинки")
+            imageView.setAccessibilityLabel(L10n.text("Просмотр картинки"))
             body = imageView
         case .unavailable(let message):
             let label = NSTextField(wrappingLabelWithString: message)

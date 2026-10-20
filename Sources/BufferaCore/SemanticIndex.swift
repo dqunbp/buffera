@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import CryptoKit
 import CSQLite
@@ -59,7 +60,7 @@ extension HistoryStore {
     /// Creates a durable queue for existing history. Reusing the same model preserves completed work.
     public func configureEmbeddingIndex(_ identity: EmbeddingIndexIdentity) throws {
         guard !identity.fingerprint.isEmpty, (1...8192).contains(identity.dimensions) else {
-            throw HistoryError.database("Некорректные параметры смыслового индекса.")
+            throw HistoryError.database(L10n.text("Некорректные параметры смыслового индекса."))
         }
         if try embeddingIndexIdentity() == identity { return }
         try execute("BEGIN IMMEDIATE")
@@ -138,7 +139,7 @@ extension HistoryStore {
     public func completeEmbedding(_ job: EmbeddingJob, vectors: [[Float]], isTruncated: Bool = false) throws -> Bool {
         guard let identity = try embeddingIndexIdentity(), identity.fingerprint == job.modelFingerprint else { return false }
         guard !vectors.isEmpty, vectors.count <= 32 else {
-            throw HistoryError.database("Модель вернула неверное число фрагментов текста.")
+            throw HistoryError.database(L10n.text("Модель вернула неверное число фрагментов текста."))
         }
         let encoded = try vectors.map { try embeddingData($0, dimensions: identity.dimensions) }
         try execute("BEGIN IMMEDIATE")
@@ -200,7 +201,7 @@ extension HistoryStore {
             case "pending": pending = count
             case "complete": complete = count; truncated = Int(sqlite3_column_int64(statement, 2))
             case "failed": failed = count
-            default: throw HistoryError.database("Неизвестное состояние смыслового индекса.")
+            default: throw HistoryError.database(L10n.text("Неизвестное состояние смыслового индекса."))
             }
             status = sqlite3_step(statement)
         }
@@ -220,7 +221,7 @@ extension HistoryStore {
                                         total: try count(filter), semanticCount: 0, modelMatched: matched)
             }
             guard maximumDistance.isFinite, (0...2).contains(maximumDistance) else {
-                throw HistoryError.database("Некорректный порог смыслового поиска.")
+                throw HistoryError.database(L10n.text("Некорректный порог смыслового поиска."))
             }
             let query = try embeddingData(vector, dimensions: identity.dimensions)
             let (exactClause, exactBindings) = predicate(filter)
@@ -355,7 +356,7 @@ extension HistoryStore {
     private func embeddingData(_ vector: [Float], dimensions: Int) throws -> Data {
         guard vector.count == dimensions, vector.allSatisfy(\.isFinite),
               vector.contains(where: { $0 != 0 }) else {
-            throw HistoryError.database("Модель вернула некорректный вектор.")
+            throw HistoryError.database(L10n.text("Модель вернула некорректный вектор."))
         }
         // Normalize using Double to avoid Float accumulation overflow for otherwise finite inputs.
         let length = sqrt(vector.reduce(0.0) { $0 + Double($1) * Double($1) })

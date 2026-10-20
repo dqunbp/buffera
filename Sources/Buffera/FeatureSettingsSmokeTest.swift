@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 import BufferaModels
@@ -28,7 +29,7 @@ func runFeatureSettingsSmokeTest() throws {
                          name.stringValue.contains(snapshot.descriptor.title) &&
                          name.stringValue.contains("\(snapshot.totalBytes)"),
                          "Model identity and download size are hidden before activation")
-        try featureCheck(!download.isHiddenOrHasHiddenAncestor && download.title == "Скачать модель и включить",
+        try featureCheck(!download.isHiddenOrHasHiddenAncestor && download.title == L10n.text("Скачать модель и включить"),
                          "The explicit download-and-enable action is missing")
         try featureCheck(!energyNote.isHiddenOrHasHiddenAncestor && !energyNote.stringValue.isEmpty,
                          "A local feature omits its energy-use explanation")
@@ -123,7 +124,7 @@ func runFeatureSettingsSmokeTest() throws {
     defer { paused.cleanup() }
     let pausedToggle = try paused.control("models.embedding.enabled", as: NSButton.self)
     let resume = try paused.control("models.embedding.download", as: NSButton.self)
-    try featureCheck(pausedToggle.state == .on && resume.title == "Продолжить",
+    try featureCheck(pausedToggle.state == .on && resume.title == L10n.text("Продолжить"),
                      "Paused preparation loses the activation request or resume action")
     #if arch(arm64)
     try featureCheck(pausedToggle.isEnabled, "Requested preparation cannot be disabled while it is paused")
@@ -137,7 +138,7 @@ func runFeatureSettingsSmokeTest() throws {
     defer { failed.cleanup() }
     let failureRetry = try failed.control("models.embedding.download", as: NSButton.self)
     let failure = try failed.control("models.embedding.status", as: NSTextField.self)
-    try featureCheck(failureRetry.title == "Повторить" && failure.stringValue == "Проверка ошибки загрузки",
+    try featureCheck(failureRetry.title == L10n.text("Повторить") && failure.stringValue == "Проверка ошибки загрузки",
                      "Preparation failure hides its error or recovery action")
     try featureCheck([fresh, installed, paused, failed].allSatisfy { !$0.window.isVisible },
                      "Settings checks unexpectedly opened a window")

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaCore
 import BufferaModels
@@ -94,7 +95,7 @@ public actor HybridSearchService {
                 }
                 guard ready.0, ready.1.complete > 0 else {
                     return try literal(databaseURL, filter: filter, limit: limit, offset: offset,
-                                       reason: "Индекс ещё готовится. Пока ищем по словам.")
+                                       reason: L10n.text("Индекс ещё готовится. Пока ищем по словам."))
                 }
                 if let cache = cachedVector, cache.text == query,
                    cache.value.identity.fingerprint == installed.modelKey {
@@ -123,7 +124,7 @@ public actor HybridSearchService {
             if Task.isCancelled { throw CancellationError() }
             // Unloading a model cancels its worker without cancelling the UI request.
             return try literal(databaseURL, filter: filter, limit: limit, offset: offset,
-                               reason: "Поиск по смыслу остановлен. Пока ищем по словам.")
+                               reason: L10n.text("Поиск по смыслу остановлен. Пока ищем по словам."))
         } catch {
             cachedVector = nil; semanticIDs = nil
             return try literal(databaseURL, filter: filter, limit: limit, offset: offset,
@@ -138,13 +139,13 @@ public actor HybridSearchService {
             let progress = try store.embeddingProgress()
             guard progress.complete > 0 else {
                 return try literal(store, filter: filter, limit: limit, offset: offset,
-                                   reason: "Индекс ещё готовится. Пока ищем по словам.", progress: progress)
+                                   reason: L10n.text("Индекс ещё готовится. Пока ищем по словам."), progress: progress)
             }
             let page = try store.hybridSearch(filter, vector: semantic.vector, identity: semantic.identity,
                                              limit: limit, offset: offset, semanticIDs: candidates)
             guard page.modelMatched else {
                 return try literal(store, filter: filter, limit: limit, offset: offset,
-                                   reason: "История готовится для поиска по смыслу. Пока ищем по словам.",
+                                   reason: L10n.text("История готовится для поиска по смыслу. Пока ищем по словам."),
                                    progress: progress)
             }
             pageKey = key; pageIdentity = semantic.identity; semanticIDs = page.semanticIDs
@@ -182,8 +183,8 @@ private enum SearchFailure: LocalizedError {
     case invalidEmbedding, modelChanged
     var errorDescription: String? {
         switch self {
-        case .invalidEmbedding: return "Не удалось выполнить поиск по смыслу. Пока ищем по словам."
-        case .modelChanged: return "Поиск по смыслу выключен или ещё не готов. Пока ищем по словам."
+        case .invalidEmbedding: return L10n.text("Не удалось выполнить поиск по смыслу. Пока ищем по словам.")
+        case .modelChanged: return L10n.text("Поиск по смыслу выключен или ещё не готов. Пока ищем по словам.")
         }
     }
 }

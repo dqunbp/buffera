@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 import BufferaModels
@@ -56,8 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Both identities must be stopped before the legacy SQLite directory moves.
         if !NSRunningApplication.runningApplications(withBundleIdentifier: LegacyMigration.previousBundleIdentifier).isEmpty {
             let alert = NSAlert()
-            alert.messageText = "Сначала завершите предыдущую версию"
-            alert.informativeText = "Предыдущая версия ещё использует историю. Закройте её через значок в строке меню и откройте Buffera снова — история и настройки перенесутся автоматически."
+            alert.messageText = L10n.text("Сначала завершите предыдущую версию")
+            alert.informativeText = L10n.text("Предыдущая версия ещё использует историю. Закройте её через значок в строке меню и откройте Buffera снова — история и настройки перенесутся автоматически.")
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
             NSApp.terminate(nil)
@@ -614,9 +615,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func registerShortcuts() {
         do {
             try hotKeys.register()
-            shortcutItem.title = "⌘⌥V подключено"
+            shortcutItem.title = L10n.text("⌘⌥V подключено")
         } catch {
-            shortcutItem.title = "Подключить ⌘⌥V снова…"
+            shortcutItem.title = L10n.text("Подключить ⌘⌥V снова…")
             showError(error)
         }
     }
@@ -629,19 +630,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func retryImageText() { imageTextIndexer?.retryFailed() }
     private func showImageTextProgress(_ progress: ImageTextProgress) {
         if progress.pending > 0 {
-            imageTextItem.title = "Распознавание картинок: осталось \(progress.pending)"
+            imageTextItem.title = L10n.text("Распознавание картинок: осталось \(progress.pending)")
         } else if progress.failed > 0 {
-            imageTextItem.title = "Не удалось распознать: \(progress.failed)"
+            imageTextItem.title = L10n.text("Не удалось распознать: \(progress.failed)")
         } else {
-            imageTextItem.title = "Поиск по картинкам: готово"
+            imageTextItem.title = L10n.text("Поиск по картинкам: готово")
         }
         retryImageTextItem.isHidden = progress.failed == 0
     }
     @objc private func showLastError() { if let lastError { showError(lastError, alert: true) } }
     @objc private func help() {
-        let alert = NSAlert(); alert.messageText = "\(BrandIdentity.name) — клавиши и история"
+        let alert = NSAlert(); alert.messageText = L10n.text("\(BrandIdentity.name) — клавиши и история")
         let actions = ClipCardAction.allCases.map { "\($0.shortcut) — \($0.title)" }.joined(separator: "\n")
-        alert.informativeText = """
+        alert.informativeText = L10n.text("""
         ⌘⌥V — открыть / следующий элемент
         ⌘⌥C — предыдущий в открытом окне
         Стрелки — выбрать запись
@@ -664,13 +665,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
 
         Помеченные пароли скрыты точками. Кнопка глаза раскрывает скрытую запись или скрывает обычный текст. Маскировка не шифрует локальную базу.
-        """
+        """)
         alert.runModal()
     }
 
     private func showError(_ error: Error, alert: Bool = false) {
         lastError = error; errorItem.isHidden = false
-        errorItem.title = "Последняя ошибка…"
+        errorItem.title = L10n.text("Последняя ошибка…")
         statusItem.button?.toolTip = error.localizedDescription
         if alert { let dialog = NSAlert(error: error); NSApp.activate(ignoringOtherApps: true); dialog.runModal() }
     }
@@ -680,49 +681,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.autosaveName = "BufferaClipboard"
         statusItem.isVisible = true
         statusItem.button?.image = BrandIdentity.menuBarIcon()
-        statusItem.button?.setAccessibilityLabel("\(BrandIdentity.name) — буфер обмена")
-        statusItem.button?.toolTip = "\(BrandIdentity.name) — история буфера обмена"
+        statusItem.button?.setAccessibilityLabel(L10n.text("\(BrandIdentity.name) — буфер обмена"))
+        statusItem.button?.toolTip = L10n.text("\(BrandIdentity.name) — история буфера обмена")
         let menu = NSMenu()
         func add(_ title: String, _ action: Selector) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
-        _ = add("Открыть историю    ⌘⌥V", #selector(showHistory))
-        let statusChatItem = add("Спросить Buffera…", #selector(showChat))
+        _ = add(L10n.text("Открыть историю    ⌘⌥V"), #selector(showHistory))
+        let statusChatItem = add(L10n.text("Спросить Buffera…"), #selector(showChat))
         statusChatItem.isHidden = true
         chatMenuItems.append(statusChatItem)
-        let settingsItem = add("Настройки…", #selector(showSettings))
+        let settingsItem = add(L10n.text("Настройки…"), #selector(showSettings))
         settingsItem.keyEquivalent = ","
-        shortcutItem = add("Подключить ⌘⌥V…", #selector(registerShortcuts))
-        pauseItem = add("Приостановить запись", #selector(togglePause))
+        shortcutItem = add(L10n.text("Подключить ⌘⌥V…"), #selector(registerShortcuts))
+        pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
         menu.addItem(.separator())
-        imageTextItem = NSMenuItem(title: "Подготовка поиска по картинкам…", action: nil, keyEquivalent: "")
+        imageTextItem = NSMenuItem(title: L10n.text("Подготовка поиска по картинкам…"), action: nil, keyEquivalent: "")
         menu.addItem(imageTextItem)
-        retryImageTextItem = add("Повторить распознавание", #selector(retryImageText))
+        retryImageTextItem = add(L10n.text("Повторить распознавание"), #selector(retryImageText))
         retryImageTextItem.isHidden = true
         menu.addItem(.separator())
-        _ = add("Папка данных…", #selector(revealData))
-        _ = add("Клавиши и справка…", #selector(help))
-        errorItem = add("Последняя ошибка…", #selector(showLastError)); errorItem.isHidden = true
-        menu.addItem(.separator()); _ = add("Завершить \(BrandIdentity.name)", #selector(quit))
+        _ = add(L10n.text("Папка данных…"), #selector(revealData))
+        _ = add(L10n.text("Клавиши и справка…"), #selector(help))
+        errorItem = add(L10n.text("Последняя ошибка…"), #selector(showLastError)); errorItem.isHidden = true
+        menu.addItem(.separator()); _ = add(L10n.text("Завершить \(BrandIdentity.name)"), #selector(quit))
         statusItem.menu = menu
         // Standard editing commands are needed for the search field in an accessory app.
         let mainMenu = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: BrandIdentity.name)
-        let chatItem = NSMenuItem(title: "Спросить Buffera…", action: #selector(showChat), keyEquivalent: "")
+        let chatItem = NSMenuItem(title: L10n.text("Спросить Buffera…"), action: #selector(showChat), keyEquivalent: "")
         chatItem.isHidden = true
         chatMenuItems.append(chatItem)
         chatItem.target = self; appMenu.addItem(chatItem)
-        let appearanceItem = NSMenuItem(title: "Настройки…", action: #selector(showSettings), keyEquivalent: ",")
+        let appearanceItem = NSMenuItem(title: L10n.text("Настройки…"), action: #selector(showSettings), keyEquivalent: ",")
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())
-        let helpItem = NSMenuItem(title: "Клавиши и справка…", action: #selector(help), keyEquivalent: "")
+        let helpItem = NSMenuItem(title: L10n.text("Клавиши и справка…"), action: #selector(help), keyEquivalent: "")
         helpItem.target = self; appMenu.addItem(helpItem); appMenu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "Завершить \(BrandIdentity.name)", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: L10n.text("Завершить \(BrandIdentity.name)"), action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self; appMenu.addItem(quitItem); appItem.submenu = appMenu; mainMenu.addItem(appItem)
-        let windowItem = NSMenuItem(); let windowMenu = NSMenu(title: "Окно")
-        windowMenu.addItem(withTitle: "Закрыть окно", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let windowItem = NSMenuItem(); let windowMenu = NSMenu(title: L10n.text("Окно"))
+        windowMenu.addItem(withTitle: L10n.text("Закрыть окно"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowItem.submenu = windowMenu; mainMenu.addItem(windowItem)
-        let edit = NSMenuItem(); let editMenu = NSMenu(title: "Правка")
-        for (title, selector, key) in [("Вырезать", #selector(NSText.cut(_:)), "x"), ("Копировать", #selector(NSText.copy(_:)), "c"), ("Вставить", #selector(NSText.paste(_:)), "v"), ("Выделить всё", #selector(NSText.selectAll(_:)), "a")] {
+        let edit = NSMenuItem(); let editMenu = NSMenu(title: L10n.text("Правка"))
+        for (title, selector, key) in [(L10n.text("Вырезать"), #selector(NSText.cut(_:)), "x"), (L10n.text("Копировать"), #selector(NSText.copy(_:)), "c"), (L10n.text("Вставить"), #selector(NSText.paste(_:)), "v"), (L10n.text("Выделить всё"), #selector(NSText.selectAll(_:)), "a")] {
             editMenu.addItem(withTitle: title, action: selector, keyEquivalent: key)
         }
         edit.submenu = editMenu; mainMenu.addItem(edit); NSApp.mainMenu = mainMenu

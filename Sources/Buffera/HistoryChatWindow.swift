@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaChat
 
@@ -13,13 +14,13 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     private let messages = NSStackView()
     private let transcriptDocument = ChatDocumentView()
     private let composer = ChatComposer()
-    private let action = NSButton(title: "Отправить", target: nil, action: nil)
-    private let newConversation = NSButton(title: "Новый разговор", target: nil, action: nil)
+    private let action = NSButton(title: L10n.text("Отправить"), target: nil, action: nil)
+    private let newConversation = NSButton(title: L10n.text("Новый разговор"), target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
     private let welcome = NSStackView()
     private var currentResponse: ChatMessageView?
     private var enabled = false
-    private var unavailableMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
+    private var unavailableMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
     private var statusMessage = ""
     private var busy = false
     private var stopping = false
@@ -28,7 +29,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         let window = ChatPanel(contentRect: NSRect(x: 0, y: 0, width: 700, height: 650),
                                styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                backing: .buffered, defer: false)
-        window.title = "Спросить Buffera"
+        window.title = L10n.text("Спросить Buffera")
         window.minSize = NSSize(width: 520, height: 460)
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
@@ -64,21 +65,21 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
 
     func setAvailability(enabled: Bool, message: String? = nil) {
         self.enabled = enabled
-        unavailableMessage = message ?? "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
+        unavailableMessage = message ?? L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
         updateControls()
     }
 
     func beginResponse(question: String) {
         guard !busy else { return }
         welcome.isHidden = true
-        append(ChatMessageView(role: "Вы", text: question, isQuestion: true))
+        append(ChatMessageView(role: L10n.text("Вы"), text: question, isQuestion: true))
         let answer = ChatMessageView(role: "Buffera", text: "", isQuestion: false)
         append(answer)
         currentResponse = answer
         composer.string = ""
         busy = true
         stopping = false
-        statusMessage = "Ищу в истории…"
+        statusMessage = L10n.text("Ищу в истории…")
         updateControls()
         scrollToBottom()
     }
@@ -96,7 +97,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         let followsAnswer = isNearBottom
         currentResponse.showSources(sources) { [weak self] id in self?.onOpenSource?(id) }
         if currentResponse.text.isEmpty {
-            currentResponse.update(text: status ?? "Ответ не получен.")
+            currentResponse.update(text: status ?? L10n.text("Ответ не получен."))
         }
         busy = false
         stopping = false
@@ -165,7 +166,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     }
 
     private func updateControls() {
-        action.title = busy ? "Остановить" : "Отправить"
+        action.title = busy ? L10n.text("Остановить") : L10n.text("Отправить")
         action.isEnabled = busy ? !stopping : enabled && !composer.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         composer.isEditable = !busy
         composer.alphaValue = busy ? 0.65 : 1
@@ -184,7 +185,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     private func stopResponse() {
         guard busy, !stopping else { return }
         stopping = true
-        statusMessage = "Останавливаю…"
+        statusMessage = L10n.text("Останавливаю…")
         updateControls()
         onStop?()
     }
@@ -198,9 +199,9 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
 
     private func build() {
         guard let root = window?.contentView else { return }
-        let heading = NSTextField(labelWithString: "Локальный ИИ-помощник")
+        let heading = NSTextField(labelWithString: L10n.text("Локальный ИИ-помощник"))
         heading.font = .systemFont(ofSize: 16, weight: .semibold)
-        let subtitle = NSTextField(labelWithString: "LLM с доступом к истории буфера обмена")
+        let subtitle = NSTextField(labelWithString: L10n.text("LLM с доступом к истории буфера обмена"))
         subtitle.font = .systemFont(ofSize: 11)
         subtitle.textColor = .secondaryLabelColor
         for label in [heading, subtitle] {
@@ -217,9 +218,9 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         newConversation.controlSize = .small
         newConversation.target = self
         newConversation.action = #selector(startNewConversation)
-        newConversation.toolTip = "Очистить разговор · ⌘N"
+        newConversation.toolTip = L10n.text("Очистить разговор · ⌘N")
         newConversation.identifier = NSUserInterfaceItemIdentifier("chat.new")
-        let models = NSButton(title: "Настройки…", target: self, action: #selector(showFeatures))
+        let models = NSButton(title: L10n.text("Настройки…"), target: self, action: #selector(showFeatures))
         models.bezelStyle = .rounded
         models.controlSize = .small
         models.identifier = NSUserInterfaceItemIdentifier("chat.models")
@@ -250,11 +251,11 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         welcome.orientation = .vertical
         welcome.alignment = .leading
         welcome.spacing = 10
-        let welcomeTitle = NSTextField(labelWithString: "Что вы хотите узнать?")
+        let welcomeTitle = NSTextField(labelWithString: L10n.text("Что вы хотите узнать?"))
         welcomeTitle.font = .systemFont(ofSize: 22, weight: .semibold)
-        let welcomeText = ChatWrappingLabel("Здесь работает языковая модель на вашем Mac. Она умеет искать в истории буфера обмена, читать найденные записи и отвечать со ссылками на них. Можно задавать уточняющие вопросы; скрытые записи ей недоступны.")
+        let welcomeText = ChatWrappingLabel(L10n.text("Здесь работает языковая модель на вашем Mac. Она умеет искать в истории буфера обмена, читать найденные записи и отвечать со ссылками на них. Можно задавать уточняющие вопросы; скрытые записи ей недоступны."))
         welcomeText.textColor = .secondaryLabelColor
-        let example = ChatWrappingLabel("Например: «Найди команду для запуска проекта, которую я копировал вчера».")
+        let example = ChatWrappingLabel(L10n.text("Например: «Найди команду для запуска проекта, которую я копировал вчера»."))
         example.textColor = .secondaryLabelColor
         example.font = .systemFont(ofSize: 12)
         welcome.addArrangedSubview(welcomeTitle)
@@ -294,13 +295,13 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         composer.textContainer?.widthTracksTextView = true
         composer.textContainer?.containerSize = NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude)
         composer.identifier = NSUserInterfaceItemIdentifier("chat.input")
-        composer.setAccessibilityLabel("Вопрос к Buffera")
+        composer.setAccessibilityLabel(L10n.text("Вопрос к Buffera"))
         composer.onSend = { [weak self] in
             guard let self, !self.busy else { return }
             self.performAction()
         }
         inputScroll.documentView = composer
-        let hint = NSTextField(labelWithString: "Enter — отправить · Shift+Enter — новая строка")
+        let hint = NSTextField(labelWithString: L10n.text("Enter — отправить · Shift+Enter — новая строка"))
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .tertiaryLabelColor
         hint.lineBreakMode = .byTruncatingTail
@@ -422,7 +423,7 @@ private final class ChatMessageView: NSView {
 
     init(role: String, text: String, isQuestion: Bool) {
         self.text = text
-        body = ChatWrappingLabel(text.isEmpty ? "Готовлю ответ…" : text)
+        body = ChatWrappingLabel(text.isEmpty ? L10n.text("Готовлю ответ…") : text)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 10
@@ -451,7 +452,7 @@ private final class ChatMessageView: NSView {
 
     func update(text: String) {
         self.text = text
-        body.stringValue = text.isEmpty ? "Готовлю ответ…" : text
+        body.stringValue = text.isEmpty ? L10n.text("Готовлю ответ…") : text
         body.textColor = text.isEmpty ? .secondaryLabelColor : .labelColor
         body.invalidateIntrinsicContentSize()
     }
@@ -471,7 +472,7 @@ private final class ChatMessageView: NSView {
         }
         sourceViews = []
         guard !sources.isEmpty else { return }
-        let heading = NSTextField(labelWithString: "Записи из истории")
+        let heading = NSTextField(labelWithString: L10n.text("Записи из истории"))
         heading.font = .systemFont(ofSize: 11, weight: .medium)
         heading.textColor = .secondaryLabelColor
         content.addArrangedSubview(heading)
@@ -504,10 +505,10 @@ private final class ChatSourceButton: NSButton {
     init(source: ChatSource, onOpen: @escaping (Int64) -> Void) {
         sourceID = source.id
         self.onOpen = onOpen
-        let date = source.copiedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(Locale(identifier: "ru_RU")))
+        let date = source.copiedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(L10n.locale))
         detail = [source.application, date].filter { !$0.isEmpty }.joined(separator: " · ")
         super.init(frame: .zero)
-        let name = source.title.isEmpty ? "Запись" : source.title.replacingOccurrences(of: "\n", with: " ")
+        let name = source.title.isEmpty ? L10n.text("Запись") : source.title.replacingOccurrences(of: "\n", with: " ")
         title = "[\(source.number)] \(name)"
         font = .systemFont(ofSize: 12)
         isBordered = false
@@ -516,8 +517,8 @@ private final class ChatSourceButton: NSButton {
         contentTintColor = .controlAccentColor
         image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: nil)
         imagePosition = .imageLeading
-        toolTip = "\(name)\n\(detail)\nОткрыть в истории"
-        setAccessibilityLabel("[\(source.number)] \(name). \(detail). Открыть в истории")
+        toolTip = L10n.text("\(name)\n\(detail)\nОткрыть в истории")
+        setAccessibilityLabel(L10n.text("[\(source.number)] \(name). \(detail). Открыть в истории"))
         identifier = NSUserInterfaceItemIdentifier("chat.source.\(source.id)")
         target = self
         action = #selector(openSource)

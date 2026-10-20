@@ -1,4 +1,5 @@
 import AppKit
+import BufferaLocalization
 import BufferaCore
 import ImageIO
 
@@ -16,10 +17,10 @@ enum ClipboardFailure: LocalizedError {
     case tooLarge, unreadable, writeFailed, noImage
     var errorDescription: String? {
         switch self {
-        case .tooLarge: return "Элемент больше 64 МБ: он остался в буфере, но не сохранён в историю."
-        case .unreadable: return "Некоторые данные буфера недоступны. Элемент не сохранён, чтобы не потерять его форматы."
-        case .writeFailed: return "Не удалось записать выбранный элемент в буфер обмена."
-        case .noImage: return "Не удалось преобразовать картинку в файл."
+        case .tooLarge: return L10n.text("Элемент больше 64 МБ: он остался в буфере, но не сохранён в историю.")
+        case .unreadable: return L10n.text("Некоторые данные буфера недоступны. Элемент не сохранён, чтобы не потерять его форматы.")
+        case .writeFailed: return L10n.text("Не удалось записать выбранный элемент в буфер обмена.")
+        case .noImage: return L10n.text("Не удалось преобразовать картинку в файл.")
         }
     }
 }

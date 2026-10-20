@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 import BufferaModels
@@ -18,19 +19,23 @@ final class SettingsWindow: NSWindowController {
     private let settings: SettingsContentController
 
     init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
-         mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
+         mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL,
+         languageDefaults: UserDefaults = .standard, frameAutosaveName: String? = "BufferaSettingsWindow") {
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
-                                             mcpAccess: mcpAccess, bundleURL: bundleURL)
+                                             mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Настройки \(BrandIdentity.name)"
+        window.title = L10n.text("Настройки \(BrandIdentity.name)")
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
         window.collectionBehavior = [.moveToActiveSpace]
-        window.setFrameAutosaveName("BufferaSettingsWindow")
-        if !window.setFrameUsingName("BufferaSettingsWindow") {
-            window.center()
-        } else if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }) {
+        if let frameAutosaveName {
+            window.setFrameAutosaveName(frameAutosaveName)
+            if !window.setFrameUsingName(frameAutosaveName) ||
+                !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }) {
+                window.center()
+            }
+        } else {
             window.center()
         }
         // Older saved frames predate the always-visible model names and sizes.
@@ -122,17 +127,21 @@ private final class SettingsContentController: NSViewController {
     private let mode = NSPopUpButton()
     private let columns = NSPopUpButton()
     private let rows = NSPopUpButton()
-    private let sidebar = NSButton(checkboxWithTitle: "Показывать боковую панель с фильтрами", target: nil, action: nil)
+    private let language = NSPopUpButton()
+    private let languageDefaults: UserDefaults
+    private let sidebar = NSButton(checkboxWithTitle: L10n.text("Показывать боковую панель с фильтрами"), target: nil, action: nil)
     private let count = NSPopUpButton()
     private let bytes = NSPopUpButton()
     private var countValues = HistoryLimits.countChoices
     private var byteValues = HistoryLimits.byteChoices
-    private let tabs = NSSegmentedControl(labels: ["Вид", "История", "Клавиши", "Агенты", "Поиск и ответы"], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), L10n.text("Агенты"), L10n.text("Поиск и ответы")], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let body = NSView()
     private var pages: [NSView] = []
 
-    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL) {
+    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL,
+         languageDefaults: UserDefaults) {
+        self.languageDefaults = languageDefaults
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
@@ -179,7 +188,7 @@ private final class SettingsContentController: NSViewController {
         icon.widthAnchor.constraint(equalToConstant: 56).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
         let name = label(BrandIdentity.name, size: 25, weight: .bold)
-        let tagline = label("Держит всё, что ты копируешь.", size: 12, color: .secondaryLabelColor)
+        let tagline = label(L10n.text("Держит всё, что ты копируешь."), size: 12, color: .secondaryLabelColor)
         let identity = vertical([name, tagline], spacing: 3)
         let header = NSStackView(views: [icon, identity])
         header.orientation = .horizontal; header.spacing = 14; header.alignment = .centerY
@@ -190,14 +199,14 @@ private final class SettingsContentController: NSViewController {
         tabs.segmentStyle = .rounded
         tabs.controlSize = .regular
         tabs.target = self; tabs.action = #selector(changeTab)
-        tabs.setAccessibilityLabel("Раздел настроек")
+        tabs.setAccessibilityLabel(L10n.text("Раздел настроек"))
         for index in 0..<tabs.segmentCount { tabs.setWidth(index == 4 ? 130 : 92, forSegment: index) }
         tabs.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(tabs)
         body.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(body)
 
-        let footer = label("Изменения сохраняются сразу", size: 11, color: .tertiaryLabelColor)
+        let footer = label(L10n.text("Изменения сохраняются сразу"), size: 11, color: .tertiaryLabelColor)
         footer.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(footer)
         NSLayoutConstraint.activate([
@@ -234,48 +243,54 @@ private final class SettingsContentController: NSViewController {
         // Preserve valid custom values from earlier versions rather than changing them on an unrelated edit.
         countValues = Array(Set(HistoryLimits.countChoices + [value.maxCount])).sorted()
         byteValues = Array(Set(HistoryLimits.byteChoices + [value.maxBytes])).sorted()
-        count.removeAllItems(); count.addItems(withTitles: countValues.map { $0.formatted(.number.locale(Locale(identifier: "ru_RU"))) })
+        count.removeAllItems(); count.addItems(withTitles: countValues.map { $0.formatted(.number.locale(L10n.locale)) })
         bytes.removeAllItems(); bytes.addItems(withTitles: byteValues.map {
-            "\((Double($0) / 1_000_000_000).formatted(.number.locale(Locale(identifier: "ru_RU")))) ГБ"
+            L10n.text("\((Double($0) / 1_000_000_000).formatted(.number.locale(L10n.locale))) ГБ")
         })
         count.selectItem(at: countValues.firstIndex(of: value.maxCount) ?? 0)
         bytes.selectItem(at: byteValues.firstIndex(of: value.maxBytes) ?? 0)
     }
 
     private func appearancePage() -> NSView {
+        language.addItems(withTitles: LanguagePreference.allCases.map(\.title))
+        language.selectItem(at: LanguagePreference.allCases.firstIndex(of: .load(from: languageDefaults)) ?? 0)
+        language.identifier = NSUserInterfaceItemIdentifier("settings.language")
+        configure(language, label: L10n.text("Язык интерфейса"), action: #selector(languageChanged))
         mode.addItems(withTitles: HistoryAppearance.Mode.allCases.map(\.title))
-        columns.addItems(withTitles: ["1 — список", "2 — сетка", "3 — сетка", "4 — сетка"])
+        columns.addItems(withTitles: [L10n.text("1 — список"), L10n.text("2 — сетка"), L10n.text("3 — сетка"), L10n.text("4 — сетка")])
         rows.addItems(withTitles: (3...12).map(String.init))
-        for (button, title) in [(mode, "Расположение окна"), (columns, "Количество колонок"), (rows, "Видимых строк")] {
+        for (button, title) in [(mode, L10n.text("Расположение окна")), (columns, L10n.text("Количество колонок")), (rows, L10n.text("Видимых строк"))] {
             configure(button, label: title, action: #selector(appearanceChanged))
         }
         sidebar.target = self; sidebar.action = #selector(appearanceChanged)
         sidebar.font = .systemFont(ofSize: 12)
         let grid = form([
-            [label("Расположение"), mode],
-            [label("Карточки"), columns],
-            [label("Видимых строк"), rows]
+            [label(L10n.text("Расположение")), mode],
+            [label(L10n.text("Карточки")), columns],
+            [label(L10n.text("Видимых строк")), rows],
+            [label(L10n.text("Язык")), language]
         ])
-        let note = paragraph("Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места.")
-        let tip = info(symbol: "sidebar.left", title: "У каждого вида — своё место",
-                       text: "Обычное окно можно перемещать и менять в размере. Боковая панель выезжает у выбранного края экрана.")
-        let page = vertical([grid, sidebar, note, tip], spacing: 15)
-        for child in [grid, note, tip] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let note = paragraph(L10n.text("Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места."))
+        let tip = info(symbol: "sidebar.left", title: L10n.text("У каждого вида — своё место"),
+                       text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель выезжает у выбранного края экрана."))
+        let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» следует предпочитаемым языкам macOS; если русский и английский отсутствуют, используется английский."))
+        let page = vertical([grid, languageNote, sidebar, note, tip], spacing: 12)
+        for child in [grid, languageNote, note, tip] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 
     private func historyPage() -> NSView {
-        configure(count, label: "Лимит записей", action: #selector(limitsChanged))
-        configure(bytes, label: "Лимит объёма истории", action: #selector(limitsChanged))
-        let grid = form([[label("Количество записей"), count], [label("Объём истории"), bytes]])
-        let note = paragraph("При следующем копировании старые записи сверх лимита будут удалены. Избранное сохраняется и не входит в эти лимиты.")
-        let ocr = info(symbol: "text.viewfinder", title: "Текст на картинках тоже находится",
-                       text: "Распознавание работает в фоне на Mac. Русский и английский текст участвуют в обычном поиске; скрытые записи пропускаются.")
-        let folder = NSButton(title: "Открыть папку данных", target: self, action: #selector(revealData))
+        configure(count, label: L10n.text("Лимит записей"), action: #selector(limitsChanged))
+        configure(bytes, label: L10n.text("Лимит объёма истории"), action: #selector(limitsChanged))
+        let grid = form([[label(L10n.text("Количество записей")), count], [label(L10n.text("Объём истории")), bytes]])
+        let note = paragraph(L10n.text("При следующем копировании старые записи сверх лимита будут удалены. Избранное сохраняется и не входит в эти лимиты."))
+        let ocr = info(symbol: "text.viewfinder", title: L10n.text("Текст на картинках тоже находится"),
+                       text: L10n.text("Распознавание работает в фоне на Mac. Русский и английский текст участвуют в обычном поиске; скрытые записи пропускаются."))
+        let folder = NSButton(title: L10n.text("Открыть папку данных"), target: self, action: #selector(revealData))
         folder.bezelStyle = .rounded
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         folder.imagePosition = .imageLeading
-        let storage = paragraph("История хранится локально. Маскировка скрывает содержимое в интерфейсе, но не шифрует базу.")
+        let storage = paragraph(L10n.text("История хранится локально. Маскировка скрывает содержимое в интерфейсе, но не шифрует базу."))
         let page = vertical([grid, note, ocr, folder, storage], spacing: 14)
         for child in [grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
@@ -283,24 +298,24 @@ private final class SettingsContentController: NSViewController {
 
     private func keyboardPage() -> NSView {
         let navigation = [
-            ("Открыть / следующая запись", "⌘⌥V"),
-            ("Предыдущая запись", "⌘⌥C"),
-            ("Выбрать запись", "↑ ↓ ← →"),
-            ("Первые девять записей", "⌘1–9"),
-            ("Перейти к поиску", "⌘F"),
-            ("Вся история", "⌘0"),
-            ("Боковая панель", "⌘⌥S"),
-            ("Настройки", "⌘,"),
-            ("Закрыть просмотр / окно", "Esc")
+            (L10n.text("Открыть / следующая запись"), "⌘⌥V"),
+            (L10n.text("Предыдущая запись"), "⌘⌥C"),
+            (L10n.text("Выбрать запись"), "↑ ↓ ← →"),
+            (L10n.text("Первые девять записей"), "⌘1–9"),
+            (L10n.text("Перейти к поиску"), "⌘F"),
+            (L10n.text("Вся история"), "⌘0"),
+            (L10n.text("Боковая панель"), "⌘⌥S"),
+            (L10n.text("Настройки"), "⌘,"),
+            (L10n.text("Закрыть просмотр / окно"), "Esc")
         ]
         let actions = ClipCardAction.allCases.map { ($0.title, $0.shortcut) }
-        let left = shortcutGroup("Навигация", entries: navigation)
-        let right = shortcutGroup("Выбранная запись", entries: actions)
+        let left = shortcutGroup(L10n.text("Навигация"), entries: navigation)
+        let right = shortcutGroup(L10n.text("Выбранная запись"), entries: actions)
         let groups = NSStackView(views: [left, right])
         groups.orientation = .horizontal; groups.alignment = .top; groups.spacing = 24
         groups.distribution = .fillEqually
         left.widthAnchor.constraint(equalTo: right.widthAnchor).isActive = true
-        let note = paragraph("Одно ⌘⌥V с отпусканием оставляет окно открытым; дальше V/C только двигают выбор. Для быстрого выбора удерживайте ⌘⌥ с самого открытия, нажмите V/C ещё раз и отпустите. Enter — выбрать, пробел — просмотр (из поиска — ⌘Y). Вставка — ⌘V в нужном приложении.")
+        let note = paragraph(L10n.text("Одно ⌘⌥V с отпусканием оставляет окно открытым; дальше V/C только двигают выбор. Для быстрого выбора удерживайте ⌘⌥ с самого открытия, нажмите V/C ещё раз и отпустите. Enter — выбрать, пробел — просмотр (из поиска — ⌘Y). Вставка — ⌘V в нужном приложении."))
         let page = vertical([groups, note], spacing: 18)
         groups.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
         note.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
@@ -414,6 +429,12 @@ private final class SettingsContentController: NSViewController {
     }
 
     @objc private func changeTab() { presentPage(tabs.selectedSegment) }
+
+    @objc private func languageChanged() {
+        let choices = LanguagePreference.allCases
+        guard choices.indices.contains(language.indexOfSelectedItem) else { return }
+        choices[language.indexOfSelectedItem].save(to: languageDefaults)
+    }
 
     @objc private func appearanceChanged() {
         let modes = HistoryAppearance.Mode.allCases

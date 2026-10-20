@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
@@ -6,13 +7,14 @@ enum HistoryDateFilter {
 
     var title: String {
         switch self {
-        case .all: return "Дата"
-        case .today: return "Сегодня"
-        case .yesterday: return "Вчера"
-        case .week: return "7 дней"
-        case .month: return "30 дней"
+        case .all: return L10n.text("Дата")
+        case .today: return L10n.text("Сегодня")
+        case .yesterday: return L10n.text("Вчера")
+        case .week: return L10n.text("7 дней")
+        case .month: return L10n.text("30 дней")
         case .range(let start, let end):
-            let format = DateFormatter(); format.locale = Locale(identifier: "ru_RU"); format.dateFormat = "d MMM"
+            let format = DateFormatter(); format.locale = L10n.locale
+            format.setLocalizedDateFormatFromTemplate("d MMM")
             return "\(format.string(from: min(start, end))) – \(format.string(from: max(start, end)))"
         }
     }
@@ -92,8 +94,8 @@ private enum HistoryContentType: Equatable {
     var title: String {
         switch self {
         case .kind(let kind): return kind.label
-        case .remote: return "С устройств"
-        case .concealed: return "Скрытые"
+        case .remote: return L10n.text("С устройств")
+        case .concealed: return L10n.text("Скрытые")
         }
     }
     var symbol: String {
@@ -111,8 +113,8 @@ private enum HistoryContentType: Equatable {
 
 final class HistoryFilters: NSView, NSPopoverDelegate {
     let sidebar: NSView = NSVisualEffectView()
-    private let toolbarButton = NSButton(image: NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Фильтры")!, target: nil, action: nil)
-    private let sidebarDateButton = SidebarFilterRow(title: "Всё время", image: NSImage(systemSymbolName: "calendar", accessibilityDescription: nil), value: nil)
+    private let toolbarButton = NSButton(image: NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: L10n.text("Фильтры"))!, target: nil, action: nil)
+    private let sidebarDateButton = SidebarFilterRow(title: L10n.text("Всё время"), image: NSImage(systemSymbolName: "calendar", accessibilityDescription: nil), value: nil)
     private let sourceRowsContainer = SidebarSourceList()
     private var kindRows: [SidebarFilterRow] = []
     private var sourceRows: [SidebarFilterRow] = []
@@ -180,11 +182,11 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
 
     private func updateTitles() {
         let summary = [contentType?.title, date.isActive ? date.title : nil, source].compactMap { $0 }.joined(separator: ", ")
-        toolbarButton.toolTip = summary.isEmpty ? "Фильтры" : "Фильтры: \(summary)"
+        toolbarButton.toolTip = summary.isEmpty ? L10n.text("Фильтры") : L10n.text("Фильтры: \(summary)")
         toolbarButton.setAccessibilityLabel(toolbarButton.toolTip)
         toolbarButton.contentTintColor = hasActiveFilters ? .controlAccentColor : .secondaryLabelColor
-        sidebarDateButton.title = date.isActive ? date.title : "Всё время"
-        sidebarDateButton.toolTip = "Период: \(sidebarDateButton.title)"
+        sidebarDateButton.title = date.isActive ? date.title : L10n.text("Всё время")
+        sidebarDateButton.toolTip = L10n.text("Период: \(sidebarDateButton.title)")
         sidebarDateButton.selected = date.isActive
         for row in kindRows { row.selected = row.value == contentType?.value }
         for row in sourceRows { row.selected = row.value == source }
@@ -195,9 +197,9 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
             effect.material = .sidebar; effect.blendingMode = .withinWindow; effect.state = .active
             effect.wantsLayer = true; effect.layer?.cornerRadius = 8; effect.layer?.masksToBounds = true
         }
-        let typeHeading = heading("Тип содержимого")
+        let typeHeading = heading(L10n.text("Тип содержимого"))
         let types = NSStackView(); types.orientation = .vertical; types.alignment = .leading; types.spacing = 1
-        let allTypes = sidebarRow("Все типы", symbol: "square.grid.2x2", value: nil, action: #selector(sidebarKindClicked))
+        let allTypes = sidebarRow(L10n.text("Все типы"), symbol: "square.grid.2x2", value: nil, action: #selector(sidebarKindClicked))
         kindRows = [allTypes] + HistoryContentType.choices.map {
             sidebarRow($0.title, symbol: $0.symbol, value: $0.value, action: #selector(sidebarKindClicked))
         }
@@ -205,8 +207,8 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
             types.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: types.widthAnchor).isActive = true
         }
-        let dateHeading = heading("Период")
-        let appHeading = heading("Приложения")
+        let dateHeading = heading(L10n.text("Период"))
+        let appHeading = heading(L10n.text("Приложения"))
         let scroll = NSScrollView()
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
@@ -269,7 +271,7 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         for view in sourceRowsContainer.arrangedSubviews {
             sourceRowsContainer.removeArrangedSubview(view); view.removeFromSuperview()
         }
-        sourceRows = [sidebarRow("Все приложения", symbol: "app", value: nil, action: #selector(sidebarSourceClicked))]
+        sourceRows = [sidebarRow(L10n.text("Все приложения"), symbol: "app", value: nil, action: #selector(sidebarSourceClicked))]
         sourceRows += sources.map { name in
             let row = sidebarRow(name, symbol: "app", value: name, action: #selector(sidebarSourceClicked))
             if let image = applicationIcon(named: name) { row.image = image }
@@ -331,22 +333,22 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
     func makeFilterMenu() -> NSMenu {
         let menu = NSMenu(); menu.autoenablesItems = false
-        let typeItem = NSMenuItem(title: contentType.map { "Тип: \($0.title)" } ?? "Тип", action: nil, keyEquivalent: "")
+        let typeItem = NSMenuItem(title: contentType.map { L10n.text("Тип: \($0.title)") } ?? L10n.text("Тип"), action: nil, keyEquivalent: "")
         typeItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
         typeItem.submenu = kindsMenu(); menu.addItem(typeItem)
-        menu.addItem(item(date.isActive ? "Дата: \(date.title)…" : "Дата…", symbol: "calendar", selected: date.isActive,
+        menu.addItem(item(date.isActive ? L10n.text("Дата: \(date.title)…") : L10n.text("Дата…"), symbol: "calendar", selected: date.isActive,
                           action: #selector(showMenuDates)))
-        let sourceItem = NSMenuItem(title: source.map { "Приложения: \($0)" } ?? "Приложения", action: nil, keyEquivalent: "")
+        let sourceItem = NSMenuItem(title: source.map { L10n.text("Приложения: \($0)") } ?? L10n.text("Приложения"), action: nil, keyEquivalent: "")
         sourceItem.image = NSImage(systemSymbolName: "app", accessibilityDescription: nil)
         sourceItem.submenu = sourcesMenu(); menu.addItem(sourceItem)
         menu.addItem(.separator())
-        let reset = item("Сбросить фильтры", symbol: "arrow.counterclockwise", selected: false, action: #selector(resetClicked))
+        let reset = item(L10n.text("Сбросить фильтры"), symbol: "arrow.counterclockwise", selected: false, action: #selector(resetClicked))
         reset.isEnabled = hasActiveFilters; menu.addItem(reset)
         return menu
     }
     private func kindsMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Все типы", symbol: "square.grid.2x2", selected: contentType == nil, action: #selector(selectKind)))
+        menu.addItem(item(L10n.text("Все типы"), symbol: "square.grid.2x2", selected: contentType == nil, action: #selector(selectKind)))
         menu.addItem(.separator())
         for type in HistoryContentType.choices {
             menu.addItem(item(type.title, symbol: type.symbol, selected: contentType == type, action: #selector(selectKind), value: type.value))
@@ -358,14 +360,14 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
     private func sourcesMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item("Все приложения", symbol: "app", selected: source == nil, action: #selector(selectSource)))
+        menu.addItem(item(L10n.text("Все приложения"), symbol: "app", selected: source == nil, action: #selector(selectSource)))
         menu.addItem(.separator())
         for name in sources {
             let entry = item(name, symbol: "app", selected: name == source, action: #selector(selectSource), value: name)
             if let icon = applicationIcon(named: name) { entry.image = icon }
             menu.addItem(entry)
         }
-        if sources.isEmpty { let empty = NSMenuItem(title: "Пока нет записей", action: nil, keyEquivalent: ""); menu.addItem(empty) }
+        if sources.isEmpty { let empty = NSMenuItem(title: L10n.text("Пока нет записей"), action: nil, keyEquivalent: ""); menu.addItem(empty) }
         return menu
     }
     @objc private func selectSource(_ sender: NSMenuItem) { chooseSource(sender.representedObject as? String) }
@@ -401,26 +403,26 @@ private final class HistoryDatePicker: NSViewController {
     override func loadView() {
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12
         root.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        let heading = NSTextField(labelWithString: "Когда скопировано"); heading.font = .systemFont(ofSize: 13, weight: .semibold)
+        let heading = NSTextField(labelWithString: L10n.text("Когда скопировано")); heading.font = .systemFont(ofSize: 13, weight: .semibold)
         root.addArrangedSubview(heading)
         let presets = NSStackView(); presets.spacing = 6
-        for (index, title) in ["Всё время", "Сегодня", "Вчера", "7 дней", "30 дней"].enumerated() {
+        for (index, title) in [L10n.text("Всё время"), L10n.text("Сегодня"), L10n.text("Вчера"), L10n.text("7 дней"), L10n.text("30 дней")].enumerated() {
             let button = NSButton(title: title, target: self, action: #selector(preset)); button.tag = index
             button.bezelStyle = .recessed; button.font = .systemFont(ofSize: 12); presets.addArrangedSubview(button)
         }
         root.addArrangedSubview(presets)
         let calendars = NSStackView(); calendars.spacing = 16; calendars.alignment = .top
-        for (label, picker) in [("С", start), ("По", end)] {
+        for (label, picker) in [(L10n.text("С"), start), (L10n.text("По"), end)] {
             picker.datePickerStyle = .clockAndCalendar; picker.datePickerElements = .yearMonthDay
-            picker.datePickerMode = .single; picker.locale = Locale(identifier: "ru_RU")
+            picker.datePickerMode = .single; picker.locale = L10n.locale
             picker.calendar = .current; picker.timeZone = .current
             picker.drawsBackground = false
-            picker.setAccessibilityLabel(label == "С" ? "Начало периода" : "Конец периода")
+            picker.setAccessibilityLabel(label == L10n.text("С") ? L10n.text("Начало периода") : L10n.text("Конец периода"))
             let column = NSStackView(views: [NSTextField(labelWithString: label), picker]); column.orientation = .vertical; column.alignment = .leading; column.spacing = 6
             calendars.addArrangedSubview(column)
         }
         root.addArrangedSubview(calendars)
-        let apply = NSButton(title: "Применить период", target: self, action: #selector(applyRange))
+        let apply = NSButton(title: L10n.text("Применить период"), target: self, action: #selector(applyRange))
         apply.bezelStyle = .rounded; apply.keyEquivalent = "\r"
         root.addArrangedSubview(apply)
         view = root

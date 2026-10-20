@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 /// State, filesystem mutations and URLSession delegate work share one serial queue.
@@ -374,7 +375,7 @@ public final class LocalModelManager: @unchecked Sendable {
         catch {
             cancel(entry, error: error)
             entry.state = .failed
-            entry.error = "Не удалось сохранить состояние функции: \(error.localizedDescription)"
+            entry.error = L10n.text("Не удалось сохранить состояние функции: \(error.localizedDescription)")
         }
         publish()
     }

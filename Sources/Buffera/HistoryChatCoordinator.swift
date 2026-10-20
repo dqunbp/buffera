@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaChat
 import BufferaModels
@@ -20,7 +21,7 @@ final class HistoryChatCoordinator {
     private var answer = ""
     private var sourceIDs = Set<Int64>()
     private var enabled = false
-    private var availabilityMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
+    private var availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
 
     init(databaseURL: URL, modelRootURL: URL, embeddingRuntime: EmbeddingRuntime? = nil) {
         session = ChatSession(databaseURL: databaseURL, modelRootURL: modelRootURL,
@@ -45,21 +46,21 @@ final class HistoryChatCoordinator {
         let assistant = snapshots.first { $0.descriptor.role == .assistant }
         let wasEnabled = enabled
         enabled = assistant?.isReadyForUse == true
-        availabilityMessage = "Для работы помощника скачайте модель в настройках «Поиск и ответы»."
+        availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
         if let assistant {
             switch assistant.state {
             case .downloading:
-                availabilityMessage = "Скачивается модель \(assistant.descriptor.title) · \(Int(assistant.progress * 100))%. После проверки можно будет задать вопрос."
+                availabilityMessage = L10n.text("Скачивается модель \(assistant.descriptor.title) · \(Int(assistant.progress * 100))%. После проверки можно будет задать вопрос.")
             case .verifying:
-                availabilityMessage = "Проверяем скачанную модель."
+                availabilityMessage = L10n.text("Проверяем скачанную модель.")
             case .paused:
-                availabilityMessage = "Подготовка модели на паузе. Продолжите её в настройках."
+                availabilityMessage = L10n.text("Подготовка модели на паузе. Продолжите её в настройках.")
             case .failed:
-                availabilityMessage = "Не удалось подготовить модель. Повторите попытку в настройках."
+                availabilityMessage = L10n.text("Не удалось подготовить модель. Повторите попытку в настройках.")
             case .notDownloaded:
                 break
             case .downloaded:
-                availabilityMessage = "Включите «Спросить Buffera» в настройках, чтобы задать вопрос."
+                availabilityMessage = L10n.text("Включите «Спросить Buffera» в настройках, чтобы задать вопрос.")
             }
         }
         if wasEnabled && !enabled { stop() }
@@ -73,7 +74,7 @@ final class HistoryChatCoordinator {
     func historyChanged(id: Int64) {
         guard responseTask != nil || sourceIDs.contains(id) else { return }
         reset()
-        controller?.setStatus("Источник скрыт или удалён. Начат новый разговор.")
+        controller?.setStatus(L10n.text("Источник скрыт или удалён. Начат новый разговор."))
     }
 
     func shutdown() {
@@ -124,12 +125,12 @@ final class HistoryChatCoordinator {
                 self.sourceIDs.formUnion(result.sources.map(\.id))
                 self.controller?.updateResponse(text: result.answer)
                 self.controller?.finishResponse(sources: result.sources,
-                    status: result.truncated ? "Ответ или найденные записи сокращены по объёму." : nil)
+                    status: result.truncated ? L10n.text("Ответ или найденные записи сокращены по объёму.") : nil)
                 self.setActive(false)
             } catch is CancellationError {
                 guard current == self.generation else { return }
                 self.responseTask = nil
-                self.controller?.finishResponse(sources: [], status: "Ответ остановлен.")
+                self.controller?.finishResponse(sources: [], status: L10n.text("Ответ остановлен."))
                 self.setActive(false)
             } catch ChatSessionError.historyChanged {
                 guard current == self.generation else { return }
@@ -169,7 +170,7 @@ final class HistoryChatCoordinator {
                   self.responseTask == nil else { return }
             self.setActive(false)
         }
-        if wasRunning { controller?.finishResponse(sources: [], status: "Ответ остановлен.") }
+        if wasRunning { controller?.finishResponse(sources: [], status: L10n.text("Ответ остановлен.")) }
     }
 
     private func setActive(_ value: Bool) {

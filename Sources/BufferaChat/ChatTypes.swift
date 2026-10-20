@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaModels
 
@@ -31,13 +32,13 @@ public enum ChatSessionError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .emptyQuestion: return "Напишите вопрос об истории."
-        case .questionTooLong: return "Вопрос слишком длинный. Оставьте до 2000 символов."
-        case .busy: return "Дождитесь ответа или остановите его."
+        case .emptyQuestion: return L10n.text("Напишите вопрос об истории.")
+        case .questionTooLong: return L10n.text("Вопрос слишком длинный. Оставьте до 2000 символов.")
+        case .busy: return L10n.text("Дождитесь ответа или остановите его.")
         case .historyChanged:
-            return "Одна из найденных записей удалена или скрыта. Разговор сброшен; задайте вопрос ещё раз."
-        case .unavailable: return "Не удалось прочитать историю. Попробуйте ещё раз."
-        case .emptyAnswer: return "Модель не вернула ответ. Попробуйте уточнить вопрос."
+            return L10n.text("Одна из найденных записей удалена или скрыта. Разговор сброшен; задайте вопрос ещё раз.")
+        case .unavailable: return L10n.text("Не удалось прочитать историю. Попробуйте ещё раз.")
+        case .emptyAnswer: return L10n.text("Модель не вернула ответ. Попробуйте уточнить вопрос.")
         }
     }
 }

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 import os
@@ -24,8 +25,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                               styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
     private let logger = Logger(subsystem: "local.buffera.app", category: "panel")
     private let search = NSSearchField()
-    private let semanticSearch = NSButton(checkboxWithTitle: "Искать также по смыслу", target: nil, action: nil)
-    private let chatButton = NSButton(title: "Спросить", target: nil, action: nil)
+    private let semanticSearch = NSButton(checkboxWithTitle: L10n.text("Искать также по смыслу"), target: nil, action: nil)
+    private let chatButton = NSButton(title: L10n.text("Спросить"), target: nil, action: nil)
     private let searchOptionsRow = NSStackView()
     private var semanticSearchAvailable = false
     private var chatAvailable = false
@@ -34,8 +35,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let filters = HistoryFilters(frame: .zero)
     private let cards = HistoryCardsView()
     private var appearance = HistoryAppearance.load()
-    private let sidebarButton = NSButton(image: NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Боковое меню")!, target: nil, action: nil)
-    private let settingsButton = NSButton(image: NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Настройки")!, target: nil, action: nil)
+    private let sidebarButton = NSButton(image: NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: L10n.text("Боковое меню"))!, target: nil, action: nil)
+    private let settingsButton = NSButton(image: NSImage(systemSymbolName: "gearshape", accessibilityDescription: L10n.text("Настройки"))!, target: nil, action: nil)
     private let contentRow = NSStackView()
     private var sidebarWidth: NSLayoutConstraint!
     private var bodyMinimumHeight: NSLayoutConstraint!
@@ -47,12 +48,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
     private let pinButton = NSButton(image: HistoryPanel.anchorImage(), target: nil, action: nil)
-    private let scope = NSSegmentedControl(labels: ["История", "Избранное"], trackingMode: .selectOne, target: nil, action: nil)
-    private let nearbyBack = NSButton(title: "Назад в историю", target: nil, action: nil)
+    private let scope = NSSegmentedControl(labels: [L10n.text("История"), L10n.text("Избранное")], trackingMode: .selectOne, target: nil, action: nil)
+    private let nearbyBack = NSButton(title: L10n.text("Назад в историю"), target: nil, action: nil)
     private var nearbyState: NearbyHistoryState?
     private var nearbyToken = 0
     private var pendingViewport: NSPoint?
-    private let resetSearch = NSButton(image: NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: "Вся история")!, target: nil, action: nil)
+    private let resetSearch = NSButton(image: NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: L10n.text("Вся история"))!, target: nil, action: nil)
     private let preview = ClipPreview()
     private var copyTransformSourceID: Int64?
     private var copyTransformToken = 0
@@ -370,7 +371,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         loading = true; rows = []; total = 0
         cards.replace(count: 0, selectedIndex: -1)
         updateNavigationControls(); updateSelection()
-        status.stringValue = "Загружаем соседние записи…"
+        status.stringValue = L10n.text("Загружаем соседние записи…")
         status.toolTip = nearbyState?.title
         window.makeFirstResponder(cards)
         requestNearby?(anchorID, nearbyToken)
@@ -438,10 +439,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
-        search.toolTip = isShowingNearby ? "Показаны соседние копирования из всей истории. Esc — вернуться в историю." : nil
+        search.toolTip = isShowingNearby ? L10n.text("Показаны соседние копирования из всей истории. Esc — вернуться в историю.") : nil
         hint.stringValue = isShowingNearby
-            ? "Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр"
-            : "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
+            ? L10n.text("Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр")
+            : L10n.text("↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное")
     }
 
     func updateFeatureAvailability(semanticSearch: Bool, chat: Bool) {
@@ -457,8 +458,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         actualSearchMode = actual
         searchFallbackReason = reason
         semanticSearch.toolTip = reason ?? (searchMode == .literal
-            ? "Все слова запроса должны встретиться в записи."
-            : "По словам и по смыслу, когда «Поиск по смыслу» включён в настройках. Пустой запрос показывает историю.")
+            ? L10n.text("Все слова запроса должны встретиться в записи.")
+            : L10n.text("По словам и по смыслу, когда «Поиск по смыслу» включён в настройках. Пустой запрос показывает историю."))
     }
 
     /// OCR and embeddings update the search index without changing a card's displayed content.
@@ -519,7 +520,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         loading = true
         actualSearchMode = .literal; searchFallbackReason = nil
         pendingMoveDelta = 0; rows = []; cards.reload(count: 0, selectedIndex: -1, scrollToSelection: false); updateSelection()
-        status.stringValue = "Загружаем историю…"
+        status.stringValue = L10n.text("Загружаем историю…")
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
         request?(filter(), 0, limit)
     }
@@ -608,7 +609,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func showConcealedText(_ text: String?, id: Int64, token: Int) {
         guard token == revealToken, window.isVisible, selected?.id == id, selected?.isConcealed == true else { return }
         revealing = false
-        guard let text else { status.stringValue = "В записи нет текста для показа."; updateSelection(); return }
+        guard let text else { status.stringValue = L10n.text("В записи нет текста для показа."); updateSelection(); return }
         revealed = (id, String(text.prefix(4_000)))
         cards.reloadCard(at: cards.selectedIndex)
         updateSelection()
@@ -718,13 +719,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if loading && rows.isEmpty {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
             scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
-            status.stringValue = "Ожидаем историю…"; logger.notice("Confirm waiting for history")
+            status.stringValue = L10n.text("Ожидаем историю…"); logger.notice("Confirm waiting for history")
             return
         }
         guard let selected else { close(); return }
         confirming = true; search.isEnabled = false; filters.setInteractionEnabled(false)
         scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
-        status.stringValue = "Копируем в буфер…"
+        status.stringValue = L10n.text("Копируем в буфер…")
         logger.notice("Confirm requested")
         onConfirm?(selected.id)
     }
@@ -826,7 +827,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         copyTransformToken += 1
         let token = copyTransformToken
         updateNavigationControls(); updateVisibleCards()
-        status.stringValue = "Копируем: \(operation.title)…"
+        status.stringValue = L10n.text("Копируем: \(operation.title)…")
         requestCopyTransform(id, operation) { [weak self] result in
             guard let self, token == self.copyTransformToken, self.isConfirmingCopyTransform,
                   self.isAvailableForShortcut else { return }
@@ -895,15 +896,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private func updateCount() {
         if let context = nearbyState {
             status.stringValue = context.title
-            status.toolTip = "\(context.title)\nЗаписей: \(total). Все типы и приложения."
+            status.toolTip = L10n.text("\(context.title)\nЗаписей: \(total). Все типы и приложения.")
             return
         }
         status.toolTip = searchFallbackReason
-        status.stringValue = "Записей: \(total.formatted())"
+        status.stringValue = L10n.text("Записей: \(total.formatted(.number.locale(L10n.locale)))")
         if !search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, searchFallbackReason == nil {
             status.toolTip = actualSearchMode == .hybrid
-                ? "Найдены совпадения текста и похожие по смыслу записи."
-                : "Найдены совпадения текста."
+                ? L10n.text("Найдены совпадения текста и похожие по смыслу записи.")
+                : L10n.text("Найдены совпадения текста.")
         }
     }
 
@@ -912,7 +913,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard let clip = selected else { return }
         previewToken += 1
         if clip.isConcealed {
-            guard revealed?.id == clip.id else { status.stringValue = "Сначала нажмите «Показать» на скрытой записи."; return }
+            guard revealed?.id == clip.id else { status.stringValue = L10n.text("Сначала нажмите «Показать» на скрытой записи."); return }
             showPreview(.text(revealed!.text), id: clip.id, token: previewToken)
         } else {
             previewRequestPending = onPreview != nil
@@ -928,7 +929,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
               !confirming, !commitWhenLoaded,
               let row = rows.firstIndex(where: { $0.id == id }),
               let card = cards.card(at: row) else { return }
-        preview.show(content, title: selected?.isConcealed == true ? "Скрытая запись" : (selected?.kind.label ?? "Просмотр"), relativeTo: card)
+        preview.show(content, title: selected?.isConcealed == true ? L10n.text("Скрытая запись") : (selected?.kind.label ?? L10n.text("Просмотр")), relativeTo: card)
     }
 
     private func dismissPreview() { previewToken += 1; previewRequestPending = false; preview.close() }
@@ -1129,7 +1130,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         filters.sidebar.isHidden = !appearance.sidebarVisible
         sidebarWidth.isActive = appearance.sidebarVisible
         sidebarButton.state = appearance.sidebarVisible ? .on : .off
-        sidebarButton.toolTip = appearance.sidebarVisible ? "Скрыть боковое меню · ⌘⌥S" : "Показать боковое меню · ⌘⌥S"
+        sidebarButton.toolTip = appearance.sidebarVisible ? L10n.text("Скрыть боковое меню · ⌘⌥S") : L10n.text("Показать боковое меню · ⌘⌥S")
         window.isMovableByWindowBackground = appearance.mode == .floating
         window.isMovable = appearance.mode == .floating
         bodyMinimumHeight.constant = appearance.sidebarVisible ? 320 : 260
@@ -1229,13 +1230,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         root.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(root)
         NSLayoutConstraint.activate([root.leadingAnchor.constraint(equalTo: background.leadingAnchor), root.trailingAnchor.constraint(equalTo: background.trailingAnchor), root.topAnchor.constraint(equalTo: background.topAnchor), root.bottomAnchor.constraint(equalTo: background.bottomAnchor)])
-        search.placeholderString = "Найти в истории"; search.delegate = self; search.font = .systemFont(ofSize: 15)
+        search.placeholderString = L10n.text("Найти в истории"); search.delegate = self; search.font = .systemFont(ofSize: 15)
         search.sendsSearchStringImmediately = true; search.heightAnchor.constraint(equalToConstant: 32).isActive = true
         resetSearch.target = self; resetSearch.action = #selector(resetEverything)
-        resetSearch.toolTip = "Вся история · ⌘0"
+        resetSearch.toolTip = L10n.text("Вся история · ⌘0")
         sidebarButton.target = self; sidebarButton.action = #selector(toggleSidebar)
         settingsButton.target = self; settingsButton.action = #selector(showSettings)
-        settingsButton.toolTip = "Настройки · ⌘,"
+        settingsButton.toolTip = L10n.text("Настройки · ⌘,")
         pinButton.setButtonType(.toggle)
         pinButton.imagePosition = .imageOnly
         pinButton.target = self; pinButton.action = #selector(togglePinned)
@@ -1262,7 +1263,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         semanticSearch.action = #selector(searchModeChanged)
         semanticSearch.identifier = NSUserInterfaceItemIdentifier("history.searchMode")
         semanticSearch.setAccessibilityLabel(semanticSearch.title)
-        semanticSearch.toolTip = "Дополнять совпадения текста похожими по смыслу записями. Включите «Поиск по смыслу» в настройках."
+        semanticSearch.toolTip = L10n.text("Дополнять совпадения текста похожими по смыслу записями. Включите «Поиск по смыслу» в настройках.")
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor; status.lineBreakMode = .byTruncatingTail
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -1271,16 +1272,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.bezelStyle = .rounded
         nearbyBack.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
         nearbyBack.imagePosition = .imageLeading
-        nearbyBack.toolTip = "Назад в историю · Esc"
-        nearbyBack.setAccessibilityLabel("Назад в историю")
+        nearbyBack.toolTip = L10n.text("Назад в историю · Esc")
+        nearbyBack.setAccessibilityLabel(L10n.text("Назад в историю"))
         nearbyBack.isHidden = true
         chatButton.target = self; chatButton.action = #selector(showChat)
         chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
         chatButton.font = .systemFont(ofSize: 12)
         chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
         chatButton.imagePosition = .imageLeading
-        chatButton.toolTip = "Спросить Buffera о том, что вы копировали"
-        chatButton.setAccessibilityLabel("Спросить Buffera")
+        chatButton.toolTip = L10n.text("Спросить Buffera о том, что вы копировали")
+        chatButton.setAccessibilityLabel(L10n.text("Спросить Buffera"))
         chatButton.identifier = NSUserInterfaceItemIdentifier("history.chat")
         let searchOptionsSpacer = NSView()
         searchOptionsSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -1309,7 +1310,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cards.widthAnchor.constraint(greaterThanOrEqualToConstant: 230).isActive = true
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor; hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        hint.stringValue = "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное"
+        hint.stringValue = L10n.text("↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное")
         root.addArrangedSubview(hint)
         hint.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
         updateNavigationControls()
@@ -1322,10 +1323,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func updatePinButton() {
-        let label = isPinned ? "Открепить окно истории" : "Закрепить окно истории"
+        let label = isPinned ? L10n.text("Открепить окно истории") : L10n.text("Закрепить окно истории")
         pinButton.toolTip = isPinned
-            ? "Открепить окно: скрывать при переходе в другое приложение"
-            : "Закрепить окно: оставить открытым при переходе в другое приложение"
+            ? L10n.text("Открепить окно: скрывать при переходе в другое приложение")
+            : L10n.text("Закрепить окно: оставить открытым при переходе в другое приложение")
         pinButton.setAccessibilityLabel(label)
         pinButton.contentTintColor = isPinned ? .controlAccentColor : nil
     }

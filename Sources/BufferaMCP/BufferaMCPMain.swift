@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaMCPKit
 import Darwin
@@ -10,12 +11,12 @@ struct BufferaMCPMain {
         do {
             let arguments = Array(CommandLine.arguments.dropFirst())
             if arguments == ["--help"] {
-                diagnostic("""
+                diagnostic(L10n.text("""
                 BufferaMCP — локальный MCP через stdio.
                 Использование: BufferaMCP [--data-directory /absolute/path]
                 По умолчанию: ~/Library/Application Support/Buffera.
                 Доступ включается в Buffera → Настройки → Агенты.
-                """)
+                """))
                 return
             }
             if arguments.isEmpty {
@@ -24,7 +25,7 @@ struct BufferaMCPMain {
                       arguments[1].hasPrefix("/") {
                 try await BufferaMCPServer.run(directory: URL(fileURLWithPath: arguments[1], isDirectory: true))
             } else {
-                diagnostic("Неверные параметры. Используйте --help.")
+                diagnostic(L10n.text("Неверные параметры. Используйте --help."))
                 exit(2)
             }
         } catch {

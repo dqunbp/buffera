@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
@@ -16,6 +17,6 @@ struct NearbyHistoryState {
     var needsReload = false
 
     var title: String {
-        "Рядом с копированием \(anchorDate.formatted(.dateTime.day().month(.abbreviated).hour().minute().second().locale(Locale(identifier: "ru_RU"))))"
+        L10n.text("Рядом с копированием \(anchorDate.formatted(.dateTime.day().month(.abbreviated).hour().minute().second().locale(L10n.locale)))")
     }
 }

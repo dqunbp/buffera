@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
@@ -6,15 +7,15 @@ enum ClipCardAction: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .copy: return "В буфер"
-        case .preview: return "Просмотр"
-        case .favorite: return "В избранное"
-        case .reveal: return "Показать содержимое"
-        case .finder: return "Показать в Finder"
-        case .save: return "Сохранить как…"
-        case .delete: return "Удалить запись"
-        case .nearby: return "Показать рядом"
-        case .copyDifferently: return "Скопировать иначе"
+        case .copy: return L10n.text("В буфер")
+        case .preview: return L10n.text("Просмотр")
+        case .favorite: return L10n.text("В избранное")
+        case .reveal: return L10n.text("Показать содержимое")
+        case .finder: return L10n.text("Показать в Finder")
+        case .save: return L10n.text("Сохранить как…")
+        case .delete: return L10n.text("Удалить запись")
+        case .nearby: return L10n.text("Показать рядом")
+        case .copyDifferently: return L10n.text("Скопировать иначе")
         }
     }
 
@@ -35,7 +36,7 @@ enum ClipCardAction: Int, CaseIterable {
     var shortcut: String {
         switch self {
         case .copy: return "↩"
-        case .preview: return "Пробел / ⌘Y"
+        case .preview: return L10n.text("Пробел / ⌘Y")
         case .favorite: return "⌘D"
         case .reveal: return "⇧⌘H"
         case .finder: return "⇧⌘R"
@@ -79,9 +80,9 @@ enum ClipCardAction: Int, CaseIterable {
 
     func title(for clip: ClipSummary, isRevealed: Bool) -> String {
         switch self {
-        case .favorite: return clip.isFavorite ? "Убрать из избранного" : title
+        case .favorite: return clip.isFavorite ? L10n.text("Убрать из избранного") : title
         case .reveal:
-            return !clip.isConcealed || isRevealed ? "Скрыть содержимое" : title
+            return !clip.isConcealed || isRevealed ? L10n.text("Скрыть содержимое") : title
         default: return title
         }
     }
@@ -100,16 +101,16 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private static let maximumPreviewLines = 12
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.locale = L10n.locale
         formatter.timeZone = .autoupdatingCurrent
-        formatter.dateFormat = "HH:mm"
+        formatter.setLocalizedDateFormatFromTemplate("jm")
         return formatter
     }()
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.locale = L10n.locale
         formatter.timeZone = .autoupdatingCurrent
-        formatter.dateFormat = "d MMM, HH:mm"
+        formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
         return formatter
     }()
     private var clip: ClipSummary
@@ -213,7 +214,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         guard clip.isConcealed, isRevealed else { return }
         isRevealed = false
         contentText.stringValue = Self.shownText(for: clip, revealedText: nil)
-        contentText.setAccessibilityLabel("Скрытая запись")
+        contentText.setAccessibilityLabel(L10n.text("Скрытая запись"))
         for (action, button) in buttons { configureButton(button, for: action) }
     }
 
@@ -237,13 +238,13 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private func updateQuickLabel() {
         if let number = quickNumber {
             quickShortcut.stringValue = "⌘\(number)"
-            quickShortcut.setAccessibilityLabel("Выбрать запись, Command \(number)")
+            quickShortcut.setAccessibilityLabel(L10n.text("Выбрать запись, Command \(number)"))
         } else {
             quickShortcut.stringValue = nearbyAnchor ? "●" : ""
-            quickShortcut.setAccessibilityLabel(nearbyAnchor ? "Опорная запись" : nil)
+            quickShortcut.setAccessibilityLabel(nearbyAnchor ? L10n.text("Опорная запись") : nil)
         }
         quickShortcut.textColor = nearbyAnchor ? .controlAccentColor : .labelColor
-        quickShortcut.toolTip = nearbyAnchor ? "Опорная запись — соседи показаны вокруг этого копирования" : nil
+        quickShortcut.toolTip = nearbyAnchor ? L10n.text("Опорная запись — соседи показаны вокруг этого копирования") : nil
         quickShortcut.isHidden = quickNumber == nil && !nearbyAnchor
     }
 
@@ -340,7 +341,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         let iconSize: CGFloat = isImage ? 56 : 24
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.image = NSImage(systemSymbolName: clip.isConcealed ? "lock.fill" : clip.kind.symbol,
-                                      accessibilityDescription: clip.isConcealed ? "Скрытая запись" : clip.kind.label)
+                                      accessibilityDescription: clip.isConcealed ? L10n.text("Скрытая запись") : clip.kind.label)
         thumbnailView.imageScaling = isImage ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
         thumbnailView.contentTintColor = .secondaryLabelColor
         thumbnailView.wantsLayer = true
@@ -351,7 +352,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         let text = contentText
         text.stringValue = Self.shownText(for: clip, revealedText: revealedText)
         text.translatesAutoresizingMaskIntoConstraints = false
-        if clip.isConcealed && !isRevealed { text.setAccessibilityLabel("Скрытая запись") }
+        if clip.isConcealed && !isRevealed { text.setAccessibilityLabel(L10n.text("Скрытая запись")) }
         // Full content is opened by an explicit preview, never an incidental hover.
         text.toolTip = nil
         content.addSubview(text)
@@ -371,7 +372,8 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         metadata.font = .systemFont(ofSize: 11)
         metadata.textColor = .secondaryLabelColor
         metadata.lineBreakMode = .byTruncatingTail
-        metadata.toolTip = clip.date.formatted(date: .complete, time: .standard)
+        metadata.toolTip = clip.date.formatted(
+            .dateTime.weekday(.wide).day().month(.wide).year().hour().minute().second().locale(L10n.locale))
         metadata.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         metadata.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         metadata.widthAnchor.constraint(greaterThanOrEqualToConstant: 0).isActive = true
@@ -441,7 +443,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         if (clip.kind == .text || clip.kind == .link), !clip.text.isEmpty {
             return String(clip.text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4_000))
         }
-        return clip.title
+        return clip.displayTitle
     }
 
     private static func makeContentText() -> NSTextField {
@@ -499,11 +501,11 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         if calendar.isDateInToday(clip.date) {
             date = Self.timeFormatter.string(from: clip.date)
         } else if calendar.isDateInYesterday(clip.date) {
-            date = "Вчера, \(Self.timeFormatter.string(from: clip.date))"
+            date = L10n.text("Вчера, \(Self.timeFormatter.string(from: clip.date))")
         } else {
             date = Self.dateFormatter.string(from: clip.date)
         }
-        let source = clip.isRemote ? "С другого устройства" : clip.source
+        let source = clip.isRemote ? L10n.text("С другого устройства") : clip.source
         return source.isEmpty ? date : "\(source)   \(date)"
     }
 

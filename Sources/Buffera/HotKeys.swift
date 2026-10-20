@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import Carbon
 import os
@@ -68,5 +69,5 @@ final class HotKeys {
 
 struct HotKeyError: LocalizedError {
     let status: OSStatus
-    var errorDescription: String? { "Не удалось включить горячую клавишу (\(status)). Закройте Pasta или другой менеджер с этим сочетанием и перезапустите \(BrandIdentity.name). История доступна через значок в строке меню." }
+    var errorDescription: String? { L10n.text("Не удалось включить горячую клавишу (\(status)). Закройте Pasta или другой менеджер с этим сочетанием и перезапустите \(BrandIdentity.name). История доступна через значок в строке меню.") }
 }

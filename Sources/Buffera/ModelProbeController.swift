@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaModels
 import Darwin
@@ -36,7 +37,7 @@ final class ModelProbeController {
         queue.async { [self] in
             cancelOnQueue(role, message: nil)
             guard FileManager.default.isExecutableFile(atPath: executable.path) else {
-                publish(role, "Движок недоступен. Пересоберите или обновите Buffera.", running: false)
+                publish(role, L10n.text("Движок недоступен. Пересоберите или обновите Buffera."), running: false)
                 return
             }
             let run = Run()
@@ -54,14 +55,14 @@ final class ModelProbeController {
                 try? log.close()
             } catch {
                 try? FileManager.default.removeItem(at: run.diagnostics)
-                publish(role, "Не удалось запустить проверку: \(error.localizedDescription)", running: false)
+                publish(role, L10n.text("Не удалось запустить проверку: \(error.localizedDescription)"), running: false)
                 return
             }
             runs[role] = run
-            publish(role, "Проверяем русский, английский и код…", running: true)
+            publish(role, L10n.text("Проверяем русский, английский и код…"), running: true)
             let timeout = DispatchWorkItem { [weak self, weak run] in
                 guard let self, let run, self.runs[role]?.id == run.id else { return }
-                self.cancelOnQueue(role, message: "Проверка заняла больше трёх минут. Модель выгружена.")
+                self.cancelOnQueue(role, message: L10n.text("Проверка заняла больше трёх минут. Модель выгружена."))
             }
             run.timeout = timeout
             queue.asyncAfter(deadline: .now() + 180, execute: timeout)
@@ -77,12 +78,12 @@ final class ModelProbeController {
                     run.timeout?.cancel()
                     if run.process.terminationStatus == 0, output.count <= 128_000,
                        let result = try? JSONDecoder().decode(Result.self, from: output), result.success {
-                        self.publish(role, "\(result.summary) Память освобождена.", running: false)
+                        self.publish(role, L10n.text("\(L10n.diagnostic(result.summary)) Память освобождена."), running: false)
                     } else {
                         let result = output.count <= 128_000
                             ? try? JSONDecoder().decode(Result.self, from: output) : nil
-                        let detail = result?.summary ?? diagnostic ?? "Движок завершился с ошибкой."
-                        self.publish(role, "Проверка не пройдена: \(detail)", running: false)
+                        let detail = L10n.diagnostic(result?.summary ?? diagnostic ?? L10n.text("Движок завершился с ошибкой."))
+                        self.publish(role, L10n.text("Проверка не пройдена: \(detail)"), running: false)
                     }
                 }
             }
@@ -91,7 +92,7 @@ final class ModelProbeController {
 
     func cancel(_ role: ModelRole) {
         queue.async { [self] in
-            cancelOnQueue(role, message: "Проверка остановлена. Модель выгружена.")
+            cancelOnQueue(role, message: L10n.text("Проверка остановлена. Модель выгружена."))
         }
     }
 

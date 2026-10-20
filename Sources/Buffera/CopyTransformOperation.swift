@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import BufferaCore
 
@@ -8,14 +9,14 @@ enum CopyTransformOperation: Hashable {
     var title: String {
         switch self {
         case .text(let transformation): return transformation.title
-        case .imageText: return "Текст с картинки"
+        case .imageText: return L10n.text("Текст с картинки")
         }
     }
 
     var detail: String {
         switch self {
         case .text(let transformation): return transformation.detail
-        case .imageText: return "Распознать и скопировать текст с изображения."
+        case .imageText: return L10n.text("Распознать и скопировать текст с изображения.")
         }
     }
 

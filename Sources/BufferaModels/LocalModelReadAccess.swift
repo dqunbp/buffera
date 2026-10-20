@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 public enum EmbeddingConfiguration {
@@ -31,14 +32,14 @@ public enum EmbeddingRuntimeError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: return "Поиск по смыслу ещё не готов: нужные файлы не скачаны или не прошли проверку."
-        case .disabled: return "«Поиск по смыслу» выключен в настройках."
-        case .invalidInput: return "Текст запроса слишком длинный или пустой."
-        case .invalidResponse: return "Движок поиска вернул некорректный ответ."
-        case .runtimeMissing: return "Движок поиска недоступен. Пересоберите или обновите Buffera."
-        case .stopped: return "Поиск по смыслу остановлен."
-        case .timedOut: return "Поиск по смыслу занял слишком много времени."
-        case .worker(let message): return message
+        case .unavailable: return L10n.text("Поиск по смыслу ещё не готов: нужные файлы не скачаны или не прошли проверку.")
+        case .disabled: return L10n.text("«Поиск по смыслу» выключен в настройках.")
+        case .invalidInput: return L10n.text("Текст запроса слишком длинный или пустой.")
+        case .invalidResponse: return L10n.text("Движок поиска вернул некорректный ответ.")
+        case .runtimeMissing: return L10n.text("Движок поиска недоступен. Пересоберите или обновите Buffera.")
+        case .stopped: return L10n.text("Поиск по смыслу остановлен.")
+        case .timedOut: return L10n.text("Поиск по смыслу занял слишком много времени.")
+        case .worker(let message): return L10n.diagnostic(message)
         }
     }
 }

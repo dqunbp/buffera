@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import CoreFoundation
 
@@ -7,9 +8,9 @@ struct HistoryAppearance: Equatable {
 
         var title: String {
             switch self {
-            case .floating: return "Обычное окно"
-            case .left: return "Панель слева"
-            case .right: return "Панель справа"
+            case .floating: return L10n.text("Обычное окно")
+            case .left: return L10n.text("Панель слева")
+            case .right: return L10n.text("Панель справа")
             }
         }
     }

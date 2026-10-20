@@ -1,13 +1,11 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
+// Run both languages: zsh scripts/check-history-panel.sh
 // Run from the repository root. The windows are fully transparent; no
 // clipboard, database, or app activation are used. Appearance checks restore
 // every preference they touch before asserting their results.
-// mkdir -p .build/history-panel-checks
-// swiftc -emit-library -emit-module -module-name BufferaCore Sources/BufferaCore/Clip.swift Sources/BufferaCore/ClipboardText.swift Sources/BufferaCore/TextTransformation.swift Sources/BufferaCore/SearchMode.swift -emit-module-path .build/history-panel-checks/BufferaCore.swiftmodule -o .build/history-panel-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I .build/history-panel-checks -L .build/history-panel-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/history-panel-checks" -module-cache-path .build/ModuleCache Sources/Buffera/HistoryPanel.swift Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformMenu.swift Sources/Buffera/NearbyHistoryState.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/HistoryFilters.swift Sources/Buffera/HistoryAppearance.swift Sources/Buffera/BrandIdentity.swift Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift Sources/Buffera/ClipboardService.swift Tests/HistoryPanelChecks/main.swift -o .build/history-panel-checks/checks
-// .build/history-panel-checks/checks
 
 var checkCount = 0
 func check(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -186,7 +184,7 @@ featureAvailabilityChecks()
 let modeHarness = PanelHarness(rows: [fixture(20)])
 let semanticSearch = descendants(of: modeHarness.panel.window.contentView!).compactMap { $0 as? NSButton }
     .first { $0.identifier?.rawValue == "history.searchMode" }!
-check(modeHarness.panel.searchMode == .automatic && semanticSearch.title == "Искать также по смыслу",
+check(modeHarness.panel.searchMode == .automatic && semanticSearch.title == L10n.text("Искать также по смыслу"),
       "new panels explain semantic search as an addition to text matches")
 semanticSearch.performClick(nil)
 check(modeHarness.requests.last?.mode == .literal && modeHarness.requests.last?.query == "fixture",
@@ -199,7 +197,7 @@ semanticSearch.performClick(nil)
 modeHarness.panel.updateSearchMode(.hybrid, reason: nil)
 modeHarness.panel.receive([fixture(20)], total: 1, offset: 0)
 check(descendants(of: modeHarness.panel.window.contentView!).compactMap { $0 as? NSTextField }
-        .contains { $0.stringValue == "Записей: 1" },
+        .contains { $0.stringValue == L10n.text("Записей: \(1)") },
       "the record count is not prefixed with search mode text")
 modeHarness.enter()
 check(!semanticSearch.isEnabled && modeHarness.confirmations == [20],
@@ -227,7 +225,9 @@ func searchLayoutChecks() {
         let content = harness.panel.window.contentView!
         content.layoutSubtreeIfNeeded()
         let views = descendants(of: content)
-        let count = views.compactMap { $0 as? NSTextField }.first { $0.stringValue.hasPrefix("Записей:") }!
+        let count = views.compactMap { $0 as? NSTextField }.first {
+            $0.stringValue == L10n.text("Записей: \(100_000.formatted(.number.locale(L10n.locale)))")
+        }!
         let toggle = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.searchMode" }!
         let countFrame = count.convert(count.bounds, to: content)
         check(content.bounds.contains(countFrame) && count.bounds.width >= count.intrinsicContentSize.width - 1,
@@ -244,7 +244,7 @@ func searchLayoutChecks() {
         } && abs(chatFrame.midY - toggleFrame.midY) < 1 && chatFrame.minX >= toggleFrame.maxX + 8,
               "the ask button and full semantic-search label share one row at \(Int(width)) pt")
         let pinFrame = pinButton.convert(pinButton.bounds, to: content)
-        let settingsButton = views.compactMap { $0 as? NSButton }.first { $0.toolTip == "Настройки · ⌘," }!
+        let settingsButton = views.compactMap { $0 as? NSButton }.first { $0.toolTip == L10n.text("Настройки · ⌘,") }!
         let settingsFrame = settingsButton.convert(settingsButton.bounds, to: content)
         // AppKit applies different optical insets to toggle and momentary buttons.
         check(content.bounds.contains(pinFrame) && pinButton.bounds.width >= 26
@@ -713,7 +713,7 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
     filtered.panel.setSources(["Panel Fixture App", "Other"])
     let filterRows = descendants(of: filters.sidebar).compactMap { $0 as? NSButton }
-    filterRows.first { $0.title == "Текст" }!.performClick(nil)
+    filterRows.first { $0.title == L10n.text("Текст") }!.performClick(nil)
     filterRows.first { $0.title == "Panel Fixture App" }!.performClick(nil)
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
     scope.selectedSegment = 1
@@ -774,7 +774,7 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     pinned.panel.receive(clips, total: clips.count, offset: 0)
     pinned.panel.shortcutPressed(1)
     pinButton.performClick(nil)
-    results.append((pinned.panel.isPinned && pinButton.accessibilityLabel() == "Открепить окно истории",
+    results.append((pinned.panel.isPinned && pinButton.accessibilityLabel() == L10n.text("Открепить окно истории"),
                     "the anchor exposes its active state and unpin action"))
     pinned.panel.window.resignKey()
     pinned.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: pinned.panel.window))
@@ -887,7 +887,7 @@ func nearbyChecks() -> [(Bool, String)] {
     }
     func backButton(_ value: PanelHarness) -> NSButton? {
         descendants(of: value.panel.window.contentView!).compactMap { $0 as? NSButton }
-            .first { $0.title == "Назад в историю" || $0.accessibilityLabel() == "Назад в историю" }
+            .first { $0.title == L10n.text("Назад в историю") || $0.accessibilityLabel() == L10n.text("Назад в историю") }
     }
     func complete(_ value: PanelHarness, rows: [ClipSummary]) {
         guard let request = value.nearbyRequests.last else {
@@ -944,7 +944,7 @@ func nearbyChecks() -> [(Bool, String)] {
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
     filtered.panel.setSources(["Panel Fixture App", "Other"])
     let filterButtons = descendants(of: filters.sidebar).compactMap { $0 as? NSButton }
-    filterButtons.first { $0.title == "Текст" }!.performClick(nil)
+    filterButtons.first { $0.title == L10n.text("Текст") }!.performClick(nil)
     filterButtons.first { $0.title == "Panel Fixture App" }!.performClick(nil)
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
     scope.selectedSegment = 1
@@ -959,7 +959,7 @@ func nearbyChecks() -> [(Bool, String)] {
     let menuEvent = NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
                                      windowNumber: filtered.panel.window.windowNumber, context: nil,
                                      eventNumber: 1, clickCount: 1, pressure: 1)!
-    let item = card.menu(for: menuEvent)!.items.first { $0.title == "Показать рядом" }!
+    let item = card.menu(for: menuEvent)!.items.first { $0.title == L10n.text("Показать рядом") }!
     _ = NSApp.sendAction(item.action!, to: item.target, from: item)
     waitUntil("nearby context menu action") { !filtered.nearbyRequests.isEmpty }
     results.append((filtered.panel.isShowingNearby && filtered.nearbyRequests.last?.anchorID == originalID
@@ -978,7 +978,7 @@ func nearbyChecks() -> [(Bool, String)] {
     filtered.panel.move(1)
     let anchorCard = filtered.cards.card(at: 0)!
     let anchorMarker = descendants(of: anchorCard).compactMap { $0 as? NSTextField }
-        .first { $0.accessibilityLabel() == "Опорная запись" }
+        .first { $0.accessibilityLabel() == L10n.text("Опорная запись") }
     results.append((filtered.panel.selected?.id != originalID && anchorMarker?.isHidden == false,
                     "the anchor keeps its visible accessible marker after selection moves to a neighbor"))
     var shownKinds: [ClipKind] = []
@@ -1000,7 +1000,7 @@ func nearbyChecks() -> [(Bool, String)] {
                     && filtered.search.stringValue == "fixture" && navigations == 2,
                     "back restores the exact selection, viewport, query, and favorites scope"))
     let markersAfterBack = descendants(of: filtered.panel.window.contentView!).compactMap { $0 as? NSTextField }
-        .filter { $0.accessibilityLabel() == "Опорная запись" && !$0.isHidden }
+        .filter { $0.accessibilityLabel() == L10n.text("Опорная запись") && !$0.isHidden }
     results.append((markersAfterBack.isEmpty, "returning to search removes the nearby anchor marker"))
     filtered.panel.refresh(preservingSelection: true)
     let restoredFilter = filtered.requests.last!.filter

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 
 /// Both the card submenu and its shortcut popup use this list and dispatch path.
@@ -11,7 +12,7 @@ final class CopyTransformMenu: NSMenu {
     init(operations: [CopyTransformOperation]?, onChoose: @escaping (CopyTransformOperation) -> Void) {
         self.operations = operations
         self.onChoose = onChoose
-        super.init(title: "Скопировать иначе")
+        super.init(title: L10n.text("Скопировать иначе"))
         autoenablesItems = false
         rebuild()
     }
@@ -32,7 +33,7 @@ final class CopyTransformMenu: NSMenu {
 
     private func rebuild() {
         guard let operations, !operations.isEmpty else {
-            let item = NSMenuItem(title: operations == nil ? "Проверяем варианты…" : "Нет подходящих вариантов",
+            let item = NSMenuItem(title: operations == nil ? L10n.text("Проверяем варианты…") : L10n.text("Нет подходящих вариантов"),
                                   action: nil, keyEquivalent: "")
             item.isEnabled = false
             items = [item]

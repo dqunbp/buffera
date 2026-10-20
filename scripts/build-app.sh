@@ -3,14 +3,22 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache"
-swift build -c release --product Buffera --cache-path "$PWD/.build/cache" "$@"
-swift build -c release --product BufferaMCP --cache-path "$PWD/.build/cache" "$@"
+BUILD_PATH="${BUFFERA_BUILD_PATH:-$PWD/.build}"
+# A file provider can attach Finder metadata to an existing resource bundle
+# between builds; SwiftPM signs that bundle before assembling the app.
+if [[ -d "$BUILD_PATH/release/Buffera_BufferaLocalization.bundle" ]]; then
+  xattr -dr com.apple.FinderInfo "$BUILD_PATH/release/Buffera_BufferaLocalization.bundle" 2>/dev/null || true
+fi
+swift build -c release --product Buffera --scratch-path "$BUILD_PATH" --cache-path "$PWD/.build/cache" "$@"
+swift build -c release --product BufferaMCP --scratch-path "$BUILD_PATH" --cache-path "$PWD/.build/cache" "$@"
+BIN_DIR=$(swift build -c release --scratch-path "$BUILD_PATH" --show-bin-path)
 APP="$PWD/dist/Buffera.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 mkdir -p "$APP/Contents/Resources/SQLiteVec"
 cp Sources/CSQLiteVec/LICENSE-* Sources/CSQLiteVec/README.md "$APP/Contents/Resources/SQLiteVec/"
-cp .build/release/Buffera "$APP/Contents/MacOS/Buffera"
-cp .build/release/BufferaMCP "$APP/Contents/MacOS/BufferaMCP"
+cp "$BIN_DIR/Buffera" "$APP/Contents/MacOS/Buffera"
+cp "$BIN_DIR/BufferaMCP" "$APP/Contents/MacOS/BufferaMCP"
+cp -R "$BIN_DIR/Buffera_BufferaLocalization.bundle" "$APP/Contents/Resources/"
 if [[ "$(uname -m)" == arm64 ]]; then
   zsh scripts/prepare-model-runtime.sh "$APP"
 fi
@@ -30,6 +38,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>ru</string></array>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>

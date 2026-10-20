@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 /// The same text projection is used by local chat and external agents.
@@ -34,19 +35,19 @@ public struct HistoryTextContent: Sendable {
                 return url.path
             }
             return Self(text: paths.joined(separator: "\n"), kind: .filePaths, isComplete: true,
-                        note: "Только пути из буфера обмена. Содержимое файлов не читается.")
+                        note: L10n.text("Только пути из буфера обмена. Содержимое файлов не читается."))
         case .image:
             guard let text = content.imageText else {
                 return Self(text: "", kind: .unavailableOCR, isComplete: false,
-                            note: "Готового OCR нет. MCP не запускает распознавание и не передаёт изображение.")
+                            note: L10n.text("Готового OCR нет. MCP не запускает распознавание и не передаёт изображение."))
             }
             let complete = text.count < 200_000
             return Self(text: text, kind: .cachedOCR, isComplete: complete,
-                        note: complete ? "Сохранённый результат OCR."
-                            : "Сохранённый OCR достиг лимита 200000 символов и может быть обрезан.")
+                        note: complete ? L10n.text("Сохранённый результат OCR.")
+                            : L10n.text("Сохранённый OCR достиг лимита 200000 символов и может быть обрезан."))
         case .other:
             return Self(text: "", kind: .unsupported, isComplete: false,
-                        note: "Для этого типа записи доступны только метаданные.")
+                        note: L10n.text("Для этого типа записи доступны только метаданные."))
         }
     }
 }

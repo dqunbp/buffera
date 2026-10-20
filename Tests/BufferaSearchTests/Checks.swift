@@ -1,4 +1,5 @@
 import Foundation
+import BufferaLocalization
 import BufferaCore
 import BufferaModels
 import BufferaSearch
@@ -74,7 +75,8 @@ private func checkPreparationPauses(root: URL) async throws {
     try require(await inference.calls == 0, "Initial battery policy must precede inference")
     try require(try store.embeddingProgress().pending == 2, "Battery pause must retain durable pending jobs")
     try require(status.latest.pauseReason == .battery && status.latest.canContinueNow &&
-                status.latest.message.contains("осталось: 2"), "Battery pause must expose its reason and remaining count")
+                status.latest.message.contains(L10n.language == "ru" ? "осталось: 2" : "remaining: 2"),
+                "Battery pause must expose its reason and remaining count")
     await indexer.schedule()
     try require(await inference.calls == 0, "Repeated schedule cannot bypass the power policy")
 
@@ -109,7 +111,8 @@ private func checkPreparationPauses(root: URL) async throws {
     await indexer.setPaused(reason: .battery)
     try insert("Captured while preparation is paused")
     await indexer.schedule()
-    try require(status.latest.message.contains("осталось: 1") && (try store.embeddingProgress().pending) == 1,
+    try require(status.latest.message.contains(L10n.language == "ru" ? "осталось: 1" : "remaining: 1") &&
+                (try store.embeddingProgress().pending) == 1,
                 "New captures must update the pending count while preparation is paused")
 
     // Model availability can interrupt a suspended request before the actor receives OFF.

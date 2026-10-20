@@ -1,3 +1,4 @@
+import BufferaLocalization
 import BufferaCore
 import Foundation
 import ImageIO
@@ -8,9 +9,9 @@ enum ImageTextRecognitionError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .noImages: return "В записи нет изображения для распознавания."
-        case .unreadableImage: return "Не удалось прочитать изображение для распознавания текста."
-        case .recognitionFailed: return "Не удалось распознать текст на изображении."
+        case .noImages: return L10n.text("В записи нет изображения для распознавания.")
+        case .unreadableImage: return L10n.text("Не удалось прочитать изображение для распознавания текста.")
+        case .recognitionFailed: return L10n.text("Не удалось распознать текст на изображении.")
         }
     }
 }

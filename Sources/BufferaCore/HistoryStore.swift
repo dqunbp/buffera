@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 import CSQLite
 import CSQLiteVec
@@ -10,6 +11,7 @@ public final class HistoryStore {
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     private static let schemaVersion = 7
     static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
+    // Storage/search sentinel: presentation translates it through ClipSummary.displayTitle.
     public static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
         SearchFilter.normalize(concealedTitle + " " + source)
@@ -23,7 +25,7 @@ public final class HistoryStore {
         let flags = mode == .readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
         guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK else {
             let error: HistoryError = mode == .readOnly
-                ? .database("Не удалось открыть историю для чтения. Сначала запустите Buffera и проверьте путь к истории.")
+                ? .database(L10n.text("Не удалось открыть историю для чтения. Сначала запустите Buffera и проверьте путь к истории."))
                 : failure()
             sqlite3_close(db); db = nil; throw error
         }
@@ -34,9 +36,9 @@ public final class HistoryStore {
                 let version = try schemaVersion()
                 guard version == Self.schemaVersion else {
                     let recovery = version < Self.schemaVersion
-                        ? "Запустите Buffera, чтобы обновить историю."
-                        : "Обновите Buffera и подключённый MCP."
-                    throw HistoryError.database("Неподдерживаемая версия истории \(version); требуется \(Self.schemaVersion). \(recovery)")
+                        ? L10n.text("Запустите Buffera, чтобы обновить историю.")
+                        : L10n.text("Обновите Buffera и подключённый MCP.")
+                    throw HistoryError.database(L10n.text("Неподдерживаемая версия истории \(version); требуется \(Self.schemaVersion). \(recovery)"))
                 }
             } else {
                 try execute("PRAGMA journal_mode=WAL")
@@ -52,7 +54,7 @@ public final class HistoryStore {
         try execute("BEGIN IMMEDIATE")
         do {
             let version = try schemaVersion()
-            guard version <= Self.schemaVersion else { throw HistoryError.database("Версия истории новее, чем поддерживает это приложение.") }
+            guard version <= Self.schemaVersion else { throw HistoryError.database(L10n.text("Версия истории новее, чем поддерживает это приложение.")) }
             if version < 2 {
                 try execute("""
                 CREATE TABLE IF NOT EXISTS clips (
@@ -452,7 +454,7 @@ public final class HistoryStore {
             case "pending": pending = count
             case "complete": complete = count
             case "failed": failed = count
-            default: throw HistoryError.database("Неизвестное состояние распознавания текста.")
+            default: throw HistoryError.database(L10n.text("Неизвестное состояние распознавания текста."))
             }
             status = sqlite3_step(statement)
         }
@@ -551,7 +553,7 @@ public final class HistoryStore {
         return (clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND "), bindings)
     }
 
-    func failure() -> HistoryError { .database(db.map { String(cString: sqlite3_errmsg($0)) } ?? "не удалось открыть файл") }
+    func failure() -> HistoryError { .database(db.map { String(cString: sqlite3_errmsg($0)) } ?? L10n.text("не удалось открыть файл")) }
     func execute(_ sql: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw failure() }
     }

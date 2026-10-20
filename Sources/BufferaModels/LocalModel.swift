@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 public enum ModelRole: String, Codable, CaseIterable, Sendable {
@@ -59,7 +60,7 @@ public enum LocalModelCatalog {
     public static let models: [LocalModelDescriptor] = [
         make(
             role: .embedding, title: "EmbeddingGemma 2",
-            summary: "Модель для поиска по смыслу. Текстовая версия, Q8.",
+            summary: L10n.text("Модель для поиска по смыслу. Текстовая версия, Q8."),
             repository: "ggml-org/embeddinggemma-2-GGUF",
             revision: "58faf90940886df2d62be555c8765d00dac362c5",
             filename: "embeddinggemma-2-Q8_0.gguf", byteCount: 309_855_456,
@@ -67,7 +68,7 @@ public enum LocalModelCatalog {
         ),
         make(
             role: .assistant, title: "Gemma 4 E2B",
-            summary: "Модель для локального помощника. Текстовая версия, Q4.",
+            summary: L10n.text("Модель для локального помощника. Текстовая версия, Q4."),
             repository: "ggml-org/gemma-4-E2B-it-GGUF",
             revision: "6938c58e698502037401a5f19f6905f2fb2f7dee",
             filename: "gemma-4-E2B-it-Q4_0.gguf", byteCount: 2_841_481_184,
@@ -100,15 +101,15 @@ enum ModelStorageError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidDescriptor: return "Не удалось определить, какие файлы нужны. Обновите Buffera."
-        case .unsafeFile: return "В папке скачивания обнаружен неожиданный файл или ссылка."
-        case .invalidResponse: return "Сервер вернул некорректный ответ."
-        case .invalidRange: return "Сервер вернул неверный диапазон файла. Повторите загрузку."
-        case .unexpectedSize: return "Размер скачанного файла не совпадает с ожидаемым."
-        case .checksum: return "Проверка файла не пройдена. Повторите скачивание."
-        case .insufficientSpace: return "Недостаточно свободного места для скачивания."
-        case .notDownloaded: return "Нужные файлы ещё не скачаны и не проверены."
-        case .http(let status): return "Сервер загрузки вернул ошибку \(status)."
+        case .invalidDescriptor: return L10n.text("Не удалось определить, какие файлы нужны. Обновите Buffera.")
+        case .unsafeFile: return L10n.text("В папке скачивания обнаружен неожиданный файл или ссылка.")
+        case .invalidResponse: return L10n.text("Сервер вернул некорректный ответ.")
+        case .invalidRange: return L10n.text("Сервер вернул неверный диапазон файла. Повторите загрузку.")
+        case .unexpectedSize: return L10n.text("Размер скачанного файла не совпадает с ожидаемым.")
+        case .checksum: return L10n.text("Проверка файла не пройдена. Повторите скачивание.")
+        case .insufficientSpace: return L10n.text("Недостаточно свободного места для скачивания.")
+        case .notDownloaded: return L10n.text("Нужные файлы ещё не скачаны и не проверены.")
+        case .http(let status): return L10n.text("Сервер загрузки вернул ошибку \(status).")
         }
     }
 }

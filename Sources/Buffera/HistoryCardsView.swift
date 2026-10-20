@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 
 struct HistoryCardsMetrics: Equatable {
@@ -74,7 +75,7 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         // resizing would temporarily validate cached cards against a narrower view.
         collectionView.autoresizingMask = []
         collectionView.register(HistoryCardItem.self, forItemWithIdentifier: Self.itemIdentifier)
-        collectionView.setAccessibilityLabel("История копирований")
+        collectionView.setAccessibilityLabel(L10n.text("История копирований"))
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true

@@ -1,3 +1,4 @@
+import BufferaLocalization
 import AppKit
 import BufferaCore
 
@@ -7,7 +8,7 @@ final class MCPSettingsView: NSView {
 
     private let access: MCPAccess
     private let executableURL: URL
-    private let enabled = NSButton(checkboxWithTitle: "Разрешить агентам читать историю", target: nil, action: nil)
+    private let enabled = NSButton(checkboxWithTitle: L10n.text("Разрешить агентам читать историю"), target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
 
     init(access: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
@@ -19,23 +20,23 @@ final class MCPSettingsView: NSView {
         enabled.action = #selector(changeAccess)
         enabled.font = .systemFont(ofSize: 12)
         enabled.identifier = NSUserInterfaceItemIdentifier("mcp.enabled")
-        let disclosure = paragraph("Агент сможет читать историю и отдельно раскрывать скрытые записи. Инструкция просит его получить ваше согласие, если оно ещё не дано. Прочитанное попадёт в контекст агента.")
-        let connection = paragraph("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON.")
+        let disclosure = paragraph(L10n.text("Агент сможет читать историю и отдельно раскрывать скрытые записи. Инструкция просит его получить ваше согласие, если оно ещё не дано. Прочитанное попадёт в контекст агента."))
+        let connection = paragraph(L10n.text("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON."))
         let command = paragraph(executableURL.path)
         command.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         command.isSelectable = true
-        command.setAccessibilityLabel("Исполняемый файл MCP")
-        let claude = copyButton("Команда для Claude Code", action: #selector(copyClaudeCommand),
+        command.setAccessibilityLabel(L10n.text("Исполняемый файл MCP"))
+        let claude = copyButton(L10n.text("Команда для Claude Code"), action: #selector(copyClaudeCommand),
                                 identifier: "mcp.copyClaudeCommand")
-        claude.toolTip = "Скопировать команду подключения Claude Code для всех проектов этого пользователя"
-        let codex = copyButton("Команда для Codex", action: #selector(copyCodexCommand),
+        claude.toolTip = L10n.text("Скопировать команду подключения Claude Code для всех проектов этого пользователя")
+        let codex = copyButton(L10n.text("Команда для Codex"), action: #selector(copyCodexCommand),
                                identifier: "mcp.copyCodexCommand")
-        codex.toolTip = "Скопировать команду подключения Codex"
+        codex.toolTip = L10n.text("Скопировать команду подключения Codex")
         let commands = NSStackView(views: [claude, codex])
         commands.orientation = .horizontal
         commands.alignment = .centerY
         commands.spacing = 10
-        let copy = copyButton("Скопировать конфигурацию", action: #selector(copyConfiguration),
+        let copy = copyButton(L10n.text("Скопировать конфигурацию"), action: #selector(copyConfiguration),
                               identifier: "mcp.copyConfiguration")
         status.font = .systemFont(ofSize: 11)
         status.setContentCompressionResistancePriority(.required, for: .vertical)
@@ -63,8 +64,8 @@ final class MCPSettingsView: NSView {
 
     func refresh() {
         enabled.state = access.isEnabled() ? .on : .off
-        showStatus(enabled.state == .on ? "Доступ включён. Скрытые записи показаны масками; раскрытие — через reveal_clip."
-                   : "Доступ выключен. Конфигурацию можно подготовить заранее.")
+        showStatus(enabled.state == .on ? L10n.text("Доступ включён. Скрытые записи показаны масками; раскрытие — через reveal_clip.")
+                   : L10n.text("Доступ выключен. Конфигурацию можно подготовить заранее."))
     }
 
     @objc private func changeAccess() {
@@ -73,13 +74,13 @@ final class MCPSettingsView: NSView {
             refresh()
         } catch {
             enabled.state = access.isEnabled() ? .on : .off
-            showStatus("Не удалось сохранить доступ: \(error.localizedDescription)", isError: true)
+            showStatus(L10n.text("Не удалось сохранить доступ: \(error.localizedDescription)"), isError: true)
         }
     }
 
     @objc private func copyConfiguration() {
         copyConnection({ try MCPAccess.configuration(executableURL: executableURL) },
-                       confirmation: "Конфигурация скопирована. Добавьте её в настройки агента.")
+                       confirmation: L10n.text("Конфигурация скопирована. Добавьте её в настройки агента."))
     }
 
     @objc private func copyClaudeCommand() { copyCommand(for: .claudeCode) }
@@ -87,7 +88,7 @@ final class MCPSettingsView: NSView {
 
     private func copyCommand(for client: MCPClient) {
         copyConnection({ MCPAccess.addCommand(for: client, executableURL: executableURL) },
-                       confirmation: "Команда скопирована. Выполните её в Терминале.")
+                       confirmation: L10n.text("Команда скопирована. Выполните её в Терминале."))
     }
 
     private func copyConnection(_ value: () throws -> String, confirmation: String) {
@@ -95,9 +96,9 @@ final class MCPSettingsView: NSView {
             guard let onCopyConfiguration else { throw MCPSettingsError.copyUnavailable }
             try onCopyConfiguration(value())
             showStatus(confirmation + (access.isEnabled() ? ""
-                       : " Чтобы агент мог читать историю, включите доступ."))
+                       : L10n.text(" Чтобы агент мог читать историю, включите доступ.")))
         } catch {
-            showStatus("Не удалось скопировать: \(error.localizedDescription)", isError: true)
+            showStatus(L10n.text("Не удалось скопировать: \(error.localizedDescription)"), isError: true)
         }
     }
 
@@ -126,5 +127,5 @@ final class MCPSettingsView: NSView {
 
 enum MCPSettingsError: LocalizedError {
     case copyUnavailable
-    var errorDescription: String? { "Копирование сейчас недоступно." }
+    var errorDescription: String? { L10n.text("Копирование сейчас недоступно.") }
 }

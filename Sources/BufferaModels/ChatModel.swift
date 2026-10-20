@@ -1,3 +1,4 @@
+import BufferaLocalization
 import Foundation
 
 public enum ChatConfiguration {
@@ -61,15 +62,15 @@ public enum ChatRuntimeError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: return "Buffera ещё не готова отвечать: нужные файлы не скачаны или не прошли проверку."
-        case .disabled: return "«Спросить Buffera» выключено в настройках."
-        case .invalidInput: return "Не удалось подготовить сообщения для помощника."
-        case .contextTooLong: return "В запросе слишком много текста для локального помощника."
-        case .invalidResponse: return "Движок помощника вернул некорректный ответ."
-        case .runtimeMissing: return "Движок помощника недоступен. Пересоберите или обновите Buffera."
-        case .stopped: return "Локальный помощник остановлен."
-        case .timedOut: return "Ответ локального помощника занял слишком много времени."
-        case .worker(let message): return message
+        case .unavailable: return L10n.text("Buffera ещё не готова отвечать: нужные файлы не скачаны или не прошли проверку.")
+        case .disabled: return L10n.text("«Спросить Buffera» выключено в настройках.")
+        case .invalidInput: return L10n.text("Не удалось подготовить сообщения для помощника.")
+        case .contextTooLong: return L10n.text("В запросе слишком много текста для локального помощника.")
+        case .invalidResponse: return L10n.text("Движок помощника вернул некорректный ответ.")
+        case .runtimeMissing: return L10n.text("Движок помощника недоступен. Пересоберите или обновите Buffera.")
+        case .stopped: return L10n.text("Локальный помощник остановлен.")
+        case .timedOut: return L10n.text("Ответ локального помощника занял слишком много времени.")
+        case .worker(let message): return L10n.diagnostic(message)
         }
     }
 }
