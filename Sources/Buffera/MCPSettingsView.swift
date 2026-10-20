@@ -20,21 +20,28 @@ final class MCPSettingsView: NSView {
         enabled.font = .systemFont(ofSize: 12)
         enabled.identifier = NSUserInterfaceItemIdentifier("mcp.enabled")
         let disclosure = paragraph("Агент сможет искать и читать нескрытые записи истории. Их содержимое попадёт в его контекст; дальнейшая обработка зависит от выбранного агента.")
-        let connection = paragraph("Подключение работает через MCP и stdio: агент сам запускает локальный файл. Вставьте конфигурацию в настройки MCP вашего агента.")
+        let connection = paragraph("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON.")
         let command = paragraph(executableURL.path)
         command.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         command.isSelectable = true
         command.setAccessibilityLabel("Исполняемый файл MCP")
-        let copy = NSButton(title: "Скопировать конфигурацию", target: self, action: #selector(copyConfiguration))
-        copy.bezelStyle = .rounded
-        copy.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
-        copy.imagePosition = .imageLeading
-        copy.identifier = NSUserInterfaceItemIdentifier("mcp.copyConfiguration")
+        let claude = copyButton("Команда для Claude Code", action: #selector(copyClaudeCommand),
+                                identifier: "mcp.copyClaudeCommand")
+        claude.toolTip = "Скопировать команду подключения Claude Code для всех проектов этого пользователя"
+        let codex = copyButton("Команда для Codex", action: #selector(copyCodexCommand),
+                               identifier: "mcp.copyCodexCommand")
+        codex.toolTip = "Скопировать команду подключения Codex"
+        let commands = NSStackView(views: [claude, codex])
+        commands.orientation = .horizontal
+        commands.alignment = .centerY
+        commands.spacing = 10
+        let copy = copyButton("Скопировать конфигурацию", action: #selector(copyConfiguration),
+                              identifier: "mcp.copyConfiguration")
         status.font = .systemFont(ofSize: 11)
         status.setContentCompressionResistancePriority(.required, for: .vertical)
         status.identifier = NSUserInterfaceItemIdentifier("mcp.status")
 
-        let stack = NSStackView(views: [enabled, disclosure, connection, command, copy, status])
+        let stack = NSStackView(views: [enabled, disclosure, connection, command, commands, copy, status])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 14
@@ -71,14 +78,36 @@ final class MCPSettingsView: NSView {
     }
 
     @objc private func copyConfiguration() {
+        copyConnection({ try MCPAccess.configuration(executableURL: executableURL) },
+                       confirmation: "Конфигурация скопирована. Добавьте её в настройки агента.")
+    }
+
+    @objc private func copyClaudeCommand() { copyCommand(for: .claudeCode) }
+    @objc private func copyCodexCommand() { copyCommand(for: .codex) }
+
+    private func copyCommand(for client: MCPClient) {
+        copyConnection({ MCPAccess.addCommand(for: client, executableURL: executableURL) },
+                       confirmation: "Команда скопирована. Выполните её в Терминале.")
+    }
+
+    private func copyConnection(_ value: () throws -> String, confirmation: String) {
         do {
             guard let onCopyConfiguration else { throw MCPSettingsError.copyUnavailable }
-            try onCopyConfiguration(MCPAccess.configuration(executableURL: executableURL))
-            showStatus(access.isEnabled() ? "Конфигурация скопирована. Добавьте её в настройки агента."
-                       : "Конфигурация скопирована. Чтобы агент мог читать историю, включите доступ.")
+            try onCopyConfiguration(value())
+            showStatus(confirmation + (access.isEnabled() ? ""
+                       : " Чтобы агент мог читать историю, включите доступ."))
         } catch {
-            showStatus("Не удалось скопировать конфигурацию: \(error.localizedDescription)", isError: true)
+            showStatus("Не удалось скопировать: \(error.localizedDescription)", isError: true)
         }
+    }
+
+    private func copyButton(_ title: String, action: Selector, identifier: String) -> NSButton {
+        let button = NSButton(title: title, target: self, action: action)
+        button.bezelStyle = .rounded
+        button.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+        button.imagePosition = .imageLeading
+        button.identifier = NSUserInterfaceItemIdentifier(identifier)
+        return button
     }
 
     private func showStatus(_ message: String, isError: Bool = false) {

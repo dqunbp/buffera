@@ -93,4 +93,51 @@ let servers = object?["mcpServers"] as? [String: [String: Any]]
 check(servers?["buffera"]?["command"] as? String == executable.path, "config safely preserves an absolute executable path with spaces and quotes")
 check((servers?["buffera"]?["args"] as? [String]) == [], "stdio config has no implicit arguments or shell command")
 check(!access.isEnabled(), "generating connection configuration never enables access")
+
+// Exercise the generated command through real shell parsers, without invoking either real CLI.
+func commandArguments(_ command: String, shell: String) throws -> [String] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: shell)
+    process.environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "en_US.UTF-8"]
+    let script = """
+        claude() { printf '%s\\0' claude "$@"; }
+        codex() { printf '%s\\0' codex "$@"; }
+        \(command)
+        """
+    process.arguments = shell == "/bin/bash" ? ["--noprofile", "--norc", "-c", script] : ["-f", "-c", script]
+    let output = Pipe()
+    let errors = Pipe()
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    let bytes = output.fileHandleForReading.readDataToEndOfFile()
+    let errorBytes = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    check(process.terminationStatus == 0 && errorBytes.isEmpty, "mock CLI command completes cleanly in \(shell)")
+    return bytes.split(separator: 0, omittingEmptySubsequences: false).dropLast().map { String(decoding: $0, as: UTF8.self) }
+}
+
+let commandPaths = [
+    "/Applications/Buffera.app/Contents/MacOS/BufferaMCP",
+    "/tmp/Приложения на Mac/Owner's Buffera.app/Contents/MacOS/BufferaMCP",
+    "/tmp/\"quoted\" $BUFFERA_MCP_TEST `printf unexpected` $(printf unexpected);printf unexpected/BufferaMCP",
+    "/tmp/back\\slash and\nnew line/BufferaMCP"
+]
+let clients: [(MCPClient, [String])] = [
+    (.claudeCode, ["claude", "mcp", "add", "--transport", "stdio", "--scope", "user", "buffera", "--"]),
+    (.codex, ["codex", "mcp", "add", "buffera", "--"])
+]
+for (client, expectedPrefix) in clients {
+    for path in commandPaths {
+        let url = URL(fileURLWithPath: path)
+        let command = MCPAccess.addCommand(for: client, executableURL: url)
+        check(command.hasPrefix(expectedPrefix.joined(separator: " ") + " '") && command.hasSuffix("'"),
+              "CLI command keeps the verified prefix and always quotes its executable path")
+        for shell in ["/bin/bash", "/bin/zsh"] {
+            let arguments = try commandArguments(command, shell: shell)
+            check(arguments == expectedPrefix + [url.path], "shell passes the complete executable path literally as one argument")
+        }
+    }
+}
+check(!access.isEnabled(), "generating CLI commands never enables MCP access")
 print("PASS \(checks) settings persistence checks")

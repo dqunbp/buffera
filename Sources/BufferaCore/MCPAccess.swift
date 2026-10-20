@@ -1,6 +1,11 @@
 import Foundation
 import Darwin
 
+public enum MCPClient {
+    case claudeCode
+    case codex
+}
+
 /// Explicit, revocable permission shared by the app and its stdio helper.
 /// Read from disk for every operation: an already running helper must observe revocation.
 public struct MCPAccess {
@@ -47,6 +52,18 @@ public struct MCPAccess {
         ]]]
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Returns a command for the user to run; generating it never invokes a client or grants access.
+    public static func addCommand(for client: MCPClient, executableURL: URL) -> String {
+        let prefix: String
+        switch client {
+        case .claudeCode: prefix = "claude mcp add --transport stdio --scope user buffera --"
+        case .codex: prefix = "codex mcp add buffera --"
+        }
+        // A quote ends the quoted segment, is escaped outside it, then starts a new segment.
+        let path = "'" + executableURL.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        return prefix + " " + path
     }
 
     private struct Permission: Codable {
