@@ -51,7 +51,8 @@ public actor ChatSession {
     private var turns: [Turn] = []
     private var activeID: UUID?
 
-    public init(databaseURL: URL, modelRootURL: URL, bundleURL: URL = Bundle.main.bundleURL) {
+    public init(databaseURL: URL, modelRootURL: URL, bundleURL: URL = Bundle.main.bundleURL,
+                embeddingRuntime: EmbeddingRuntime? = nil) {
         let runtime = ChatRuntime(modelRootURL: modelRootURL, bundleURL: bundleURL)
         self.runtime = runtime
         provider = { messages, maximum, format, onToken in
@@ -59,7 +60,8 @@ public actor ChatSession {
                                        responseFormat: format, onToken: onToken)
         }
         reader = ChatHistoryReader(databaseURL: databaseURL,
-            searchService: HybridSearchService(modelRootURL: modelRootURL, bundleURL: bundleURL))
+            searchService: HybridSearchService(modelRootURL: modelRootURL, bundleURL: bundleURL,
+                                               embeddingRuntime: embeddingRuntime))
     }
 
     public init(databaseURL: URL, searchService: HybridSearchService,

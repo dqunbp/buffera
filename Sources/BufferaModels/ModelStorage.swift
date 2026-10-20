@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 struct ModelReceipt: Codable {
@@ -26,6 +27,62 @@ final class ModelVerification: @unchecked Sendable {
         if value { throw CancellationError() }
     }
 }
+
+/// A successful hash is trusted only inside this process and for this exact file version.
+/// ctime catches rewrites even if a caller restores the old mtime; inode/birthtime catch replacement.
+private struct VerifiedModelFile: Hashable {
+    let device: Int64
+    let inode: UInt64
+    let size: Int64
+    let modifiedSeconds: Int64
+    let modifiedNanoseconds: Int64
+    let changedSeconds: Int64
+    let changedNanoseconds: Int64
+    let createdSeconds: Int64
+    let createdNanoseconds: Int64
+
+    init(_ value: stat) throws {
+        guard value.st_mode & S_IFMT == S_IFREG else { throw ModelStorageError.unsafeFile }
+        device = Int64(value.st_dev)
+        inode = UInt64(value.st_ino)
+        size = Int64(value.st_size)
+        modifiedSeconds = Int64(value.st_mtimespec.tv_sec)
+        modifiedNanoseconds = Int64(value.st_mtimespec.tv_nsec)
+        changedSeconds = Int64(value.st_ctimespec.tv_sec)
+        changedNanoseconds = Int64(value.st_ctimespec.tv_nsec)
+        createdSeconds = Int64(value.st_birthtimespec.tv_sec)
+        createdNanoseconds = Int64(value.st_birthtimespec.tv_nsec)
+    }
+}
+
+private final class ModelVerificationCache: @unchecked Sendable {
+    struct Key: Hashable {
+        let file: VerifiedModelFile
+        let revision: String
+        let sha256: String
+    }
+
+    static let shared = ModelVerificationCache()
+    private let lock = NSLock()
+    private var keys = Set<Key>()
+    private var order: [Key] = []
+
+    func contains(_ key: Key) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return keys.contains(key)
+    }
+
+    func insert(_ key: Key) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard keys.insert(key).inserted else { return }
+        order.append(key)
+        if order.count > 16 { keys.remove(order.removeFirst()) }
+    }
+}
+
+enum ModelVerificationOutcome: Equatable, Sendable { case hashed, reused }
 
 enum ModelStorage {
     static func validate(_ descriptor: LocalModelDescriptor) throws {
@@ -68,10 +125,27 @@ enum ModelStorage {
         return (attributes[.size] as? NSNumber)?.int64Value ?? 0
     }
 
-    static func verify(_ url: URL, descriptor: LocalModelDescriptor, token: ModelVerification) throws {
-        guard try fileSize(url) == descriptor.byteCount else { throw ModelStorageError.unexpectedSize }
-        let handle = try FileHandle(forReadingFrom: url)
+    @discardableResult
+    static func verify(_ url: URL, descriptor: LocalModelDescriptor,
+                       token: ModelVerification) throws -> ModelVerificationOutcome {
+        try token.checkCancellation()
+        let descriptorFD = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard descriptorFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: descriptorFD, closeOnDealloc: true)
         defer { try? handle.close() }
+        let identity = try fileIdentity(descriptorFD)
+        guard identity.size == descriptor.byteCount else { throw ModelStorageError.unexpectedSize }
+        guard try fileIdentity(url) == identity else { throw ModelStorageError.unsafeFile }
+        let key = ModelVerificationCache.Key(file: identity, revision: descriptor.revision,
+                                             sha256: descriptor.sha256)
+        if ModelVerificationCache.shared.contains(key) {
+            try token.checkCancellation()
+            guard try fileIdentity(descriptorFD) == identity, try fileIdentity(url) == identity else {
+                throw ModelStorageError.unsafeFile
+            }
+            return .reused
+        }
+
         var hash = SHA256()
         var count: Int64 = 0
         while true {
@@ -83,7 +157,29 @@ enum ModelStorage {
         }
         try token.checkCancellation()
         guard count == descriptor.byteCount else { throw ModelStorageError.unexpectedSize }
+        guard try fileIdentity(descriptorFD) == identity, try fileIdentity(url) == identity else {
+            throw ModelStorageError.unsafeFile
+        }
         let actual = hash.finalize().map { String(format: "%02x", $0) }.joined()
         guard actual == descriptor.sha256 else { throw ModelStorageError.checksum }
+        try token.checkCancellation()
+        ModelVerificationCache.shared.insert(key)
+        return .hashed
+    }
+
+    private static func fileIdentity(_ descriptor: Int32) throws -> VerifiedModelFile {
+        var value = stat()
+        guard Darwin.fstat(descriptor, &value) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        return try VerifiedModelFile(value)
+    }
+
+    private static func fileIdentity(_ url: URL) throws -> VerifiedModelFile {
+        var value = stat()
+        guard Darwin.lstat(url.path, &value) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        return try VerifiedModelFile(value)
     }
 }

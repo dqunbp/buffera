@@ -13,6 +13,8 @@ public final class LocalModelManager: @unchecked Sendable {
         var generation = UUID()
         var download: ModelFileDownload?
         var verification: ModelVerification?
+        var needsVerification = false
+        var verificationRequests: [(Result<URL, Error>) -> Void] = []
         var lastNotification = Date.distantPast
 
         init(_ descriptor: LocalModelDescriptor) { self.descriptor = descriptor }
@@ -60,8 +62,18 @@ public final class LocalModelManager: @unchecked Sendable {
             let finalSize = try ModelStorage.fileSize(fileURL(entry))
             let partialSize = try ModelStorage.fileSize(partialURL(entry))
             if finalSize > 0 {
-                entry.state = .verifying
+                entry.needsVerification = true
                 entry.received = min(finalSize, descriptor.byteCount)
+                if entry.enabled {
+                    entry.state = .verifying
+                } else if finalSize == descriptor.byteCount {
+                    // Installed but switched-off features do not read gigabytes at app launch.
+                    // They cannot expose a usable URL until explicit activation verifies the file.
+                    entry.state = .downloaded
+                } else {
+                    entry.state = .failed
+                    entry.error = ModelStorageError.unexpectedSize.localizedDescription
+                }
             } else if partialSize > 0 {
                 entry.state = .paused
                 entry.received = min(partialSize, descriptor.byteCount)
@@ -94,10 +106,38 @@ public final class LocalModelManager: @unchecked Sendable {
         set { queue.async { [weak self] in self?.observer = newValue; self?.publish() } }
     }
 
+    /// Returns only a file verified in this process. An installed, switched-off feature
+    /// can display as downloaded while verification is deferred until its first activation.
     public func modelURL(for role: ModelRole) -> URL? {
         queue.sync {
-            guard let entry = entries[role], entry.state == .downloaded else { return nil }
+            guard let entry = entries[role], entry.state == .downloaded, !entry.needsVerification else { return nil }
             return fileURL(entry)
+        }
+    }
+
+    /// Verifies an installed file for an explicit diagnostic without enabling its feature
+    /// or starting a download. Completion is delivered on the main queue.
+    public func verifyInstalledModel(for role: ModelRole,
+                                     completion: @escaping (Result<URL, Error>) -> Void) {
+        queue.async { [weak self] in
+            guard let self, !self.stopped, let entry = self.entries[role] else {
+                DispatchQueue.main.async { completion(.failure(CancellationError())) }
+                return
+            }
+            if entry.state == .verifying {
+                entry.verificationRequests.append(completion)
+                return
+            }
+            do {
+                guard try ModelStorage.fileSize(self.fileURL(entry)) > 0 else {
+                    throw ModelStorageError.notDownloaded
+                }
+                entry.verificationRequests.append(completion)
+                entry.generation = UUID()
+                self.verify(entry, at: self.fileURL(entry))
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
         }
     }
 
@@ -111,7 +151,7 @@ public final class LocalModelManager: @unchecked Sendable {
 
     private func startDownload(_ entry: Entry) {
         guard entry.state != .downloading, entry.state != .verifying,
-              entry.state != .downloaded else { return }
+              entry.state != .downloaded || entry.needsVerification else { return }
         do {
             try prepareDirectory(entry)
             if try ModelStorage.fileSize(fileURL(entry)) > 0 {
@@ -192,6 +232,7 @@ public final class LocalModelManager: @unchecked Sendable {
                     try FileManager.default.removeItem(at: directory)
                 }
                 entry.state = .notDownloaded
+                entry.needsVerification = false
                 entry.received = 0
                 entry.error = nil
                 self.saveAndPublish(entry)
@@ -205,6 +246,11 @@ public final class LocalModelManager: @unchecked Sendable {
             guard let self, !self.stopped, let entry = self.entries[role] else { return }
             entry.enabled = enabled
             entry.error = nil
+            if enabled && entry.state == .downloaded && entry.needsVerification {
+                entry.generation = UUID()
+                self.verify(entry, at: self.fileURL(entry))
+                return
+            }
             if enabled && ![.downloaded, .downloading, .verifying].contains(entry.state) {
                 self.startDownload(entry)
                 return
@@ -234,6 +280,7 @@ public final class LocalModelManager: @unchecked Sendable {
 
     private func verify(_ entry: Entry, at url: URL) {
         entry.state = .verifying
+        entry.needsVerification = true
         entry.error = nil
         let generation = entry.generation
         let token = ModelVerification()
@@ -242,7 +289,7 @@ public final class LocalModelManager: @unchecked Sendable {
         saveAndPublish(entry)
         guard entry.state == .verifying else { return }
         DispatchQueue.global(qos: .utility).async { [weak self, weak entry] in
-            let result = Result { try ModelStorage.verify(url, descriptor: descriptor, token: token) }
+            let result = Result { _ = try ModelStorage.verify(url, descriptor: descriptor, token: token) }
             self?.queue.async { [weak self, weak entry] in
                 guard let self, let entry, entry.generation == generation else { return }
                 entry.verification = nil
@@ -256,8 +303,12 @@ public final class LocalModelManager: @unchecked Sendable {
                         try FileManager.default.moveItem(at: url, to: destination)
                     }
                     entry.state = .downloaded
+                    entry.needsVerification = false
                     entry.received = descriptor.byteCount
                     self.saveAndPublish(entry)
+                    if entry.state == .downloaded {
+                        self.finishVerificationRequests(entry, result: .success(destination))
+                    }
                 } catch {
                     if error is ModelStorageError {
                         do {
@@ -273,12 +324,20 @@ public final class LocalModelManager: @unchecked Sendable {
         }
     }
 
-    private func cancel(_ entry: Entry) {
+    private func finishVerificationRequests(_ entry: Entry, result: Result<URL, Error>) {
+        let requests = entry.verificationRequests
+        entry.verificationRequests.removeAll()
+        guard !requests.isEmpty else { return }
+        DispatchQueue.main.async { requests.forEach { $0(result) } }
+    }
+
+    private func cancel(_ entry: Entry, error: Error = CancellationError()) {
         entry.generation = UUID()
         entry.download?.cancel()
         entry.download = nil
         entry.verification?.cancel()
         entry.verification = nil
+        finishVerificationRequests(entry, result: .failure(error))
     }
 
     private func prepareDirectory(_ entry: Entry) throws {
@@ -313,7 +372,7 @@ public final class LocalModelManager: @unchecked Sendable {
     private func saveAndPublish(_ entry: Entry) {
         do { try persist() }
         catch {
-            cancel(entry)
+            cancel(entry, error: error)
             entry.state = .failed
             entry.error = "Не удалось сохранить состояние функции: \(error.localizedDescription)"
         }
@@ -321,7 +380,7 @@ public final class LocalModelManager: @unchecked Sendable {
     }
 
     private func fail(_ entry: Entry, _ error: Error) {
-        cancel(entry)
+        cancel(entry, error: error)
         entry.state = .failed
         entry.error = error.localizedDescription
         saveAndPublish(entry)

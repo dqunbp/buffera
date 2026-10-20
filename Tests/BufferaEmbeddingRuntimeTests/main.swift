@@ -79,12 +79,16 @@ while True:
     length = struct.unpack('>I', header)[0]
     request = json.loads(sys.stdin.buffer.read(length))
     text = request['texts'][0]
+    with open(os.path.join(os.path.dirname(__file__), 'requests'), 'a') as output:
+        output.write(text + '\n')
+    if text.startswith('slow-'): time.sleep(0.4)
     if text == 'hang': time.sleep(30)
     if text == 'crash': os._exit(7)
     if text == 'frame':
         sys.stdout.buffer.write(struct.pack('>I', 5 * 1024 * 1024)); sys.stdout.buffer.flush()
         continue
     vector = [1.0] + [0.0] * (1 if text == 'invalid' else 767)
+    if text == 'slow-obsolete-query': vector = [0.0, 1.0] + [0.0] * 766
     response = {'id': request['id'], 'outputs': [
         {'vectors': [vector], 'truncated': False} for _ in request['texts']
     ]}
@@ -96,6 +100,10 @@ try source.write(to: executable, atomically: true, encoding: .utf8)
 try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
 func launchCount() -> Int {
     ((try? String(contentsOf: launches, encoding: .utf8)) ?? "").split(separator: "\n").count
+}
+func requestOrder() -> [String] {
+    ((try? String(contentsOf: root.appendingPathComponent("requests"), encoding: .utf8)) ?? "")
+        .split(separator: "\n").map(String.init)
 }
 func runtime(idle: TimeInterval = 30, timeout: TimeInterval = 5) -> EmbeddingRuntime {
     EmbeddingRuntime(modelRootURL: root, executableURL: executable, idleTimeout: idle,
@@ -151,6 +159,47 @@ let afterCancel = try await queued.value
 check(afterCancel.count == 1 && Date().timeIntervalSince(cancelledAt) < 2,
       "queued request survives active cancellation and gets a new worker")
 
+let beforeSoftCancel = launchCount()
+let obsoleteQuery = Task { try await worker.embed(["slow-obsolete-query"], kind: .query) }
+_ = await eventually { requestOrder().contains("slow-obsolete-query") }
+let queryCancelledAt = Date()
+obsoleteQuery.cancel()
+await expectError("obsolete active query cancellation returns promptly") { _ = try await obsoleteQuery.value }
+check(Date().timeIntervalSince(queryCancelledAt) < 0.2 && worker.isRunning,
+      "obsolete queries release callers without killing the loaded worker")
+var staleQueries: [Task<[EmbeddingOutput], Error>] = []
+for index in 0..<40 {
+    let stale = Task { try await worker.embed(["cancelled-pending-\(index)"], kind: .query) }
+    stale.cancel()
+    staleQueries.append(stale)
+}
+let latest = try await worker.embed(["latest-query"], kind: .query)
+for stale in staleQueries { _ = try? await stale.value }
+check(latest.first?.vectors.first?.first == 1 && launchCount() == beforeSoftCancel,
+      "latest pending query reuses weights after an abandoned result is drained")
+check(!requestOrder().contains { $0.hasPrefix("cancelled-pending-") },
+      "cancelled pending queries never accumulate as inference work")
+
+let background = Task { try await worker.embed(["slow-background"], kind: .document) }
+_ = await eventually { requestOrder().contains("slow-background") }
+let pendingDocument = Task { try await worker.embed(["queued-background"], kind: .document) }
+try await Task.sleep(nanoseconds: 20_000_000)
+let foreground = Task { try await worker.embed(["priority-query"], kind: .query) }
+_ = try await background.value
+_ = try await foreground.value
+_ = try await pendingDocument.value
+let order = requestOrder()
+check(order.firstIndex(of: "priority-query")! < order.firstIndex(of: "queued-background")!,
+      "foreground queries run before queued background documents")
+check(launchCount() == beforeSoftCancel, "query priority does not reload the shared worker")
+
+let abandoned = Task { try await worker.embed(["slow-unload-query"], kind: .query) }
+_ = await eventually { requestOrder().contains("slow-unload-query") }
+abandoned.cancel()
+_ = try? await abandoned.value
+worker.unload()
+check(!worker.isRunning, "explicit unload still kills an abandoned active query")
+
 let permissionRequest = Task { try await worker.embed(["hang"], kind: .document) }
 try await Task.sleep(nanoseconds: 100_000_000)
 try receipt(false)
@@ -184,6 +233,15 @@ await expectError("request deadline interrupts a stuck worker") {
 }
 check(!timedWorker.isRunning, "timed-out process is released")
 timedWorker.shutdown()
+
+let abandonedTimedWorker = runtime(timeout: 0.2)
+let stuckQuery = Task { try await abandonedTimedWorker.embed(["hang"], kind: .query) }
+_ = await eventually { abandonedTimedWorker.isRunning }
+stuckQuery.cancel()
+_ = try? await stuckQuery.value
+let timedOutAbandoned = await eventually { !abandonedTimedWorker.isRunning }
+check(timedOutAbandoned, "abandoned query keeps a bounded deadline and cannot retain a stuck worker")
+abandonedTimedWorker.shutdown()
 
 let pids = ((try? String(contentsOf: launches, encoding: .utf8)) ?? "")
     .split(separator: "\n").compactMap { Int32($0) }

@@ -200,7 +200,7 @@ public final class ChatRuntime: @unchecked Sendable {
         startAvailabilityTimer()
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = Result {
-                try ModelStorage.verify(model.fileURL, descriptor: model.descriptor, token: next.verification)
+                _ = try ModelStorage.verify(model.fileURL, descriptor: model.descriptor, token: next.verification)
             }
             self?.queue.async { [weak self] in
                 guard let self, self.run?.id == next.id else { return }

@@ -50,6 +50,7 @@ public actor HybridSearchService {
     }
 
     private let runtime: EmbeddingRuntime?
+    private let ownsRuntime: Bool
     private let access: LocalModelReadAccess?
     private let queryProvider: (@Sendable (String) async throws -> SemanticQuery)?
     private var cachedVector: CachedVector?
@@ -57,8 +58,10 @@ public actor HybridSearchService {
     private var pageIdentity: EmbeddingIndexIdentity?
     private var semanticIDs: [Int64]?
 
-    public init(modelRootURL: URL, bundleURL: URL = Bundle.main.bundleURL) {
-        runtime = EmbeddingRuntime(modelRootURL: modelRootURL, bundleURL: bundleURL)
+    public init(modelRootURL: URL, bundleURL: URL = Bundle.main.bundleURL,
+                embeddingRuntime: EmbeddingRuntime? = nil) {
+        runtime = embeddingRuntime ?? EmbeddingRuntime(modelRootURL: modelRootURL, bundleURL: bundleURL)
+        ownsRuntime = embeddingRuntime == nil
         access = LocalModelReadAccess(rootURL: modelRootURL)
         queryProvider = nil
     }
@@ -66,6 +69,7 @@ public actor HybridSearchService {
     /// Test boundary supplies deterministic vectors without enabling a real model or touching user data.
     public init(queryProvider: @escaping @Sendable (String) async throws -> SemanticQuery) {
         runtime = nil; access = nil
+        ownsRuntime = false
         self.queryProvider = queryProvider
     }
 
@@ -149,13 +153,14 @@ public actor HybridSearchService {
         }
     }
 
-    /// Call on model disable/deletion; the next request will recheck persisted availability.
+    /// Clear this client's caches. An injected worker belongs to its application owner;
+    /// closing a chat or resetting a search must not stop other users of that worker.
     public func unload() {
         cachedVector = nil; semanticIDs = nil; pageKey = nil; pageIdentity = nil
-        runtime?.unload()
+        if ownsRuntime { runtime?.unload() }
     }
 
-    public nonisolated func shutdown() { runtime?.shutdown() }
+    public nonisolated func shutdown() { if ownsRuntime { runtime?.shutdown() } }
 
     private func literal(_ databaseURL: URL, filter: SearchFilter, limit: Int, offset: Int,
                          reason: String? = nil) throws -> HybridSearchResponse {

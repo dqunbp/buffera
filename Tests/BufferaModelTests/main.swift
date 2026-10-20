@@ -221,13 +221,16 @@ do {
     try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
     try fullPayload.write(to: file)
     let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+    check(manager.snapshots[0].state == .downloaded && !manager.snapshots[0].isReadyForUse &&
+          manager.modelURL(for: .embedding) == nil,
+          "installed switched-off files are visible without exposing an unverified usable URL")
     manager.setEnabled(false, for: .embedding)
-    check(waitFor(manager) { !$0.isEnabled && [.paused, .downloaded].contains($0.state) },
-          "disable during startup verification retains files and never activates the feature")
+    check(waitFor(manager) { !$0.isEnabled && $0.state == .downloaded },
+          "keeping a feature off leaves its verification deferred")
     let before = requests().count
     manager.setEnabled(true, for: .embedding)
-    check(waitFor(manager) { $0.isReadyForUse }, "re-enabling verifies retained final files after startup cancellation")
-    check(requests().count == before, "cancelled verification restarts locally without a second download")
+    check(waitFor(manager) { $0.isReadyForUse }, "enabling verifies retained final files after deferred startup")
+    check(requests().count == before, "deferred verification runs locally without a second download")
     manager.shutdown()
 }
 
@@ -341,6 +344,48 @@ do {
 }
 
 do {
+    let directory = root("diagnostic-off")
+    let file = partial(directory).deletingPathExtension()
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fullPayload.write(to: file)
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+    let before = requests().count
+    var outcomes: [Result<URL, Error>] = []
+    var callbacksOnMain = true
+    for _ in 0..<2 {
+        manager.verifyInstalledModel(for: .embedding) { result in
+            callbacksOnMain = callbacksOnMain && Thread.isMainThread
+            outcomes.append(result)
+        }
+    }
+    let deadline = Date().addingTimeInterval(2)
+    while outcomes.count < 2 && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    check(outcomes.count == 2 && outcomes.allSatisfy { (try? $0.get()) == file },
+          "explicit diagnostics obtain verified installed files without enabling their feature")
+    check(callbacksOnMain, "diagnostic verification results arrive on the main queue")
+    check(!manager.snapshots[0].isEnabled && manager.modelURL(for: .embedding) == file,
+          "diagnostic verification leaves the feature off and makes verified URL available")
+    check(requests().count == before, "explicit diagnostics never download installed files again")
+    var corrupted = fullPayload
+    corrupted[corrupted.count / 2] ^= 0xff
+    try corrupted.write(to: file)
+    var changedFileResult: Result<URL, Error>?
+    manager.verifyInstalledModel(for: .embedding) { changedFileResult = $0 }
+    let changedFileDeadline = Date().addingTimeInterval(2)
+    while changedFileResult == nil && Date() < changedFileDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    let rejected: Bool
+    if case .failure = changedFileResult { rejected = true }
+    else { rejected = false }
+    check(rejected && manager.snapshots[0].state == .failed && manager.modelURL(for: .embedding) == nil,
+          "explicit diagnostics reject same-process mutations after an earlier successful verification")
+    manager.shutdown()
+}
+
+do {
     let directory = root("modified-file")
     let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
     manager.download(.embedding)
@@ -351,8 +396,12 @@ do {
     corrupted[corrupted.count / 2] ^= 0xff
     try corrupted.write(to: file)
     let restored = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
-    check(waitFor(restored) { $0.state == .failed }, "restart rejects same-size file modified after download")
-    check(restored.modelURL(for: .embedding) == nil, "receipt alone cannot bypass integrity verification")
+    check(restored.snapshots[0].state == .downloaded && !restored.snapshots[0].isEnabled &&
+          restored.modelURL(for: .embedding) == nil,
+          "restart defers full verification of installed switched-off files")
+    restored.setEnabled(true, for: .embedding)
+    check(waitFor(restored) { $0.state == .failed }, "enabling rejects same-size file modified after download")
+    check(restored.modelURL(for: .embedding) == nil, "deferred receipt cannot bypass integrity verification")
     restored.shutdown()
 }
 

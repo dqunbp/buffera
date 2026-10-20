@@ -17,16 +17,132 @@ func eventually(_ condition: () throws -> Bool) async throws {
 
 actor Inference {
     var calls = 0
+    var stoppedCalls = 0
     var failing = false
     var delay: UInt64 = 0
+    private var shouldStopNext = false
     func configure(failing: Bool = false, delay: UInt64 = 0) {
         self.failing = failing; self.delay = delay
     }
+    func stopNextRequest() { shouldStopNext = true }
     func embed(_ text: String) async throws -> EmbeddingOutput {
         calls += 1
+        let stop = shouldStopNext
+        shouldStopNext = false
         if delay > 0 { try await Task.sleep(nanoseconds: delay) }
+        if stop {
+            stoppedCalls += 1
+            throw EmbeddingRuntimeError.stopped
+        }
         if failing { throw CheckFailure(message: "Fixture inference failure") }
         return EmbeddingOutput(vectors: [[1, 0, 0]], truncated: false)
+    }
+}
+
+private final class IndexStatusRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = EmbeddingIndexStatus.disabled
+    func record(_ value: EmbeddingIndexStatus) {
+        lock.lock(); self.value = value; lock.unlock()
+    }
+    var latest: EmbeddingIndexStatus {
+        lock.lock(); defer { lock.unlock() }; return value
+    }
+}
+
+private func checkPreparationPauses(root: URL) async throws {
+    let database = root.appendingPathComponent("paused-history.sqlite")
+    let store = try HistoryStore(url: database)
+    func insert(_ text: String) throws {
+        _ = try store.insert(payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text",
+            data: Data(text.utf8))]]), kind: .text, title: text, text: text, source: "Fixture",
+            isConcealed: false, date: Date(), maxCount: 100, maxBytes: 1_000_000)
+    }
+    try insert("First battery document")
+    try insert("Second battery document")
+    let inference = Inference()
+    let status = IndexStatusRecorder()
+    let indexer = EmbeddingIndexer(databaseURL: database,
+        identity: EmbeddingIndexIdentity(fingerprint: "pause-fixture", dimensions: 3),
+        documentProvider: { try await inference.embed($0) },
+        onProgress: { status.record($0) }, onIndexed: {})
+    defer { indexer.shutdown() }
+
+    // Applying the startup policy before enabling must queue work without launching inference.
+    await indexer.setPaused(reason: .battery)
+    await indexer.setEnabled(true)
+    try require(await inference.calls == 0, "Initial battery policy must precede inference")
+    try require(try store.embeddingProgress().pending == 2, "Battery pause must retain durable pending jobs")
+    try require(status.latest.pauseReason == .battery && status.latest.canContinueNow &&
+                status.latest.message.contains("осталось: 2"), "Battery pause must expose its reason and remaining count")
+    await indexer.schedule()
+    try require(await inference.calls == 0, "Repeated schedule cannot bypass the power policy")
+
+    await inference.configure(delay: 150_000_000)
+    await indexer.setPaused(reason: nil)
+    for _ in 0..<100 {
+        if await inference.calls == 1 { break }
+        try await Task.sleep(nanoseconds: 5_000_000)
+    }
+    try require(await inference.calls == 1, "Resuming did not start the pending document")
+    await indexer.setPaused(reason: .foregroundChat)
+    try await eventually { try store.embeddingProgress().complete == 1 }
+    try await Task.sleep(nanoseconds: 30_000_000)
+    try require(await inference.calls == 1 && (try store.embeddingProgress().pending) == 1,
+                "A pause must finish the active document without dequeuing another")
+    try require(try store.embeddingProgress().failed == 0,
+                "Pausing active preparation must not mark a job failed")
+    try require(status.latest.pauseReason == .foregroundChat && !status.latest.canContinueNow,
+                "Interactive priority pause cannot offer a battery override")
+    await indexer.setPaused(reason: .lowPowerMode)
+    try require(status.latest.pauseReason == .lowPowerMode && !status.latest.canContinueNow,
+                "Low Power Mode must remain distinguishable from a battery preference")
+
+    await indexer.setEnabled(false)
+    await indexer.setEnabled(true)
+    try require(await inference.calls == 1 && (try store.embeddingProgress().pending) == 1,
+                "Re-enabling a feature cannot bypass an active pause")
+    await inference.configure()
+    await indexer.setPaused(reason: nil)
+    try await eventually { try store.embeddingProgress().complete == 2 }
+    try require(await inference.calls == 2, "Resume recomputed an already completed document")
+    await indexer.setPaused(reason: .battery)
+    try insert("Captured while preparation is paused")
+    await indexer.schedule()
+    try require(status.latest.message.contains("осталось: 1") && (try store.embeddingProgress().pending) == 1,
+                "New captures must update the pending count while preparation is paused")
+
+    // Model availability can interrupt a suspended request before the actor receives OFF.
+    // Reasserting ON must restart that drain rather than trusting the stale enabled flag.
+    await inference.configure(delay: 50_000_000)
+    await inference.stopNextRequest()
+    await indexer.setPaused(reason: nil)
+    for _ in 0..<100 {
+        if await inference.stoppedCalls == 1 { break }
+        try await Task.sleep(nanoseconds: 5_000_000)
+    }
+    try require(await inference.stoppedCalls == 1, "Fixture did not interrupt the previous drain")
+    let interrupted = try store.embeddingProgress()
+    try require(interrupted.pending == 1 && interrupted.failed == 0,
+                "Interrupted runtime must preserve the pending document")
+    await inference.configure()
+    await indexer.setEnabled(true)
+    try await eventually { try store.embeddingProgress().complete == 3 }
+    try require(await inference.calls == 4, "Reasserted enable must resume the interrupted pending document once")
+
+    // An injected runtime belongs to the application, including after indexer shutdown.
+    let shared = EmbeddingRuntime(modelRootURL: root)
+    defer { shared.shutdown() }
+    let sharedIndexer = EmbeddingIndexer(databaseURL: database, modelRootURL: root, embeddingRuntime: shared,
+        onProgress: { _ in }, onIndexed: {})
+    sharedIndexer.shutdown()
+    do {
+        _ = try await shared.embed(["Check shared ownership"], kind: .query)
+        throw CheckFailure(message: "An absent test model unexpectedly embedded a query")
+    } catch EmbeddingRuntimeError.stopped {
+        throw CheckFailure(message: "Indexer shutdown permanently stopped its shared runtime")
+    } catch EmbeddingRuntimeError.unavailable {
+        // Missing fixture files are expected; the runtime still accepted the request.
     }
 }
 
@@ -116,6 +232,7 @@ actor Inference {
         await indexer.schedule()
         try await Task.sleep(nanoseconds: 30_000_000)
         try require(await inference.calls == stoppedCalls, "Shutdown cannot be restarted")
-        print("PASS: index lifecycle, resume, retry, cancellation, conceal race, shutdown, shared search")
+        try await checkPreparationPauses(root: root)
+        print("PASS: index lifecycle, pause policy, resume, retry, cancellation, conceal race, shutdown, shared search")
     }
 }

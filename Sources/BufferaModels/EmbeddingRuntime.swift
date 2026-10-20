@@ -22,15 +22,30 @@ public final class EmbeddingRuntime: @unchecked Sendable {
         let id: UUID
         let texts: [String]
         let kind: EmbeddingInputKind
-        let continuation: CheckedContinuation<[EmbeddingOutput], Error>
+        let cancellation: ModelVerification
+        private var continuation: CheckedContinuation<[EmbeddingOutput], Error>?
         var timeout: DispatchWorkItem?
 
         init(id: UUID, texts: [String], kind: EmbeddingInputKind,
+             cancellation: ModelVerification,
              continuation: CheckedContinuation<[EmbeddingOutput], Error>) {
             self.id = id
             self.texts = texts
             self.kind = kind
+            self.cancellation = cancellation
             self.continuation = continuation
+        }
+
+        var isCancelled: Bool {
+            do { try cancellation.checkCancellation(); return false }
+            catch { return true }
+        }
+
+        // A cancelled query still owns its protocol response, but no longer owns a caller.
+        func finish(_ result: Result<[EmbeddingOutput], Error>) {
+            let callback = continuation
+            continuation = nil
+            callback?.resume(with: result)
         }
     }
 
@@ -102,7 +117,9 @@ public final class EmbeddingRuntime: @unchecked Sendable {
                     do {
                         try cancellation.checkCancellation()
                         guard !stopped else { throw EmbeddingRuntimeError.stopped }
-                        pending.append(Request(id: id, texts: texts, kind: kind, continuation: continuation))
+                        discardCancelledPending()
+                        pending.append(Request(id: id, texts: texts, kind: kind,
+                                               cancellation: cancellation, continuation: continuation))
                         startNext()
                     } catch {
                         continuation.resume(throwing: error)
@@ -140,11 +157,14 @@ public final class EmbeddingRuntime: @unchecked Sendable {
         guard active == nil, !stopped else { return }
         idle?.cancel()
         idle = nil
+        discardCancelledPending()
         guard !pending.isEmpty else {
             scheduleIdleUnload()
             return
         }
-        active = pending.removeFirst()
+        // A user query runs after the current item and ahead of queued background documents.
+        let next = pending.firstIndex { $0.kind == .query } ?? 0
+        active = pending.remove(at: next)
         guard let request = active else { return }
         let timeout = DispatchWorkItem { [weak self, weak request] in
             guard let self, let request, self.active?.id == request.id else { return }
@@ -178,7 +198,7 @@ public final class EmbeddingRuntime: @unchecked Sendable {
         startAvailabilityTimer()
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = Result {
-                try ModelStorage.verify(model.fileURL, descriptor: model.descriptor, token: next.verification)
+                _ = try ModelStorage.verify(model.fileURL, descriptor: model.descriptor, token: next.verification)
             }
             self?.queue.async { [weak self] in
                 guard let self, self.run?.id == next.id else { return }
@@ -315,7 +335,7 @@ public final class EmbeddingRuntime: @unchecked Sendable {
         let finished = active
         active = nil
         finished?.timeout?.cancel()
-        finished?.continuation.resume(with: result)
+        finished?.finish(result)
         startNext()
     }
 
@@ -326,11 +346,26 @@ public final class EmbeddingRuntime: @unchecked Sendable {
     }
 
     private func cancel(_ id: UUID) {
-        if active?.id == id {
-            stopWorker()
-            finishActive(.failure(CancellationError()))
+        if let active, active.id == id {
+            if active.kind == .query {
+                // Queries are short, bounded inputs. Finish the caller immediately, then
+                // consume and discard this response so the next query reuses loaded weights.
+                // Its existing deadline still kills a stuck worker.
+                active.finish(.failure(CancellationError()))
+            } else {
+                stopWorker()
+                finishActive(.failure(CancellationError()))
+            }
         } else if let index = pending.firstIndex(where: { $0.id == id }) {
-            pending.remove(at: index).continuation.resume(throwing: CancellationError())
+            pending.remove(at: index).finish(.failure(CancellationError()))
+        }
+    }
+
+    private func discardCancelledPending() {
+        pending.removeAll { request in
+            guard request.isCancelled else { return false }
+            request.finish(.failure(CancellationError()))
+            return true
         }
     }
 
@@ -383,7 +418,7 @@ public final class EmbeddingRuntime: @unchecked Sendable {
         pending.removeAll()
         for request in requests {
             request.timeout?.cancel()
-            request.continuation.resume(throwing: error)
+            request.finish(.failure(error))
         }
     }
 }

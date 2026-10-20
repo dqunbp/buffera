@@ -12,6 +12,8 @@ final class SettingsWindow: NSWindowController {
     var onCancelModelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
     var onRetryEmbeddingIndex: (() -> Void)?
+    var onOnlyPrepareOnExternalPowerChanged: ((Bool) -> Void)?
+    var onContinueEmbeddingPreparation: (() -> Void)?
 
     private let settings: SettingsContentController
 
@@ -51,6 +53,10 @@ final class SettingsWindow: NSWindowController {
         settings.onCancelModelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
         settings.onWillDisableOrRemoveModel = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
         settings.onRetryEmbeddingIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
+        settings.onOnlyPrepareOnExternalPowerChanged = { [weak self] in
+            self?.onOnlyPrepareOnExternalPowerChanged?($0)
+        }
+        settings.onContinueEmbeddingPreparation = { [weak self] in self?.onContinueEmbeddingPreparation?() }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -75,8 +81,12 @@ final class SettingsWindow: NSWindowController {
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
         settings.updateModelCheck(role: role, status: status, running: running)
     }
-    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
-        settings.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry)
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool, canContinueNow: Bool = false) {
+        settings.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry,
+                                      canContinueNow: canContinueNow)
+    }
+    func updateBackgroundPreparation(onlyOnExternalPower: Bool) {
+        settings.updateBackgroundPreparation(onlyOnExternalPower: onlyOnExternalPower)
     }
 }
 
@@ -102,6 +112,8 @@ private final class SettingsContentController: NSViewController {
     var onCancelModelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemoveModel: ((ModelRole) -> Void)?
     var onRetryEmbeddingIndex: (() -> Void)?
+    var onOnlyPrepareOnExternalPowerChanged: ((Bool) -> Void)?
+    var onContinueEmbeddingPreparation: (() -> Void)?
 
     private let mcp: MCPSettingsView
     private let models: ModelSettingsView
@@ -132,6 +144,10 @@ private final class SettingsContentController: NSViewController {
         models.onCancelCheck = { [weak self] role in self?.onCancelModelCheck?(role) }
         models.onWillDisableOrRemove = { [weak self] role in self?.onWillDisableOrRemoveModel?(role) }
         models.onRetryEmbeddingIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
+        models.onOnlyPrepareOnExternalPowerChanged = { [weak self] in
+            self?.onOnlyPrepareOnExternalPowerChanged?($0)
+        }
+        models.onContinueEmbeddingPreparation = { [weak self] in self?.onContinueEmbeddingPreparation?() }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -147,8 +163,12 @@ private final class SettingsContentController: NSViewController {
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
         models.updateCheck(role: role, status: status, running: running)
     }
-    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
-        models.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry)
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool, canContinueNow: Bool = false) {
+        models.updateEmbeddingIndex(status: status, progress: progress, canRetry: canRetry,
+                                    canContinueNow: canContinueNow)
+    }
+    func updateBackgroundPreparation(onlyOnExternalPower: Bool) {
+        models.updateBackgroundPreparation(onlyOnExternalPower: onlyOnExternalPower)
     }
 
     override func loadView() {

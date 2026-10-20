@@ -17,12 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var modelManager: LocalModelManager?
     private var modelStorageError: String?
     private let modelProbe = ModelProbeController()
+    private var modelCheckTokens: [ModelRole: UUID] = [:]
+    private var embeddingRuntime: EmbeddingRuntime?
     private var embeddingIndexer: EmbeddingIndexer?
     private var searchService: HybridSearchService!
     private var searchTask: Task<Void, Never>?
     private var historyChat: HistoryChatCoordinator?
     private var embeddingStatus = EmbeddingIndexStatus.disabled
     private var embeddingEnabled: Bool?
+    private var preparationMonitor: BackgroundPreparationMonitor?
+    private var preparationPolicy = BackgroundPreparationPolicy(environment:
+        BackgroundPreparationEnvironment(powerSource: .unknown, lowPowerMode: false, thermalState: .nominal))
+    private var assistantIsBusy = false
     private var imageTextIndexer: ImageTextIndexer?
     private var copyTransformService: CopyTransformService?
     private var generation = 0
@@ -72,16 +78,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }
         let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
-        searchService = HybridSearchService(modelRootURL: modelRoot)
+        let preparationMonitor = BackgroundPreparationMonitor()
+        self.preparationMonitor = preparationMonitor
+        preparationPolicy = BackgroundPreparationPolicy(
+            onlyOnExternalPower: UserDefaults.standard.object(
+                forKey: BackgroundPreparationPolicy.preferenceKey) as? Bool ?? true,
+            environment: preparationMonitor.environment)
+        preparationMonitor.onChange = { [weak self] environment in
+            guard let self else { return }
+            self.preparationPolicy.updateEnvironment(environment)
+            self.updateBackgroundPreparation()
+        }
+        let runtime = EmbeddingRuntime(modelRootURL: modelRoot)
+        embeddingRuntime = runtime
+        searchService = HybridSearchService(modelRootURL: modelRoot, embeddingRuntime: runtime)
         historyChat = HistoryChatCoordinator(databaseURL: folder.appendingPathComponent("history.sqlite"),
-            modelRootURL: modelRoot)
+            modelRootURL: modelRoot, embeddingRuntime: runtime)
         historyChat?.onOpenSource = { [weak self] in self?.openChatSource($0) }
+        historyChat?.onActivityChange = { [weak self] busy in
+            guard let self else { return }
+            self.assistantIsBusy = busy
+            self.updateBackgroundPreparation()
+        }
         historyChat?.onShowFeatures = { [weak self] in
             self?.showSettings()
             self?.settings?.showFeatures()
         }
         embeddingIndexer = EmbeddingIndexer(databaseURL: folder.appendingPathComponent("history.sqlite"),
-            modelRootURL: modelRoot,
+            modelRootURL: modelRoot, embeddingRuntime: runtime,
             onProgress: { [weak self] status in
                 DispatchQueue.main.async { self?.showEmbeddingProgress(status) }
             },
@@ -155,13 +179,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         clipboard.paused = true
         clipboardSession.stop()
+        preparationMonitor?.stop()
         imageTextIndexer?.stop()
+        modelCheckTokens.removeAll()
         modelManager?.shutdown()
         modelProbe.shutdown()
         searchTask?.cancel()
         embeddingIndexer?.shutdown()
         searchService?.shutdown()
         historyChat?.shutdown()
+        embeddingRuntime?.shutdown()
     }
 
     private func connectPanel() {
@@ -188,7 +215,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onAppearanceChange = { [weak self] value in self?.settings?.updateAppearance(value) }
         panel.request = { [weak self] filter, offset, limit in
             guard let self else { return }
-            let refreshSources = offset == 0 && !self.panel.isRefreshingSearchIndex
+            let isIndexRefresh = self.panel.isRefreshingSearchIndex
+            let refreshSources = offset == 0 && !isIndexRefresh
             if offset == 0 {
                 self.searchGeneration += 1
                 // OCR refreshes the same view: its existing thumbnail/action requests remain valid.
@@ -197,12 +225,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let searchGeneration = self.searchGeneration
             self.searchTask?.cancel()
             let mode = self.panel.searchMode
+            let usesSemanticSearch = mode != .literal && self.embeddingEnabled == true
             let databaseURL = self.folder.appendingPathComponent("history.sqlite")
             self.searchTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 do {
-                    if offset == 0, !filter.query.isEmpty {
-                        try await Task.sleep(nanoseconds: 180_000_000)
+                    if offset == 0, !filter.query.isEmpty, !isIndexRefresh {
+                        // Wait for a short typing pause before doing inference. Index refreshes
+                        // are already coalesced by the panel; literal search stays responsive.
+                        let delay: UInt64 = usesSemanticSearch ? 450_000_000 : 120_000_000
+                        try await Task.sleep(nanoseconds: delay)
                     }
                     let response = try await self.searchService.search(databaseURL: databaseURL,
                         filter: filter, mode: mode, limit: limit, offset: offset)
@@ -376,6 +408,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await embeddingIndexer.schedule() }
     }
 
+    private var preparationPauseReason: EmbeddingIndexPauseReason? {
+        preparationPolicy.pauseReason ?? (assistantIsBusy ? .foregroundChat : nil)
+    }
+
+    private func updateBackgroundPreparation() {
+        settings?.updateBackgroundPreparation(onlyOnExternalPower: preparationPolicy.onlyOnExternalPower)
+        let reason = preparationPauseReason
+        Task { @MainActor [weak self] in
+            guard let self, reason == self.preparationPauseReason else { return }
+            await self.embeddingIndexer?.setPaused(reason: reason)
+        }
+    }
+
     private func modelsChanged(_ snapshots: [LocalModelSnapshot]) {
         settings?.updateModels(snapshots)
         historyChat?.modelsChanged(snapshots)
@@ -388,16 +433,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the panel in its loading state, which also prevents the deferred index refresh.
         Task { @MainActor [weak self] in
             guard let self, enabled == self.embeddingEnabled else { return }
+            // Apply the initial power policy before allowing the first document to start.
+            await self.embeddingIndexer?.setPaused(reason: self.preparationPauseReason)
+            guard enabled == self.embeddingEnabled else { return }
             await self.embeddingIndexer?.setEnabled(enabled)
             guard enabled == self.embeddingEnabled else { return }
-            if !enabled { await self.searchService.unload() }
+            if !enabled {
+                self.embeddingRuntime?.unload()
+                await self.searchService.unload()
+            }
             self.panel?.searchIndexDidChange()
         }
     }
 
     private func showEmbeddingProgress(_ status: EmbeddingIndexStatus) {
         embeddingStatus = status
-        settings?.updateEmbeddingIndex(status: status.message, progress: status.fraction, canRetry: status.canRetry)
+        settings?.updateEmbeddingIndex(status: status.message, progress: status.fraction,
+                                       canRetry: status.canRetry, canContinueNow: status.canContinueNow)
     }
 
     /// Normal and transformed copies share suppression and usage ordering.
@@ -496,17 +548,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let controller = SettingsWindow(modelManager: modelManager, modelError: modelStorageError,
                                             mcpAccess: MCPAccess(directory: folder))
             controller.onCheckModel = { [weak self] role in
-                guard let self, let url = self.modelManager?.modelURL(for: role) else { return }
-                self.modelProbe.check(role, modelURL: url)
+                guard let self, let manager = self.modelManager else { return }
+                let token = UUID()
+                self.modelCheckTokens[role] = token
+                manager.verifyInstalledModel(for: role) { [weak self] result in
+                    guard let self, self.modelCheckTokens[role] == token else { return }
+                    self.modelCheckTokens[role] = nil
+                    switch result {
+                    case .success(let url): self.modelProbe.check(role, modelURL: url)
+                    case .failure(let error):
+                        guard !(error is CancellationError) else { return }
+                        self.settings?.updateModelCheck(role: role, status: error.localizedDescription, running: false)
+                    }
+                }
             }
-            controller.onCancelModelCheck = { [weak self] role in self?.modelProbe.cancel(role) }
+            controller.onCancelModelCheck = { [weak self] role in
+                self?.modelCheckTokens[role] = nil
+                self?.modelProbe.cancel(role)
+            }
             controller.onWillDisableOrRemoveModel = { [weak self] role in
+                self?.modelCheckTokens[role] = nil
                 self?.modelProbe.cancel(role)
                 self?.historyChat?.willDisableModel(role)
             }
             controller.onRetryEmbeddingIndex = { [weak self] in
                 guard let indexer = self?.embeddingIndexer else { return }
                 Task { await indexer.retry() }
+            }
+            controller.onOnlyPrepareOnExternalPowerChanged = { [weak self] value in
+                guard let self else { return }
+                self.preparationPolicy.onlyOnExternalPower = value
+                UserDefaults.standard.set(value, forKey: BackgroundPreparationPolicy.preferenceKey)
+                self.updateBackgroundPreparation()
+            }
+            controller.onContinueEmbeddingPreparation = { [weak self] in
+                guard let self else { return }
+                self.preparationPolicy.continueOnBattery()
+                self.updateBackgroundPreparation()
             }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onRevealData = { [weak self] in self?.revealData() }
@@ -516,6 +594,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
             }
             settings = controller
+            controller.updateBackgroundPreparation(onlyOnExternalPower: preparationPolicy.onlyOnExternalPower)
             showEmbeddingProgress(embeddingStatus)
         }
         if panel?.window.isVisible == true { panel.close(restoreFocus: false) }

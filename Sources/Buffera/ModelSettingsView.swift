@@ -7,6 +7,8 @@ final class ModelSettingsView: NSView {
     var onCancelCheck: ((ModelRole) -> Void)?
     var onWillDisableOrRemove: ((ModelRole) -> Void)?
     var onRetryEmbeddingIndex: (() -> Void)?
+    var onOnlyPrepareOnExternalPowerChanged: ((Bool) -> Void)?
+    var onContinueEmbeddingPreparation: (() -> Void)?
 
     private let manager: LocalModelManager?
     private var cards: [ModelRole: ModelCardView] = [:]
@@ -49,6 +51,10 @@ final class ModelSettingsView: NSView {
             card.onCheck = { [weak self] in self?.onCheck?(role) }
             card.onCancelCheck = { [weak self] in self?.onCancelCheck?(role) }
             card.onRetryIndex = { [weak self] in self?.onRetryEmbeddingIndex?() }
+            card.onOnlyPrepareOnExternalPowerChanged = { [weak self] in
+                self?.onOnlyPrepareOnExternalPowerChanged?($0)
+            }
+            card.onContinuePreparation = { [weak self] in self?.onContinueEmbeddingPreparation?() }
             cards[role] = card
             content.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -101,8 +107,13 @@ final class ModelSettingsView: NSView {
         cards[role]?.updateCheck(status: status, running: running)
     }
 
-    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool) {
-        cards[.embedding]?.updateIndex(status: status, progress: progress, canRetry: canRetry)
+    func updateEmbeddingIndex(status: String, progress: Double?, canRetry: Bool, canContinueNow: Bool = false) {
+        cards[.embedding]?.updateIndex(status: status, progress: progress, canRetry: canRetry,
+                                      canContinueNow: canContinueNow)
+    }
+
+    func updateBackgroundPreparation(onlyOnExternalPower: Bool) {
+        cards[.embedding]?.updateBackgroundPreparation(onlyOnExternalPower: onlyOnExternalPower)
     }
 }
 
@@ -118,6 +129,8 @@ private final class ModelCardView: NSBox {
     var onCheck: (() -> Void)?
     var onCancelCheck: (() -> Void)?
     var onRetryIndex: (() -> Void)?
+    var onOnlyPrepareOnExternalPowerChanged: ((Bool) -> Void)?
+    var onContinuePreparation: (() -> Void)?
 
     private var snapshot: LocalModelSnapshot
     private var isChecking = false
@@ -132,8 +145,13 @@ private final class ModelCardView: NSBox {
     private let indexStatus = modelParagraph("")
     private let indexProgress = NSProgressIndicator()
     private let retryIndex = NSButton()
+    private let continuePreparation = NSButton()
+    private let onlyOnExternalPower = NSButton(
+        checkboxWithTitle: "Готовить историю для поиска по смыслу только при питании от сети",
+        target: nil, action: nil)
     private var indexHasProgress = false
     private var indexCanRetry = false
+    private var indexCanContinueNow = false
     private let details = NSStackView()
     private let disclosure = NSButton(title: "Подробнее", target: nil, action: nil)
 
@@ -157,6 +175,19 @@ private final class ModelCardView: NSBox {
         let description = modelParagraph(isSearch
             ? "Находите записи, даже если не помните точные слова. Для поиска по смыслу используется отдельная модель на вашем Mac."
             : "Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы.")
+        let energyNote = modelParagraph(isSearch
+            ? "Подготовка истории расходует заряд. Поиск по уже подготовленным записям доступен и от аккумулятора."
+            : "Локальные ответы расходуют заряд и могут нагревать Mac. Обработка начинается после вашего вопроса.")
+        energyNote.identifier = NSUserInterfaceItemIdentifier("\(prefix).energyNote")
+        onlyOnExternalPower.font = .systemFont(ofSize: 11)
+        onlyOnExternalPower.cell?.wraps = true
+        onlyOnExternalPower.cell?.lineBreakMode = .byWordWrapping
+        onlyOnExternalPower.state = .on
+        onlyOnExternalPower.target = self
+        onlyOnExternalPower.action = #selector(changeExternalPowerPreference)
+        onlyOnExternalPower.identifier = NSUserInterfaceItemIdentifier("\(prefix).onlyOnExternalPower")
+        onlyOnExternalPower.isHidden = !isSearch
+        onlyOnExternalPower.toolTip = "Влияет на фоновую подготовку истории. Поиск и ответы по вашему запросу доступны при любом питании."
 
         modelName.font = .systemFont(ofSize: 11)
         modelName.identifier = NSUserInterfaceItemIdentifier("\(prefix).name")
@@ -203,6 +234,11 @@ private final class ModelCardView: NSBox {
         configure(retryIndex, action: #selector(retryIndexing), identifier: "\(prefix).retryIndex")
         retryIndex.title = "Повторить обработку"
         retryIndex.isHidden = true
+        configure(continuePreparation, action: #selector(continueIndexPreparation),
+                  identifier: "\(prefix).continuePreparation")
+        continuePreparation.title = "Продолжить сейчас"
+        continuePreparation.toolTip = "Продолжить на аккумуляторе до следующего подключения к сети или перезапуска Buffera"
+        continuePreparation.isHidden = true
 
         let technicalActions = NSStackView(views: [check, license])
         technicalActions.orientation = .horizontal
@@ -212,8 +248,9 @@ private final class ModelCardView: NSBox {
         details.spacing = 8
         for view in [technicalActions, checkStatus] { details.addArrangedSubview(view) }
         details.isHidden = true
-        let stack = NSStackView(views: [enabled, description, modelName, status, progress,
-                                      indexStatus, indexProgress, retryIndex, actions, details])
+        let stack = NSStackView(views: [enabled, description, modelName, energyNote, status, progress,
+                                      onlyOnExternalPower, indexStatus, indexProgress, continuePreparation,
+                                      retryIndex, actions, details])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -226,7 +263,8 @@ private final class ModelCardView: NSBox {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
-        for view in [description, modelName, status, progress, indexStatus, indexProgress, details] {
+        for view in [description, modelName, energyNote, status, progress, onlyOnExternalPower,
+                     indexStatus, indexProgress, details] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         checkStatus.widthAnchor.constraint(equalTo: details.widthAnchor).isActive = true
@@ -297,6 +335,7 @@ private final class ModelCardView: NSBox {
             status.textColor = .systemRed
         }
         updateIndexVisibility()
+        onlyOnExternalPower.isEnabled = platformSupported
         updateCheckButton()
     }
 
@@ -308,13 +347,18 @@ private final class ModelCardView: NSBox {
         updateCheckButton()
     }
 
-    func updateIndex(status: String, progress: Double?, canRetry: Bool) {
+    func updateIndex(status: String, progress: Double?, canRetry: Bool, canContinueNow: Bool) {
         guard snapshot.descriptor.role == .embedding else { return }
         indexStatus.stringValue = status
         indexHasProgress = progress != nil
         indexCanRetry = canRetry
+        indexCanContinueNow = canContinueNow
         if let progress { indexProgress.doubleValue = max(0, min(1, progress)) }
         updateIndexVisibility()
+    }
+
+    func updateBackgroundPreparation(onlyOnExternalPower value: Bool) {
+        onlyOnExternalPower.state = value ? .on : .off
     }
 
     private func updateIndexVisibility() {
@@ -322,12 +366,14 @@ private final class ModelCardView: NSBox {
         indexProgress.isHidden = !indexHasProgress || !snapshot.isReadyForUse
         retryIndex.isHidden = !indexCanRetry || !snapshot.isReadyForUse
         retryIndex.isEnabled = snapshot.isReadyForUse && platformSupported
+        continuePreparation.isHidden = !indexCanContinueNow || !snapshot.isReadyForUse
+        continuePreparation.isEnabled = snapshot.isReadyForUse && platformSupported
     }
 
     private func updateCheckButton() {
         check.isHidden = snapshot.state != .downloaded && !isChecking
         check.title = isChecking ? "Остановить проверку" : "Проверить работу"
-        check.isEnabled = platformSupported && (isChecking || snapshot.isReadyForUse)
+        check.isEnabled = platformSupported && (isChecking || snapshot.state == .downloaded)
     }
 
     private var platformSupported: Bool {
@@ -358,6 +404,10 @@ private final class ModelCardView: NSBox {
     }
     @objc private func removeModel() { onRemove?() }
     @objc private func retryIndexing() { onRetryIndex?() }
+    @objc private func continueIndexPreparation() { onContinuePreparation?() }
+    @objc private func changeExternalPowerPreference() {
+        onOnlyPrepareOnExternalPowerChanged?(onlyOnExternalPower.state == .on)
+    }
     @objc private func checkModel() {
         if isChecking { onCancelCheck?() }
         else { onCheck?() }
