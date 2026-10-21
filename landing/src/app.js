@@ -2,9 +2,9 @@
 
 // The demo is deliberately self-contained: no access to the visitor's clipboard or history.
 const samples = [
-  { id: 'idea', kind: 'text', title: 'Хорошая идея не должна теряться.', source: 'Заметки', time: 'только что', favorite: true, text: 'Хорошая идея не должна теряться.\n\nСначала придумать. Потом скопировать. А когда понадобится — найти в Buffera.', keywords: 'идея дизайн текст память' },
-  { id: 'link', kind: 'link', title: 'Та самая статья про хороший дизайн', source: 'Safari', time: '2 минуты назад', favorite: false, text: 'https://example.com/design?utm_source=newsletter\n\nВ приложении действие «Убрать метки из ссылки» удалит рекламную метку. Это демонстрационная ссылка.', keywords: 'статья дизайн ссылка сайт' },
-  { id: 'image', kind: 'image', title: 'Скриншот с адресом любимого места', source: 'Снимок экрана', time: '12 минут назад', favorite: false, text: 'Текст внутри демонстрационного скриншота:\n\nКофейня «Пауза»\nУлица Примеров, 12\nКаждый день, 09:00–21:00\n\nЭто вымышленный пример распознанного текста.', keywords: 'кофе кофейня адрес картинка скриншот пауза улица примеров' },
+  { id: 'idea', kind: 'text', title: 'План встречи: обсудить макеты интерфейса', source: 'Заметки', time: 'только что', favorite: true, text: 'План встречи: обсудить макеты интерфейса\n\nОбсудить структуру главного экрана, проверить сценарий поиска и согласовать макеты. Это демонстрационная заметка.', keywords: 'встреча макеты интерфейс заметки дизайн текст' },
+  { id: 'link', kind: 'link', title: 'Статья о дизайне интерфейсов', source: 'Safari', time: '2 минуты назад', favorite: false, text: 'https://example.com/design?utm_source=newsletter\n\nВ приложении действие «Убрать метки из ссылки» удалит рекламную метку. Это демонстрационная ссылка.', keywords: 'статья дизайн ссылка сайт' },
+  { id: 'image', kind: 'image', title: 'Скриншот с адресом встречи', source: 'Снимок экрана', time: '12 минут назад', favorite: false, text: 'Текст внутри демонстрационного скриншота:\n\nКофейня «Пауза»\nУлица Примеров, 12\nКаждый день, 09:00–21:00\n\nЭто вымышленный пример распознанного текста.', keywords: 'кофе кофейня адрес картинка скриншот пауза улица примеров' },
   { id: 'json', kind: 'text', title: '{"idea":"сохранить","status":"готово"}', source: 'Terminal', time: '24 минуты назад', favorite: true, text: '{\n  "idea": "сохранить",\n  "status": "готово"\n}\n\nВ Buffera корректный JSON можно отформатировать перед копированием.', keywords: 'json код форматирование текст terminal' },
 ];
 const kindLabels = { text: 'Текст', link: 'Ссылка', image: 'Картинка · OCR' };
@@ -30,7 +30,7 @@ function renderDemo() {
   if (!visible.length) {
     const empty = document.createElement('p');
     empty.className = 'demo-empty';
-    empty.textContent = 'Здесь пока ничего. Попробуй «дизайн», «адрес» или сбрось фильтр.';
+    empty.textContent = 'Совпадений нет. Попробуй «дизайн», «адрес» или другой фильтр.';
     list.append(empty);
   }
   visible.forEach((item, index) => {
@@ -73,7 +73,7 @@ function renderDemo() {
     button.addEventListener('focus', () => select(index));
     list.append(button);
   });
-  count.textContent = `${visible.length} из ${samples.length} примеров · твои данные не используются`;
+  count.textContent = `${visible.length} из ${samples.length} примеров · демонстрационные данные`;
 }
 
 function select(index) {
@@ -204,20 +204,3 @@ new IntersectionObserver(([entry]) => {
 }, { threshold: .05 }).observe(sculpture);
 // A single small arrival bounce; there is no continuous idle animation.
 if (!reduceMotion.matches) { bodies[0].y = -16; bodies[1].y = -11; wakeSpring(); }
-
-document.querySelector('#copy-command').addEventListener('click', async () => {
-  const status = document.querySelector('#copy-status');
-  const command = 'zsh scripts/build-app.sh\nopen dist/Buffera.app';
-  try {
-    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(command);
-    status.textContent = 'Команды скопированы. Запусти их из папки с исходниками.';
-  } catch {
-    status.textContent = 'Не удалось скопировать. Выдели команды выше и нажми ⌘C.';
-    const range = document.createRange();
-    range.selectNodeContents(document.querySelector('.command-block code'));
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-});

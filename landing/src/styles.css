@@ -363,24 +363,6 @@ h3 {
   filter:blur(23px);
 }
 
-.sculpture-mark {
-  position:absolute;
-  width:72px;
-  left:calc(50% - 36px);
-  top:46%;
-  z-index:4;
-  pointer-events:none;
-  opacity:.75;
-}
-
-.sculpture-mark svg {
-  fill:none;
-  stroke:#f7eaff;
-  stroke-width:7;
-  stroke-linecap:round;
-  filter:drop-shadow(0 1px 2px #602c83);
-}
-
 .orbit-note {
   position:absolute;
   z-index:5;
@@ -482,6 +464,10 @@ h3 {
   grid-template-columns:.8fr 1.3fr;
   gap:10%;
   align-items:center;
+}
+
+.section-intro {
+  min-width:0;
 }
 
 .section-intro .small-mark {
@@ -977,8 +963,8 @@ h3 {
 
 .ocr-art {
   width:200px;
-  padding:31px 28px;
-  font-size:25px;
+  padding:31px 22px;
+  font-size:23px;
   letter-spacing:-1px;
   line-height:1.1;
 }
@@ -1408,41 +1394,23 @@ details p {
   color:#756180!important;
 }
 
-.command-block {
-  margin-top:20px;
-  border:1px solid #decee9;
-  border-radius:9px;
-  background:#efe6f8;
-  overflow:hidden;
+.install-actions {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:24px;
+  margin-top:24px;
 }
 
-.command-block code {
-  display:block;
-  padding:16px;
-  font-size:12px;
-  line-height:1.8;
-  color:#5a3676;
-  overflow-wrap:anywhere;
+.install-actions .button {
+  max-width:100%;
+  padding:18px 24px;
+  font-size:16px;
+  gap:22px;
 }
 
-.command-block button {
-  display:block;
-  padding:9px 16px;
-  font-size:11px;
-  background:#e7d8f1;
-  text-align:left;
-  width:100%;
-}
-
-.command-block button:hover {
-  background:#dcc8ed;
-}
-
-.install-card .copy-status {
-  font-size:11px!important;
-  margin:0!important;
-  min-height:18px;
-  color:#735189!important;
+.install-actions .text-link {
+  font-size:13px;
 }
 
 .install-requirements {
@@ -1490,9 +1458,15 @@ details p {
   width:29px;
 }
 
-.footer>span,.footer>a:last-child {
+.footer>span,.footer-links {
   font-size:11px;
   color:#8d789c;
+}
+
+.footer-links {
+  display:flex;
+  gap:24px;
+  flex-shrink:0;
 }
 
 @media(min-width:1600px) {
@@ -1982,10 +1956,6 @@ details p {
     height:215px;
     top:12%;
   }
-  .sculpture-mark {
-    width:52px;
-    left:calc(50% - 26px);
-  }
   .note-file {
     top:16%;
     right:-2%;
@@ -2144,6 +2114,9 @@ details p {
     transform-origin:left center;
     width:190px;
   }
+  .mini-feature>.nearby-art {
+    padding-left:0;
+  }
   .keyboard-section {
     padding:40px 0;
   }
@@ -2244,8 +2217,9 @@ details p {
     width:100%;
     text-align:left;
   }
-  .footer>a:last-child {
+  .footer-links {
     margin-left:auto;
+    gap:18px;
   }
 }
 
