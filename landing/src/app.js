@@ -1,13 +1,11 @@
 'use strict';
 
 // The demo is deliberately self-contained: no access to the visitor's clipboard or history.
-const samples = [
-  { id: 'idea', kind: 'text', title: 'План встречи: обсудить макеты интерфейса', source: 'Заметки', time: 'только что', favorite: true, text: 'План встречи: обсудить макеты интерфейса\n\nОбсудить структуру главного экрана, проверить сценарий поиска и согласовать макеты. Это демонстрационная заметка.', keywords: 'встреча макеты интерфейс заметки дизайн текст' },
-  { id: 'link', kind: 'link', title: 'Статья о дизайне интерфейсов', source: 'Safari', time: '2 минуты назад', favorite: false, text: 'https://example.com/design?utm_source=newsletter\n\nВ приложении действие «Убрать метки из ссылки» удалит рекламную метку. Это демонстрационная ссылка.', keywords: 'статья дизайн ссылка сайт' },
-  { id: 'image', kind: 'image', title: 'Скриншот с адресом встречи', source: 'Снимок экрана', time: '12 минут назад', favorite: false, text: 'Текст внутри демонстрационного скриншота:\n\nКофейня «Пауза»\nУлица Примеров, 12\nКаждый день, 09:00–21:00\n\nЭто вымышленный пример распознанного текста.', keywords: 'кофе кофейня адрес картинка скриншот пауза улица примеров' },
-  { id: 'json', kind: 'text', title: '{"idea":"сохранить","status":"готово"}', source: 'Terminal', time: '24 минуты назад', favorite: true, text: '{\n  "idea": "сохранить",\n  "status": "готово"\n}\n\nВ Buffera корректный JSON можно отформатировать перед копированием.', keywords: 'json код форматирование текст terminal' },
-];
-const kindLabels = { text: 'Текст', link: 'Ссылка', image: 'Картинка · OCR' };
+const messages = JSON.parse(document.querySelector('#locale-data').textContent);
+const { samples, kindLabels } = messages;
+const locale = document.documentElement.lang;
+const touchIdle = document.querySelector('#touch-label').textContent;
+const formatMessage = (message, values) => message.replace(/\{(\w+)\}/g, (_, key) => values[key]);
 const kindIcons = { text: 'T', link: '↗', image: '▧' };
 const search = document.querySelector('#demo-search');
 const list = document.querySelector('#demo-items');
@@ -20,17 +18,17 @@ let selection = 0;
 let lastOpened = null;
 
 function renderDemo() {
-  const query = search.value.trim().toLocaleLowerCase('ru');
+  const query = search.value.trim().toLocaleLowerCase(locale);
   visible = samples.filter(item => {
     const matchesFilter = filter === 'all' || (filter === 'favorite' ? item.favorite : item.kind === filter);
-    return matchesFilter && `${item.title} ${item.text} ${item.source} ${item.keywords}`.toLocaleLowerCase('ru').includes(query);
+    return matchesFilter && `${item.title} ${item.text} ${item.source} ${item.keywords}`.toLocaleLowerCase(locale).includes(query);
   });
   selection = 0;
   list.replaceChildren();
   if (!visible.length) {
     const empty = document.createElement('p');
     empty.className = 'demo-empty';
-    empty.textContent = 'Совпадений нет. Попробуй «дизайн», «адрес» или другой фильтр.';
+    empty.textContent = messages.empty;
     list.append(empty);
   }
   visible.forEach((item, index) => {
@@ -38,7 +36,7 @@ function renderDemo() {
     button.type = 'button';
     button.className = `demo-item${index === selection ? ' selected' : ''}`;
     button.dataset.id = item.id;
-    button.setAttribute('aria-label', `Посмотреть: ${item.title}`);
+    button.setAttribute('aria-label', formatMessage(messages.view, { title: item.title }));
     const icon = document.createElement('span');
     icon.className = `item-icon ${item.kind}`;
     icon.setAttribute('aria-hidden', 'true');
@@ -61,7 +59,7 @@ function renderDemo() {
       const star = document.createElement('span');
       star.className = 'item-favorite';
       star.textContent = '☆';
-      star.setAttribute('aria-label', 'В избранном');
+      star.setAttribute('aria-label', messages.favorite);
       button.append(star);
     }
     const key = document.createElement('span');
@@ -73,7 +71,7 @@ function renderDemo() {
     button.addEventListener('focus', () => select(index));
     list.append(button);
   });
-  count.textContent = `${visible.length} из ${samples.length} примеров · демонстрационные данные`;
+  count.textContent = formatMessage(messages.count, { visible: visible.length, total: samples.length });
 }
 
 function select(index) {
@@ -189,9 +187,9 @@ sculpture.addEventListener('pointerleave', () => {
 sculpture.addEventListener('click', () => {
   bodies.forEach((body, index) => { body.vy += index ? 300 : 385; body.vx += index ? 100 : -100; });
   const label = document.querySelector('#touch-label');
-  label.textContent = 'Мягкие. Память — крепкая.';
+  label.textContent = messages.touchActive;
   clearTimeout(labelTimer);
-  labelTimer = setTimeout(() => { label.textContent = 'Да, их можно потрогать.'; }, 2400);
+  labelTimer = setTimeout(() => { label.textContent = touchIdle; }, 2400);
   wakeSpring();
 });
 reduceMotion.addEventListener('change', stopSpring);
