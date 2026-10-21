@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee9f8">
+  <meta name="description" content="Buffera — локальная история буфера обмена для macOS. Поиск по смыслу, текст со скриншотов, избранное и помощник, который помнит контекст.">
+  <meta property="og:title" content="Buffera — хорошие буфера. Всё помнят.">
+  <meta property="og:description" content="История буфера обмена с приятными формами и серьёзной памятью. Для твоего Mac.">
+  <title>Buffera — хорошие буфера. Всё помнят.</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">К содержимому</a>
+  <header class="header wrap">
+    <a class="brand" href="#" aria-label="Buffera, наверх"><svg viewBox="0 0 40 32" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg><span>buffera</span></a>
+    <nav aria-label="Основная навигация"><a href="#try">Потрогать</a><a href="#features">Что умеет</a><a href="#privacy">Личное</a></nav>
+    <a class="button button-small button-outline" href="#install">Хочу на Mac <span aria-hidden="true">↗</span></a>
+  </header>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="availability"><span></span>Для твоего Mac. И твоей памяти.</div>
+        <h1 id="hero-title">Хорошие<br>буфера.<br>Всё помнят.</h1>
+        <p class="hero-description">Тексты, ссылки, скриншоты и всё, что ты копируешь. В приятных формах. С поиском по смыслу. Под рукой.</p>
+        <div class="hero-actions"><a class="button button-dark" href="#install">Как установить <span aria-hidden="true">↗</span></a><a class="text-link" href="#try">Сначала потрогать <span aria-hidden="true">↓</span></a></div>
+        <p class="hero-note">macOS 14+ <span aria-hidden="true">/</span> История хранится на твоём Mac</p>
+      </div>
+      <div class="hero-art">
+        <span class="orbit-note note-copy" aria-hidden="true"><span>⌘</span> C</span>
+        <span class="orbit-note note-file" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg>тот_самый_файл</span>
+        <button class="sculpture" id="sculpture" type="button" aria-label="Потрогать буфера — запустить пружинящую анимацию">
+          <span class="sculpture-shadow"></span>
+          <span class="soft-form form-left"><span class="form-shine"></span></span>
+          <span class="soft-form form-right"><span class="form-shine"></span></span>
+          <span class="sculpture-mark" aria-hidden="true"><svg viewBox="0 0 100 70"><path d="M15 10C1 54 36 77 50 35C64 77 99 54 85 10"/></svg></span>
+        </button>
+        <span class="orbit-note note-kept" aria-hidden="true"><span>✓</span> Всё сохранено</span>
+        <div class="touch-caption"><svg viewBox="0 0 65 40" aria-hidden="true"><path d="M3 33C39 40 61 26 47 5m-5 9 5-9 10 3"/></svg><span id="touch-label">Да, их можно потрогать.</span></div>
+      </div>
+      <div class="hero-bottom"><span>Большая память. Мягкое прикосновение.</span><a href="#try" aria-label="Перейти к демо">↓</a></div>
+    </section>
+
+    <section class="demo-section" id="try" aria-labelledby="demo-title">
+      <div class="wrap demo-layout">
+        <div class="section-intro"><span class="small-mark" aria-hidden="true">⌘⌥V</span><h2 id="demo-title">Ты это уже<br>копировал.</h2><p>Ссылку, которая нужна прямо сейчас. Текст, который не хочется писать заново. Скриншот с тем самым адресом.</p><p>Buffera держит их рядом.<br>Просто начни искать.</p><div class="demo-hint"><span aria-hidden="true">↘</span> Попробуй поиск и фильтры</div></div>
+        <div class="demo-window">
+          <div class="window-top"><div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div><strong>Buffera</strong><span class="demo-label">Интерактивное демо</span></div>
+          <div class="demo-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><label class="visually-hidden" for="demo-search">Искать в демонстрационной истории</label><input id="demo-search" placeholder="Что хочется вернуть?" type="search" autocomplete="off"><kbd>⌘F</kbd></div>
+          <div class="demo-filters" role="group" aria-label="Фильтр демонстрационной истории"><button class="active" type="button" data-filter="all" aria-pressed="true">Всё</button><button type="button" data-filter="text" aria-pressed="false">Тексты</button><button type="button" data-filter="link" aria-pressed="false">Ссылки</button><button type="button" data-filter="image" aria-pressed="false">Картинки</button><button type="button" data-filter="favorite" aria-pressed="false">☆ Избранное</button></div>
+          <div id="demo-items" class="demo-items" aria-label="Примеры записей"><p class="demo-fallback">Включи JavaScript, чтобы попробовать поиск на примерах. Твою историю это демо не читает.</p></div>
+          <div class="demo-bottom"><span id="demo-count" role="status">Примеры записей</span><span>↑ ↓ выбрать <span class="key-separator">/</span> ↵ посмотреть</span></div>
+          <div id="demo-detail" class="demo-detail" hidden><button type="button" class="detail-close" aria-label="Закрыть просмотр">×</button><span class="detail-kind"></span><h3></h3><p></p><span class="detail-note">Это пример для демо. Твой буфер не изменился.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features-section wrap" id="features" aria-labelledby="features-title">
+      <div class="section-heading"><h2 id="features-title">Есть за что<br>полюбить.</h2><p>За формы — с первого взгляда.<br>За всё остальное — каждый день.</p></div>
+      <div class="feature-pair">
+        <article class="feature feature-semantic"><div class="semantic-art" aria-hidden="true"><span class="query-bubble">та штука про дизайн</span><div class="matching-lines"><span></span><span></span><span></span></div><span class="result-bubble"><span>✦</span> Нашлась.</span></div><div class="feature-copy"><span class="feature-kicker">Поиск по смыслу</span><h3>Помнишь ощущение.<br>Не помнишь слово.</h3><p>Ищи своими словами. Buffera добавит близкие по смыслу записи к точным совпадениям. Тексты, ссылки и даже распознанные скриншоты.</p><span class="feature-note">На Apple Silicon · модель скачивается отдельно</span></div></article>
+        <article class="feature feature-chat"><div class="chat-art"><span class="chat-question">Какую ошибку я копировал вчера?</span><div class="chat-answer"><span class="chat-spark" aria-hidden="true">✦</span><div>Ошибка подключения к базе.<br>Вот запись и её контекст.<span class="source-pill">Terminal <span>вчера, 18:42</span></span></div></div><span class="illustration-note">Пример диалога</span></div><div class="feature-copy"><span class="feature-kicker">Спросить Buffera</span><h3>Поговори<br>со своей памятью.</h3><p>Локальный помощник найдёт нужное в истории, прочитает и покажет источники. Ответ появляется постепенно, а к записи можно перейти одним нажатием.</p><span class="feature-note">На Apple Silicon · после загрузки модели</span></div></article>
+      </div>
+      <div class="feature-trio">
+        <article class="mini-feature"><div class="ocr-art" aria-hidden="true"><span class="scan-corner top-left"></span><span class="scan-corner top-right"></span><span class="scan-corner bottom-left"></span><span class="scan-corner bottom-right"></span><span>Текст внутри<br>тоже текст.</span><i></i></div><h3>Скриншот?<br>Прочитано.</h3><p>Ищи по тексту внутри картинок или забери его в буфер. Распознавание работает на Mac через Apple Vision.</p></article>
+        <article class="mini-feature"><div class="clean-art" aria-hidden="true"><span>site.ru/article<span class="tracking">?utm_source=…</span></span><span class="clean-arrow">↓</span><span>site.ru/article <b>✦</b></span></div><h3>Сними<br>всё лишнее.</h3><p>Форматирование, метки в ссылках, повторы и переносы строк. А JSON, наоборот, разложи красиво. Прямо перед копированием.</p></article>
+        <article class="mini-feature"><div class="nearby-art" aria-hidden="true"><span>Ссылка на задачу</span><span><i></i> Та самая ошибка</span><span>Кусочек решения</span></div><h3>У каждой записи<br>есть история.</h3><p>Посмотри, что копировал до и после. «Показать рядом» возвращает контекст, даже когда ты уже сменил запрос.</p></article>
+      </div>
+    </section>
+
+    <section class="keyboard-section"><div class="wrap keyboard-layout"><div><h2>Между «где это?»<br>и «вот оно».</h2><p>Три движения. Без охоты по вкладкам.</p></div><ol class="keyboard-steps"><li><div><kbd>⌘</kbd><kbd>⌥</kbd><kbd>V</kbd></div><span>Открой историю</span></li><li><div><kbd>↑</kbd><kbd>↓</kbd><kbd>↵</kbd></div><span>Выбери и верни в буфер</span></li><li><div><kbd>⌘</kbd><kbd>V</kbd></div><span>Вставь куда нужно</span></li></ol></div></section>
+
+    <section class="privacy-section wrap" id="privacy" aria-labelledby="privacy-title"><div class="privacy-visual" aria-hidden="true"><div class="privacy-disc"><svg viewBox="0 0 80 90"><rect x="17" y="40" width="46" height="38" rx="12"/><path d="M27 40V28a13 13 0 0 1 26 0v12"/><circle cx="40" cy="57" r="4"/><path d="M40 61v5"/></svg></div><span class="privacy-tag tag-local">У тебя дома.</span><span class="privacy-tag tag-hidden">••••••••</span></div><div class="privacy-copy"><span class="feature-kicker">Личное остаётся личным</span><h2 id="privacy-title">Близко к тебе.<br>Подальше<br>от облака.</h2><p>История, распознавание, поиск по смыслу и встроенный чат работают на твоём Mac. Модели скачиваются по твоему решению.</p><ul><li>Скрой чувствительный текст от показа и поиска.</li><li>На заблокированном или спящем Mac история не записывается.</li><li>Поставь запись на паузу. Удали лишнее. Настрой лимиты.</li></ul><p class="fine-print">Скрытие маскирует запись, но не шифрует её отдельно. Если включишь MCP, выбранный внешний агент сможет получать историю — с учётом его собственных правил обработки данных.</p></div></section>
+
+    <section class="all-features wrap" aria-labelledby="all-title"><div class="all-heading"><h2 id="all-title">И ещё немного<br>приятного.</h2><p>Небольшие детали,<br>к которым быстро привыкаешь.</p></div><div class="details-grid">
+      <details open><summary>Любимое всегда рядом <span>+</span></summary><p>Ставь звёздочку важному через ⌘D. Избранное переживает перезапуск, ищется отдельно и не удаляется при автоматической очистке истории.</p></details>
+      <details><summary>История без дублей <span>+</span></summary><p>Тексты, ссылки, картинки, группы файлов и доступные форматы приложений. Повторное копирование поднимает запись наверх. После выбора сохраняются исходные дата, источник и звёздочка. Файлы хранятся как ссылки на оригиналы.</p></details>
+      <details><summary>Фильтры, которые помнят <span>+</span></summary><p>Отбирай по типу, приложению, дате и избранному. Отдельно покажи записи с других устройств. Запрос и фильтры сохраняются между открытиями окна до выхода из Buffera. ⌘0 возвращает всю историю.</p></details>
+      <details><summary>Твоё окно. Твои правила. <span>+</span></summary><p>Окно или боковая панель, список или сетка до четырёх колонок. Меняй размер, плотность и положение, прячь фильтры и закрепляй историю поверх других окон. Интерфейс — на русском или английском.</p></details>
+      <details><summary>Больше, чем миниатюра <span>+</span></summary><p>Пробел или ⌘Y открывает быстрый просмотр. Картинку можно показать в Finder или сохранить как PNG в выбранную папку. Длинные тексты, пути и исходные форматы тоже можно рассмотреть.</p></details>
+      <details><summary>С другого устройства <span>+</span></summary><p>Buffera отмечает записи, пришедшие через Universal Clipboard от Apple, и собирает их в отдельный фильтр. Так легко отличить их от скопированного в приложениях Mac.</p></details>
+      <details><summary>Контекст для твоего агента <span>+</span></summary><p>Включи доступ через MCP для Codex, Claude Code или другого совместимого клиента: поиск, чтение записей и соседних копирований. Доступ подключается отдельно; внешний агент может передавать данные своему провайдеру.</p></details>
+      <details><summary>Память под твоим контролем <span>+</span></summary><p>По умолчанию — до 50 000 обычных записей и 5 ГБ содержимого. Лимиты настраиваются; избранное в них не входит. Подготовка смыслового поиска по умолчанию ждёт питания от сети, чтобы поберечь батарею.</p></details>
+    </div></section>
+
+    <section class="install-section" id="install" aria-labelledby="install-title"><div class="wrap install-layout"><div><svg class="closing-mark" viewBox="0 0 100 70" aria-hidden="true"><path d="M15 10C1 54 36 77 50 35C64 77 99 54 85 10"/></svg><h2 id="install-title">Твои новые<br>любимые буфера.</h2><p>Пусть голова хранит идеи.<br>Остальное запомнит Buffera.</p></div><div class="install-card"><span class="release-label"><span></span>Первая версия</span><h3>Уже можно собрать.<br>И попробовать на Mac.</h3><p>Публичный установщик пока не опубликован. Если у тебя есть исходники Buffera, собери приложение локально:</p><div class="command-block"><code>zsh scripts/build-app.sh<br>open dist/Buffera.app</code><button type="button" id="copy-command" aria-label="Скопировать команды сборки">Копировать</button></div><p id="copy-status" class="copy-status" role="status"></p><p class="install-requirements">macOS 14+ · Для сборки: Swift 6.4+<br>Поиск по смыслу и чат: Apple Silicon</p><details><summary>Что нужно для локального AI?</summary><p>Поиск скачивает EmbeddingGemma 2 (около 310 МБ), помощник — Gemma 4 E2B (2,84 ГБ). Их можно включить независимо в настройках. Обычная история и OCR работают без этих моделей.</p></details></div></div></section>
+  </main>
+  <footer class="footer wrap"><a class="brand" href="#"><svg viewBox="0 0 40 32" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg><span>buffera</span></a><span>С памятью. С характером. С формами.</span><a href="#main">Наверх ↑</a></footer>
+</body>
+</html>
