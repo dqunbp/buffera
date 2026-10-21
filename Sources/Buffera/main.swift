@@ -1,6 +1,12 @@
 import AppKit
 
-if CommandLine.arguments.contains("--localization-ui-smoke-test") {
+if CommandLine.arguments.contains("--shortcuts-ui-smoke-test") {
+    do { try runShortcutSmokeTest() }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--setup-ui-smoke-test") {
+    do { try runSetupSmokeTest() }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--localization-ui-smoke-test") {
     do { try runLocalizationSmokeTest() }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else if CommandLine.arguments.contains("--features-ui-smoke-test") {

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardSession = ClipboardSessionMonitor()
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
+    private var setup: SetupWindow?
     private var settings: SettingsWindow?
     private var modelManager: LocalModelManager?
     private var modelStorageError: String?
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
     private var shortcutItem: NSMenuItem!
+    private var openHistoryItem: NSMenuItem!
     private var imageTextItem: NSMenuItem!
     private var retryImageTextItem: NSMenuItem!
     private var applicationExitObserver: NSObjectProtocol?
@@ -161,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardSession.start()
         clipboard.discardPendingChanges()
         clipboard.start()
+        panel.applyShortcuts(hotKeys.preferences)
         hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
             if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat) }
@@ -172,7 +175,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, !self.hotKeys.isRegistered else { return }
             self.registerShortcuts()
         }
-        if CommandLine.arguments.contains("--show-settings") { showSettings() }
+        if CommandLine.arguments.contains("--show-setup") || !UserDefaults.standard.bool(forKey: SetupPreferences.completionKey) { showSetup() }
+        else if CommandLine.arguments.contains("--show-settings") { showSettings() }
         else { open() }
         imageTextIndexer?.start()
     }
@@ -214,6 +218,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+        }
+        panel.onShowFeatures = { [weak self] in
+            guard let self, self.setup?.window?.isVisible != true, self.panel.window.attachedSheet == nil else { return }
+            self.showSettings(); self.settings?.showFeatures()
         }
         panel.onShowSettings = { [weak self] in self?.showSettings() }
         panel.onShowChat = { [weak self] in self?.showChat() }
@@ -448,6 +456,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             $0.descriptor.role == .assistant && $0.isReadyForUse
         }
         panel?.updateFeatureAvailability(semanticSearch: enabled, chat: assistantEnabled)
+        updateSemanticDiscovery(snapshots)
         chatMenuItems.forEach { $0.isHidden = !assistantEnabled }
         guard embeddingChanged else { return }
         // Let an active query finish (or fall back after runtime unload). Cancelling here leaves
@@ -469,8 +478,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showEmbeddingProgress(_ status: EmbeddingIndexStatus) {
         embeddingStatus = status
+        updateSemanticDiscovery(modelManager?.snapshots ?? [])
         settings?.updateEmbeddingIndex(status: status.message, progress: status.fraction,
                                        canRetry: status.canRetry, canContinueNow: status.canContinueNow)
+    }
+
+    private func updateSemanticDiscovery(_ snapshots: [LocalModelSnapshot]) {
+        guard let snapshot = snapshots.first(where: { $0.descriptor.role == .embedding }) else {
+            panel?.updateSemanticSetup(title: L10n.text("Поиск по смыслу · настроить"), detail: modelStorageError)
+            return
+        }
+        let title: String
+        if !snapshot.isEnabled { title = L10n.text("Поиск по смыслу · выключен — настроить") }
+        else {
+            switch snapshot.state {
+            case .downloading:
+                title = L10n.text("Поиск по смыслу · загрузка \(Int(snapshot.progress * 100))%")
+            case .verifying: title = L10n.text("Поиск по смыслу · проверка модели…")
+            case .downloaded: title = L10n.text("Поиск по смыслу · настройки")
+            case .paused: title = L10n.text("Поиск по смыслу · загрузка приостановлена")
+            case .failed: title = L10n.text("Поиск по смыслу · ошибка — открыть настройки")
+            case .notDownloaded: title = L10n.text("Поиск по смыслу · нужна модель")
+            }
+        }
+        var preparation: String?
+        if snapshot.isReadyForUse {
+            if embeddingStatus.canRetry { preparation = L10n.text("ошибка подготовки") }
+            else if embeddingStatus.pauseReason == .battery { preparation = L10n.text("ожидает питания") }
+            else if embeddingStatus.pauseReason != nil { preparation = L10n.text("подготовка на паузе") }
+            else if let fraction = embeddingStatus.fraction, fraction < 1 {
+                preparation = L10n.text("подготовка \(Int(fraction * 100))%")
+            }
+        }
+        panel?.updateSemanticPreparation(preparation)
+        panel?.updateSemanticSetup(title: title, detail: snapshot.errorMessage ?? embeddingStatus.message)
     }
 
     /// Normal and transformed copies share suppression and usage ordering.
@@ -529,6 +570,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func open(fromShortcut: Bool = false) {
+        if setup?.window?.isVisible == true { setup?.show(); return }
         guard panel != nil else { if let lastError { showError(lastError, alert: true) }; return }
         confirmationToken += 1
         panel.open(fromShortcut: fromShortcut)
@@ -564,7 +606,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func showSetup() {
+        guard panel?.window.attachedSheet == nil else { return }
+        if setup?.window?.isVisible == true { setup?.show(); return }
+        let access = MCPAccess(directory: folder)
+        let initial = SetupPreferences(mcpEnabled: access.isEnabled(), snapshots: modelManager?.snapshots ?? [])
+        #if arch(arm64)
+        let modelsAvailable = modelManager != nil
+        #else
+        let modelsAvailable = false
+        #endif
+        let controller = SetupWindow(initial: initial, modelsAvailable: modelsAvailable,
+                                     modelError: modelStorageError, access: access)
+        controller.onCopyConfiguration = { [weak self] value in
+            guard let self else { throw MCPSettingsError.copyUnavailable }
+            try self.copyMCPConfiguration(value)
+        }
+        controller.onSkip = { [weak self] in
+            UserDefaults.standard.set(true, forKey: SetupPreferences.completionKey)
+            self?.open()
+        }
+        controller.onFinish = { [weak self] draft, initial in
+            guard let self else { return }
+            // Persist the only throwing permission write first. No downloads start on failure.
+            if draft.mcpEnabled != initial.mcpEnabled { try access.setEnabled(draft.mcpEnabled) }
+            if draft.language != initial.language { draft.language.save() }
+            if draft.theme != initial.theme { draft.theme.save(); draft.theme.apply() }
+            if draft.appearance != initial.appearance {
+                draft.appearance.save(); self.panel.applyAppearance(draft.appearance)
+            }
+            if draft.limits != initial.limits { draft.limits.save() }
+            if draft.onlyOnExternalPower != initial.onlyOnExternalPower {
+                UserDefaults.standard.set(draft.onlyOnExternalPower, forKey: BackgroundPreparationPolicy.preferenceKey)
+                self.preparationPolicy.onlyOnExternalPower = draft.onlyOnExternalPower
+                self.updateBackgroundPreparation()
+            }
+            for (role, value, old) in [(ModelRole.embedding, draft.embeddingEnabled, initial.embeddingEnabled),
+                                      (.assistant, draft.assistantEnabled, initial.assistantEnabled)] where value != old {
+                if !value {
+                    self.modelCheckTokens[role] = nil; self.modelProbe.cancel(role)
+                    self.historyChat?.willDisableModel(role)
+                }
+                self.modelManager?.setEnabled(value, for: role)
+            }
+            UserDefaults.standard.set(true, forKey: SetupPreferences.completionKey)
+            // Let the wizard close before presenting another window.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if LanguagePreference.load() != L10n.preference {
+                    let alert = NSAlert()
+                    alert.messageText = L10n.text("Применить новый язык?")
+                    alert.informativeText = L10n.text("Настройки сохранены. Новый язык появится после перезапуска Buffera.")
+                    alert.addButton(withTitle: L10n.text("Перезапустить"))
+                    alert.addButton(withTitle: L10n.text("Позже"))
+                    if alert.runModal() == .alertFirstButtonReturn {
+                        do { try AppRelaunch.schedule(); self.quit(); return }
+                        catch { self.showError(error, alert: true) }
+                    }
+                }
+                self.open()
+            }
+        }
+        setup = controller
+        panel?.close(restoreFocus: false); settings?.close()
+        controller.show()
+    }
+
+    private func copyMCPConfiguration(_ configuration: String) throws {
+        try clipboard.restore(ClipPayload(items: [[Representation(
+            type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
+    }
+
     @objc private func showSettings() {
+        if setup?.window?.isVisible == true { setup?.show(); return }
         // A save sheet must finish before its parent can be hidden.
         if let window = panel?.window, window.attachedSheet != nil {
             window.makeKeyAndOrderFront(nil)
@@ -612,7 +726,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.preparationPolicy.continueOnBattery()
                 self.updateBackgroundPreparation()
             }
+            controller.onShortcutsChange = { [weak self] value in
+                guard let self else { throw ShortcutPreferenceError.unavailable }
+                try self.hotKeys.apply(value)
+                self.panel.applyShortcuts(value)
+                self.updateShortcutMenu()
+            }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
+            controller.onShowSetup = { [weak self] in self?.showSetup() }
             controller.onRestart = { [weak self] in
                 guard let self else { return }
                 do {
@@ -623,8 +744,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.onRevealData = { [weak self] in self?.revealData() }
             controller.onCopyMCPConfiguration = { [weak self] configuration in
                 guard let self else { throw MCPSettingsError.copyUnavailable }
-                try self.clipboard.restore(ClipPayload(items: [[Representation(
-                    type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
+                try self.copyMCPConfiguration(configuration)
             }
             settings = controller
             controller.updateBackgroundPreparation(onlyOnExternalPower: preparationPolicy.onlyOnExternalPower)
@@ -639,11 +759,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func registerShortcuts() {
         do {
             try hotKeys.register()
-            shortcutItem.title = L10n.text("⌘⌥V подключено")
+            updateShortcutMenu()
         } catch {
-            shortcutItem.title = L10n.text("Подключить ⌘⌥V снова…")
+            updateShortcutMenu()
             showError(error)
         }
+    }
+    private func updateShortcutMenu() {
+        let title = hotKeys.preferences.nextTitle
+        shortcutItem.title = hotKeys.isRegistered ? L10n.text("\(title) подключено") : L10n.text("Подключить \(title) снова…")
+        openHistoryItem.title = L10n.text("Открыть историю    \(title)")
     }
     @objc private func togglePause() {
         clipboard.paused.toggle(); pauseItem.state = clipboard.paused ? .on : .off
@@ -667,8 +792,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert(); alert.messageText = L10n.text("\(BrandIdentity.name) — клавиши и история")
         let actions = ClipCardAction.allCases.map { "\($0.shortcut) — \($0.title)" }.joined(separator: "\n")
         alert.informativeText = L10n.text("""
-        ⌘⌥V — открыть / следующий элемент
-        ⌘⌥C — предыдущий в открытом окне
+        \(hotKeys.preferences.nextTitle) — открыть / следующий элемент
+        \(hotKeys.preferences.previousTitle) — предыдущий в открытом окне
         Стрелки — выбрать запись
         ⌘⌥S — скрыть или показать боковое меню
         ⌘, — настройки
@@ -711,13 +836,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         func add(_ title: String, _ action: Selector) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item); return item
         }
-        _ = add(L10n.text("Открыть историю    ⌘⌥V"), #selector(showHistory))
+        openHistoryItem = add(L10n.text("Открыть историю    \(hotKeys.preferences.nextTitle)"), #selector(showHistory))
         let statusChatItem = add(L10n.text("Спросить Buffera…"), #selector(showChat))
         statusChatItem.isHidden = true
         chatMenuItems.append(statusChatItem)
         let settingsItem = add(L10n.text("Настройки…"), #selector(showSettings))
         settingsItem.keyEquivalent = ","
-        shortcutItem = add(L10n.text("Подключить ⌘⌥V…"), #selector(registerShortcuts))
+        _ = add(L10n.text("Настроить Buffera…"), #selector(showSetup))
+        shortcutItem = add(L10n.text("Подключить \(hotKeys.preferences.nextTitle) снова…"), #selector(registerShortcuts))
         pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
         menu.addItem(.separator())
         imageTextItem = NSMenuItem(title: L10n.text("Подготовка поиска по картинкам…"), action: nil, keyEquivalent: "")

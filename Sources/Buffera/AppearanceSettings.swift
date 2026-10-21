@@ -5,8 +5,10 @@ import BufferaModels
 
 /// A retained settings window, independent of the history panel's focus/lifetime.
 final class SettingsWindow: NSWindowController {
+    var onShortcutsChange: ((ShortcutPreferences) throws -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
@@ -23,12 +25,12 @@ final class SettingsWindow: NSWindowController {
     init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
          mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL,
          languageDefaults: UserDefaults = .standard, limitsDefaults: UserDefaults = .standard,
-         themeDefaults: UserDefaults = .standard,
+         themeDefaults: UserDefaults = .standard, shortcutDefaults: UserDefaults = .standard,
          launchLanguage: LanguagePreference = L10n.preference, frameAutosaveName: String? = "BufferaSettingsWindow") {
         self.limitsDefaults = limitsDefaults
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
                                              mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults,
-                                             limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, launchLanguage: launchLanguage)
+                                             limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, shortcutDefaults: shortcutDefaults, launchLanguage: launchLanguage)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
@@ -53,7 +55,12 @@ final class SettingsWindow: NSWindowController {
         }
         super.init(window: window)
         window.contentViewController = settings
+        settings.onShortcutsChange = { [weak self] value in
+            guard let apply = self?.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
+            try apply(value)
+        }
         settings.onAppearanceChange = { [weak self] value in self?.onAppearanceChange?(value) }
+        settings.onShowSetup = { [weak self] in self?.onShowSetup?() }
         settings.onRestart = { [weak self] in self?.onRestart?() }
         settings.onLimitsChange = { [weak self] value in self?.onLimitsChange?(value) }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
@@ -78,6 +85,7 @@ final class SettingsWindow: NSWindowController {
         settings.updateLimits(HistoryLimits.load(from: limitsDefaults))
         settings.refreshLanguage()
         settings.refreshTheme()
+        settings.refreshShortcuts()
         settings.refreshMCPAccess()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
@@ -118,8 +126,10 @@ private final class SettingsPanel: NSWindow {
 }
 
 private final class SettingsContentController: NSViewController {
+    var onShortcutsChange: ((ShortcutPreferences) throws -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
     var onCopyMCPConfiguration: ((String) throws -> Void)?
@@ -130,6 +140,8 @@ private final class SettingsContentController: NSViewController {
     var onOnlyPrepareOnExternalPowerChanged: ((Bool) -> Void)?
     var onContinueEmbeddingPreparation: (() -> Void)?
 
+    private let shortcutDefaults: UserDefaults
+    private let shortcutSettings: ShortcutSettingsView
     private let mcp: MCPSettingsView
     private let models: ModelSettingsView
     private var appearance = HistoryAppearance.load()
@@ -149,13 +161,16 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSSlider()
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
-    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), L10n.text("Агенты"), L10n.text("Поиск и ответы")], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), "MCP", L10n.text("Поиск и ответы")], trackingMode: .selectOne,
                                           target: nil, action: nil)
+    private let saveNotice = NSTextField(labelWithString: "")
     private let body = NSView()
     private var pages: [NSView] = []
 
     init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL,
-         languageDefaults: UserDefaults, limitsDefaults: UserDefaults, themeDefaults: UserDefaults, launchLanguage: LanguagePreference) {
+         languageDefaults: UserDefaults, limitsDefaults: UserDefaults, themeDefaults: UserDefaults, shortcutDefaults: UserDefaults, launchLanguage: LanguagePreference) {
+        self.shortcutDefaults = shortcutDefaults
+        shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
         self.limitsDefaults = limitsDefaults
         self.limits = HistoryLimits.load(from: limitsDefaults)
         self.launchLanguage = launchLanguage
@@ -164,6 +179,11 @@ private final class SettingsContentController: NSViewController {
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
+        shortcutSettings.onApply = { [weak self] value in
+            guard let self, let apply = self.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
+            try apply(value)
+            try value.save(to: self.shortcutDefaults)
+        }
         mcp.onCopyConfiguration = { [weak self] configuration in
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
             try copy(configuration)
@@ -180,6 +200,7 @@ private final class SettingsContentController: NSViewController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func refreshShortcuts() { shortcutSettings.refresh(.load(from: shortcutDefaults)) }
     func refreshMCPAccess() { mcp.refresh() }
     func refreshModels() { models.refresh() }
     func showFeatures() {
@@ -225,7 +246,11 @@ private final class SettingsContentController: NSViewController {
         body.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(body)
 
-        let footer = label(L10n.text("Изменения сохраняются сразу"), size: 11, color: .tertiaryLabelColor)
+        let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
+        setupButton.bezelStyle = .inline
+        saveNotice.font = .systemFont(ofSize: 11); saveNotice.textColor = .tertiaryLabelColor
+        let footer = NSStackView(views: [saveNotice, setupButton])
+        footer.spacing = 18
         footer.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(footer)
         NSLayoutConstraint.activate([
@@ -240,7 +265,7 @@ private final class SettingsContentController: NSViewController {
             footer.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), historyPage(), keyboardPage(), mcp, models]
+        pages = [appearancePage(), historyPage(), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)
@@ -356,8 +381,6 @@ private final class SettingsContentController: NSViewController {
 
     private func keyboardPage() -> NSView {
         let navigation = [
-            (L10n.text("Открыть / следующая запись"), "⌘⌥V"),
-            (L10n.text("Предыдущая запись"), "⌘⌥C"),
             (L10n.text("Выбрать запись"), "↑ ↓ ← →"),
             (L10n.text("Первые девять записей"), "⌘1–9"),
             (L10n.text("Перейти к поиску"), "⌘F"),
@@ -373,10 +396,9 @@ private final class SettingsContentController: NSViewController {
         groups.orientation = .horizontal; groups.alignment = .top; groups.spacing = 24
         groups.distribution = .fillEqually
         left.widthAnchor.constraint(equalTo: right.widthAnchor).isActive = true
-        let note = paragraph(L10n.text("Одно ⌘⌥V с отпусканием оставляет окно открытым; дальше V/C только двигают выбор. Для быстрого выбора удерживайте ⌘⌥ с самого открытия, нажмите V/C ещё раз и отпустите. Enter — выбрать, пробел — просмотр (из поиска — ⌘Y). Вставка — ⌘V в нужном приложении."))
-        let page = vertical([groups, note], spacing: 18)
+        let page = vertical([shortcutSettings, groups], spacing: 18)
         groups.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
-        note.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
+        shortcutSettings.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
         return page
     }
 
@@ -472,6 +494,7 @@ private final class SettingsContentController: NSViewController {
 
     private func presentPage(_ index: Int) {
         guard pages.indices.contains(index) else { return }
+        saveNotice.stringValue = index == 2 ? L10n.text("Сочетания применяются без перезапуска") : L10n.text("Изменения сохраняются сразу")
         for view in body.subviews { view.removeFromSuperview() }
         let page = pages[index]
         page.translatesAutoresizingMaskIntoConstraints = false
@@ -480,11 +503,13 @@ private final class SettingsContentController: NSViewController {
             page.leadingAnchor.constraint(equalTo: body.leadingAnchor),
             page.trailingAnchor.constraint(equalTo: body.trailingAnchor),
             page.topAnchor.constraint(equalTo: body.topAnchor),
-            page === models
+            page === models || page is NSScrollView
                 ? page.bottomAnchor.constraint(equalTo: body.bottomAnchor)
                 : page.bottomAnchor.constraint(lessThanOrEqualTo: body.bottomAnchor)
         ])
     }
+
+    @objc private func showSetup() { onShowSetup?() }
 
     @objc private func changeTab() { presentPage(tabs.selectedSegment) }
 

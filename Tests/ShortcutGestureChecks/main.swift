@@ -12,7 +12,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String) {
     print("PASS", message)
 }
 
-let held = HistoryShortcutGesture.requiredModifiers
+let held = HistoryShortcutGesture().requiredModifiers
 var gesture = HistoryShortcutGesture()
 check(!gesture.isActive, "a new gesture is inactive")
 check(!gesture.modifiersChanged([]), "releasing modifiers without a shortcut does not confirm")

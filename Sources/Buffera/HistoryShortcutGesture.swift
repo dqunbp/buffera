@@ -3,7 +3,7 @@ import AppKit
 /// A single shortcut tap keeps history open. Cycling within the same modifier
 /// hold confirms the selection when that hold ends.
 struct HistoryShortcutGesture {
-    static let requiredModifiers: NSEvent.ModifierFlags = [.command, .option]
+    var requiredModifiers: NSEvent.ModifierFlags = [.command, .option]
 
     private(set) var isActive = false
     private var pressCount = 0
@@ -16,7 +16,7 @@ struct HistoryShortcutGesture {
 
     /// Returns true once when a cycling gesture releases either required key.
     mutating func modifiersChanged(_ flags: NSEvent.ModifierFlags) -> Bool {
-        guard !flags.contains(Self.requiredModifiers) else { return false }
+        guard !flags.contains(requiredModifiers) else { return false }
         let shouldConfirm = pressCount >= 2
         cancel()
         return shouldConfirm

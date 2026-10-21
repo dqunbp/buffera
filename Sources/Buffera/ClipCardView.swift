@@ -14,7 +14,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .finder: return L10n.text("Показать в Finder")
         case .save: return L10n.text("Сохранить как…")
         case .delete: return L10n.text("Удалить запись")
-        case .nearby: return L10n.text("Показать рядом")
+        case .nearby: return L10n.text("Что копировал до и после")
         case .copyDifferently: return L10n.text("Скопировать иначе")
         }
     }
@@ -118,6 +118,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private let onAction: (ClipCardAction) -> Void
     private let thumbnailView = NSImageView()
     private let contentText = ClipCardView.makeContentText()
+    private var metadataLabel: NSTextField?
     private let quickShortcut = NSTextField(labelWithString: "")
     private var buttons: [ClipCardAction: NSButton] = [:]
     private var selected = false
@@ -245,6 +246,8 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
 
     func setNearbyAnchor(_ value: Bool) {
         nearbyAnchor = value
+        metadataLabel?.stringValue = value ? L10n.text("Исходная запись") + " · " + metadataText() : metadataText()
+        metadataLabel?.textColor = value ? .controlAccentColor : .secondaryLabelColor
         updateQuickLabel()
         updateAppearance()
     }
@@ -398,6 +401,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         content.addSubview(quickShortcut)
 
         let metadata = NSTextField(labelWithString: metadataText())
+        metadataLabel = metadata
         metadata.isEditable = false
         metadata.isSelectable = false
         metadata.font = .systemFont(ofSize: 11)

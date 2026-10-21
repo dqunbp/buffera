@@ -27,6 +27,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let search = NSSearchField()
     private let semanticSearch = NSButton(checkboxWithTitle: L10n.text("Искать также по смыслу"), target: nil, action: nil)
     private let chatButton = NSButton(title: L10n.text("Спросить"), target: nil, action: nil)
+    private let semanticSetup = NSButton(title: L10n.text("Поиск по смыслу · выключен — настроить"), target: nil, action: nil)
     private let searchOptionsRow = NSStackView()
     private var semanticSearchAvailable = false
     private var chatAvailable = false
@@ -50,6 +51,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let pinButton = NSButton(image: NSImage(systemSymbolName: "pin", accessibilityDescription: nil)!, target: nil, action: nil)
     private let scope = NSSegmentedControl(labels: [L10n.text("История"), L10n.text("Избранное")], trackingMode: .selectOne, target: nil, action: nil)
     private let nearbyBack = NSButton(title: L10n.text("Назад в историю"), target: nil, action: nil)
+    private let nearbyHeading = NSTextField(wrappingLabelWithString: "")
+    private let nearbyHeader = NSStackView()
+    private let introductionDefaults: UserDefaults
+    private var nearbyIntroduction: NearbyIntroductionWindow?
     private var nearbyState: NearbyHistoryState?
     private var nearbyToken = 0
     private var pendingViewport: NSPoint?
@@ -64,7 +69,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var previewToken = 0
     private var previewRequestPending = false
     private var commandHeld = false
+    private var shortcuts = ShortcutPreferences.defaults
     private var shortcutGesture = HistoryShortcutGesture()
+
+    func applyShortcuts(_ value: ShortcutPreferences) {
+        cancelShortcutGesture()
+        shortcuts = value
+        shortcutGesture.requiredModifiers = value.base.modifiers
+    }
     private var shortcutModifiersTimer: Timer?
     private var cardMenuTracking = false
     private var dragSourceID: Int64?
@@ -110,6 +122,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onClose: (() -> Void)?
     var onShortcutGestureEnd: (() -> Void)?
     var onShowSettings: (() -> Void)?
+    var onShowFeatures: (() -> Void)?
     var onShowChat: (() -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
@@ -118,10 +131,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isShowingNearby: Bool { nearbyState != nil }
     var isPinned: Bool { pinButton.state == .on }
     var searchMode: HistorySearchMode { semanticSearchAvailable && semanticSearch.state == .on ? .automatic : .literal }
-    var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
-    var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
+    var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || nearbyIntroduction != nil || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
+    var isAvailableForShortcut: Bool { window.isVisible && !isClosing && nearbyIntroduction == nil }
 
-    override init() {
+    init(introductionDefaults: UserDefaults = .standard) {
+        self.introductionDefaults = introductionDefaults
         super.init()
         build()
         thumbnails.countLimit = 150
@@ -133,7 +147,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 return true
             }
             guard let self, self.window.isVisible, self.window.attachedSheet == nil,
-                  !self.isClosing, !self.filters.isPresenting, !self.cardMenuTracking else { return false }
+                  !self.isClosing, self.nearbyIntroduction == nil, !self.filters.isPresenting, !self.cardMenuTracking else { return false }
             return self.handle(event) == nil
         }
         window.onFlagsChanged = { [weak self] flags in
@@ -177,6 +191,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func open(fromShortcut: Bool = false) {
+        if let nearbyIntroduction { nearbyIntroduction.show(); return }
         cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
         rememberPreviousApp()
@@ -341,6 +356,45 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         close()
     }
 
+    private func requestShowNearby(id: Int64) {
+        guard isAvailableForShortcut, !loading, !confirming, !commitWhenLoaded,
+              pendingFavorites.isEmpty, window.attachedSheet == nil else { return }
+        if introductionDefaults.bool(forKey: NearbyIntroductionWindow.preferenceKey) { showNearby(id: id) }
+        else { presentNearbyIntroduction(anchorID: id) }
+    }
+
+    @objc private func explainNearby() { presentNearbyIntroduction(anchorID: nil) }
+
+    private func presentNearbyIntroduction(anchorID: Int64?) {
+        guard nearbyIntroduction == nil else { nearbyIntroduction?.show(); return }
+        cancelShortcutGesture(); dismissPreview(); remaskConcealedText()
+        let controller = NearbyIntroductionWindow(explainingOnly: anchorID == nil, defaults: introductionDefaults)
+        nearbyIntroduction = controller
+        controller.onDismiss = { [weak self] accepted in
+            guard let self else { return }
+            self.nearbyIntroduction = nil
+            if NSApp.isActive { self.window.makeKeyAndOrderFront(nil) }
+            if accepted, let anchorID { self.showNearby(id: anchorID) }
+        }
+        controller.show()
+    }
+
+    @objc private func setupSemanticSearch() {
+        guard !isClosing, !confirming, !commitWhenLoaded, nearbyIntroduction == nil else { return }
+        dismissPreview(); filters.dismiss()
+        onShowFeatures?()
+    }
+
+    func updateSemanticPreparation(_ status: String?) {
+        semanticSearch.title = status.map { L10n.text("По смыслу · \($0)") } ?? L10n.text("Искать также по смыслу")
+        semanticSearch.setAccessibilityLabel(semanticSearch.title)
+    }
+
+    func updateSemanticSetup(title: String, detail: String? = nil) {
+        semanticSetup.title = title
+        semanticSetup.toolTip = detail ?? title
+    }
+
     func showNearby(id: Int64) {
         guard isAvailableForShortcut, !loading, !confirming, !commitWhenLoaded,
               pendingFavorites.isEmpty, window.attachedSheet == nil,
@@ -389,7 +443,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receiveNearby(_ result: [ClipSummary], anchorID: Int64, token: Int) {
-        guard isAvailableForShortcut, token == nearbyToken, nearbyState?.anchorID == anchorID else { return }
+        guard window.isVisible, !isClosing, token == nearbyToken, nearbyState?.anchorID == anchorID else { return }
         guard let anchor = result.first(where: { $0.id == anchorID }) else {
             nearbyFailed(HistoryError.missing, token: token); return
         }
@@ -406,7 +460,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func nearbyFailed(_ error: Error, token: Int) {
-        guard isAvailableForShortcut, isShowingNearby, token == nearbyToken else { return }
+        guard window.isVisible, !isClosing, isShowingNearby, token == nearbyToken else { return }
         failed(error)
     }
 
@@ -446,7 +500,17 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         semanticSearch.isHidden = isShowingNearby || !semanticSearchAvailable
         chatButton.isHidden = !chatAvailable
         chatButton.isEnabled = chatAvailable && !confirming && !commitWhenLoaded
-        searchOptionsRow.isHidden = semanticSearch.isHidden && chatButton.isHidden
+        semanticSetup.isHidden = isShowingNearby || semanticSearchAvailable
+        semanticSetup.isEnabled = enabled
+        searchOptionsRow.isHidden = semanticSearch.isHidden && semanticSetup.isHidden && chatButton.isHidden
+        nearbyHeader.isHidden = !isShowingNearby
+        nearbyBack.title = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
+            ? L10n.text("К истории") : L10n.text("К результатам поиска")
+        nearbyBack.setAccessibilityLabel(nearbyBack.title)
+        if let context = nearbyState {
+            nearbyHeading.stringValue = L10n.text("Копирования до и после") + "\n" +
+                L10n.text("Из всей истории · \(context.anchorDate.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(L10n.locale)))")
+        }
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
@@ -537,6 +601,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func close(restoreFocus: Bool = true) {
+        nearbyIntroduction?.onDismiss = nil
+        nearbyIntroduction?.close(); nearbyIntroduction = nil
         if dragSourceID != nil {
             cancelDragPreparation?()
             if dragSourceID != nil { return }
@@ -612,7 +678,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func closeIfUnfocused() {
-        guard dragSourceID == nil else { return }
+        guard dragSourceID == nil, nearbyIntroduction == nil else { return }
         // Filter menus, calendar popovers and save sheets can own keyboard input.
         if !window.isKeyWindow, window.attachedSheet == nil, !filters.isPresenting,
            !cardMenuTracking, !preview.isShown {
@@ -624,7 +690,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
-                  self.dragSourceID == nil, !self.cardMenuTracking, !self.preview.isShown else { return }
+                  self.dragSourceID == nil, self.nearbyIntroduction == nil, !self.cardMenuTracking, !self.preview.isShown else { return }
             guard !self.isPinned else { return }
             self.close(restoreFocus: false)
         }
@@ -676,29 +742,29 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             return nil
         }
         if confirming || commitWhenLoaded { return nil }
+        // Match the configured pair before ordinary local commands. Extra
+        // modifiers must never turn a different command into navigation.
+        if let delta = shortcuts.direction(keyCode: event.keyCode, modifiers: flags) {
+            shortcutPressed(delta, isRepeat: event.isARepeat)
+            return nil
+        }
         if event.keyCode == 36 || event.keyCode == 76 { dismissPreview(); confirm(); return nil }
         if event.keyCode == 125 { move(cards.effectiveColumns); return nil }
         if event.keyCode == 126 { move(-cards.effectiveColumns); return nil }
         if !editingSearch, event.keyCode == 124 { move(1); return nil }
         if !editingSearch, event.keyCode == 123 { move(-1); return nil }
         if flags.contains(.command), event.keyCode == 43 { showSettings(); return nil }
-        if flags.contains([.command, .option]), event.keyCode == 1 { toggleSidebar(); return nil }
+        if flags.intersection([.command, .option, .control, .shift]) == [.command, .option], event.keyCode == 1 { toggleSidebar(); return nil }
         if event.keyCode == 48 {
             if isShowingNearby { window.makeFirstResponder(cards); return nil }
             window.makeFirstResponder(editingSearch ? cards : search); return nil
         }
-        if flags.contains(.command) && event.keyCode == 3 {
+        if flags.intersection([.command, .option, .control, .shift]) == .command && event.keyCode == 3 {
             if isShowingNearby { returnFromNearby() }
             dismissPreview(); window.makeFirstResponder(search); return nil
         }
-        if flags.contains(HistoryShortcutGesture.requiredModifiers) {
-            // Carbon consumes physical hotkeys. Handle directly delivered key events too
-            // (for example accessibility input targeting this window instead of the session).
-            if event.keyCode == 9 { shortcutPressed(1, isRepeat: event.isARepeat); return nil }
-            if event.keyCode == 8 { shortcutPressed(-1, isRepeat: event.isARepeat); return nil }
-            return event
-        }
-        if flags.contains(.command) {
+        if flags.intersection([.command, .option, .control, .shift]) == .command ||
+            flags.intersection([.command, .option, .control, .shift]) == [.command, .shift] {
             let quickKeys: [UInt16: Int] = [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8]
             if !flags.contains(.shift), let index = quickKeys[event.keyCode] {
                 if rows.indices.contains(index) { select(id: rows[index].id); confirm() }
@@ -740,7 +806,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func confirm() {
         cancelShortcutGesture()
-        guard !isClosing, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
+        guard !isClosing, nearbyIntroduction == nil, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if loading && rows.isEmpty {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
             scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
@@ -785,6 +851,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func perform(_ action: ClipCardAction, id: Int64) {
+        guard nearbyIntroduction == nil else { return }
         guard !isClosing, !confirming, !commitWhenLoaded, window.attachedSheet == nil,
               let clip = rows.first(where: { $0.id == id }) else { return }
         select(id: id, scrollIntoView: false)
@@ -803,7 +870,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             guard clip.kind == .image, !clip.isConcealed else { return }
             onExport?(id, action == .save)
         case .delete: onDelete?(id)
-        case .nearby: showNearby(id: id)
+        case .nearby: requestShowNearby(id: id)
         case .copyDifferently: showCopyTransform(clip)
         }
     }
@@ -1332,6 +1399,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         status.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        nearbyBack.identifier = .init("history.nearbyBack")
         nearbyBack.target = self; nearbyBack.action = #selector(returnFromNearby)
         nearbyBack.bezelStyle = .rounded
         nearbyBack.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
@@ -1350,14 +1418,34 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let searchOptionsSpacer = NSView()
         searchOptionsSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         searchOptionsSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        [semanticSearch, searchOptionsSpacer, chatButton].forEach(searchOptionsRow.addArrangedSubview)
+        [semanticSearch, semanticSetup, searchOptionsSpacer, chatButton].forEach(searchOptionsRow.addArrangedSubview)
         searchOptionsRow.identifier = NSUserInterfaceItemIdentifier("history.searchOptions")
         searchOptionsRow.spacing = 8; searchOptionsRow.distribution = .fill; searchOptionsRow.alignment = .centerY
         root.addArrangedSubview(searchOptionsRow)
         searchOptionsRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
         root.setCustomSpacing(6, after: searchRow)
         root.setCustomSpacing(8, after: searchOptionsRow)
-        let scopeRow = NSStackView(views: [scope, nearbyBack, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
+        semanticSetup.target = self; semanticSetup.action = #selector(setupSemanticSearch)
+        semanticSetup.bezelStyle = .inline; semanticSetup.controlSize = .small
+        semanticSetup.font = .systemFont(ofSize: 11)
+        semanticSetup.lineBreakMode = .byTruncatingTail
+        semanticSetup.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        semanticSetup.identifier = .init("history.semanticSetup")
+        nearbyHeading.font = .systemFont(ofSize: 13, weight: .semibold)
+        let help = NSButton(image: NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: L10n.text("Что копировал до и после"))!, target: self, action: #selector(explainNearby))
+        help.bezelStyle = .inline; help.identifier = .init("history.nearbyHelp")
+        nearbyHeader.orientation = .vertical; nearbyHeader.alignment = .leading; nearbyHeader.spacing = 8
+        nearbyHeader.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        nearbyHeader.wantsLayer = true; nearbyHeader.layer?.cornerRadius = 10
+        nearbyHeader.layer?.backgroundColor = BrandIdentity.accentColor.withAlphaComponent(0.10).cgColor
+        let nearbyActions = NSStackView(views: [nearbyBack, NSView(), help])
+        nearbyHeader.addArrangedSubview(nearbyHeading); nearbyHeader.addArrangedSubview(nearbyActions)
+        nearbyHeading.widthAnchor.constraint(equalTo: nearbyHeader.widthAnchor, constant: -24).isActive = true
+        nearbyActions.widthAnchor.constraint(equalTo: nearbyHeading.widthAnchor).isActive = true
+        root.addArrangedSubview(nearbyHeader)
+        nearbyHeader.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        nearbyHeader.identifier = .init("history.nearbyHeader"); nearbyHeader.isHidden = true
+        let scopeRow = NSStackView(views: [scope, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
         scope.widthAnchor.constraint(equalToConstant: 210).isActive = true
         root.addArrangedSubview(scopeRow)
         scopeRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true

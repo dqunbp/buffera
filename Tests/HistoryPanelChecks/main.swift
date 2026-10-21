@@ -140,15 +140,21 @@ func featureAvailabilityChecks() {
     let toggle = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.searchMode" }!
     let chat = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.chat" }!
     let options = views.first { $0.identifier?.rawValue == "history.searchOptions" }!
+    let setup = views.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "history.semanticSetup" }!
+    var setupOpened = false
+    harness.panel.onShowFeatures = { setupOpened = true }
     var chatOpened = false
     harness.panel.onShowChat = { chatOpened = true }
 
     harness.panel.updateFeatureAvailability(semanticSearch: false, chat: false)
     content.layoutSubtreeIfNeeded()
-    check(toggle.isHidden && chat.isHidden && options.isHidden,
-          "disabling both features hides their controls and the whole options row")
+    check(toggle.isHidden && chat.isHidden && !options.isHidden,
+          "disabled features keep the setup entry visible")
     check(harness.panel.searchMode == .literal && !toggle.isEnabled,
           "a hidden semantic checkbox cannot request semantic search")
+    check(!setup.isHidden, "disabled semantic search exposes a setup action")
+    setup.performClick(nil)
+    check(setupOpened && harness.confirmations.isEmpty, "semantic setup opens settings without copying")
     chat.performClick(nil)
     check(!chatOpened && harness.confirmations.isEmpty, "an unavailable assistant cannot open or copy a record")
     waitUntil("literal refresh after disabling semantic search") { !harness.requests.isEmpty }
@@ -169,8 +175,8 @@ func featureAvailabilityChecks() {
     check(options.isHidden, "nearby collapses the options row when only semantic search is available")
     harness.panel.updateFeatureAvailability(semanticSearch: false, chat: false)
     harness.panel.returnFromNearby()
-    check(toggle.isHidden && options.isHidden && harness.panel.searchMode == .literal,
-          "returning from nearby does not reveal a feature disabled while browsing neighbors")
+    check(toggle.isHidden && !options.isHidden && harness.panel.searchMode == .literal,
+          "returning from nearby restores setup without enabling semantic search")
     harness.panel.receive([fixture(20)], total: 1, offset: 0)
     harness.panel.updateFeatureAvailability(semanticSearch: true, chat: false)
     toggle.performClick(nil)
@@ -404,7 +410,7 @@ func shortcutChecks() -> [(Bool, String)] {
     // Disable dock animations for deterministic synchronous shortcut sequences.
     HistoryAppearance(mode: .floating, columns: 1, visibleRows: 6, sidebarVisible: false).save()
     let clips = (1...20).map(fixture)
-    let held = HistoryShortcutGesture.requiredModifiers
+    let held = HistoryShortcutGesture().requiredModifiers
     var results: [(Bool, String)] = []
 
     func opened(load: Bool = true, fromShortcut: Bool = true) -> PanelHarness {
@@ -422,6 +428,25 @@ func shortcutChecks() -> [(Bool, String)] {
                                     isARepeat: isRepeat, keyCode: code)!
         harness.panel.window.sendEvent(event)
     }
+
+    for base in ShortcutPreferences.Base.allCases {
+        let configured = opened(fromShortcut: false)
+        let value = ShortcutPreferences(base: base, next: "J", previous: "K")
+        configured.panel.applyShortcuts(value)
+        configured.panel.close(restoreFocus: false)
+        configured.panel.open(fromShortcut: true)
+        configured.panel.receive(clips, total: clips.count, offset: 0)
+        key(configured, code: 38, characters: "о", flags: base.modifiers)
+        key(configured, code: 38, characters: "j", flags: base.modifiers)
+        key(configured, code: 40, characters: "k", flags: base.modifiers)
+        configured.panel.window.onFlagsChanged?([])
+        results.append((configured.confirmations == [2], "custom pair navigates by physical keys and confirms for \(base)"))
+    }
+    let changed = opened()
+    changed.panel.shortcutPressed(1)
+    changed.panel.applyShortcuts(ShortcutPreferences(base: .controlShift, next: "J", previous: "K"))
+    changed.panel.window.onFlagsChanged?([])
+    results.append((changed.confirmations.isEmpty, "changing shortcuts cancels an armed gesture"))
 
     let single = opened()
     single.panel.window.onFlagsChanged?(held)
@@ -887,7 +912,7 @@ func nearbyChecks() -> [(Bool, String)] {
     }
     func backButton(_ value: PanelHarness) -> NSButton? {
         descendants(of: value.panel.window.contentView!).compactMap { $0 as? NSButton }
-            .first { $0.title == L10n.text("Назад в историю") || $0.accessibilityLabel() == L10n.text("Назад в историю") }
+            .first { $0.identifier?.rawValue == "history.nearbyBack" || $0.accessibilityLabel() == L10n.text("Назад в историю") }
     }
     func complete(_ value: PanelHarness, rows: [ClipSummary]) {
         guard let request = value.nearbyRequests.last else {
@@ -959,7 +984,7 @@ func nearbyChecks() -> [(Bool, String)] {
     let menuEvent = NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
                                      windowNumber: filtered.panel.window.windowNumber, context: nil,
                                      eventNumber: 1, clickCount: 1, pressure: 1)!
-    let item = card.menu(for: menuEvent)!.items.first { $0.title == L10n.text("Показать рядом") }!
+    let item = card.menu(for: menuEvent)!.items.first { $0.title == L10n.text("Что копировал до и после") }!
     _ = NSApp.sendAction(item.action!, to: item.target, from: item)
     waitUntil("nearby context menu action") { !filtered.nearbyRequests.isEmpty }
     results.append((filtered.panel.isShowingNearby && filtered.nearbyRequests.last?.anchorID == originalID

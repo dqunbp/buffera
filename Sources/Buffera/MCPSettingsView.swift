@@ -6,9 +6,15 @@ import BufferaCore
 final class MCPSettingsView: NSView {
     var onCopyConfiguration: ((String) throws -> Void)?
 
+    // The wizard stages permission in its draft; settings keep immediate persistence.
+    var readEnabled: (() -> Bool)?
+    var writeEnabled: ((Bool) throws -> Void)?
+    private var isEnabled: Bool { readEnabled?() ?? access.isEnabled() }
+
     private let access: MCPAccess
     private let executableURL: URL
     private let enabled = NSButton(checkboxWithTitle: L10n.text("Разрешить агентам читать историю"), target: nil, action: nil)
+    private var confirmations: [String: NSTextField] = [:]
     private let status = NSTextField(wrappingLabelWithString: "")
 
     init(access: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL) {
@@ -22,27 +28,17 @@ final class MCPSettingsView: NSView {
         enabled.identifier = NSUserInterfaceItemIdentifier("mcp.enabled")
         let disclosure = paragraph(L10n.text("Агент сможет читать историю и отдельно раскрывать скрытые записи. Инструкция просит его получить ваше согласие, если оно ещё не дано. Прочитанное попадёт в контекст агента."))
         let connection = paragraph(L10n.text("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON."))
-        let command = paragraph(executableURL.path)
-        command.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        command.isSelectable = true
-        command.setAccessibilityLabel(L10n.text("Исполняемый файл MCP"))
-        let claude = copyButton(L10n.text("Команда для Claude Code"), action: #selector(copyClaudeCommand),
-                                identifier: "mcp.copyClaudeCommand")
-        claude.toolTip = L10n.text("Скопировать команду подключения Claude Code для всех проектов этого пользователя")
-        let codex = copyButton(L10n.text("Команда для Codex"), action: #selector(copyCodexCommand),
-                               identifier: "mcp.copyCodexCommand")
-        codex.toolTip = L10n.text("Скопировать команду подключения Codex")
-        let commands = NSStackView(views: [claude, codex])
-        commands.orientation = .horizontal
-        commands.alignment = .centerY
-        commands.spacing = 10
-        let copy = copyButton(L10n.text("Скопировать конфигурацию"), action: #selector(copyConfiguration),
-                              identifier: "mcp.copyConfiguration")
+        let claude = connectionBlock("Claude Code", value: MCPAccess.addCommand(for: .claudeCode, executableURL: executableURL),
+                                     action: #selector(copyClaudeCommand), identifier: "mcp.copyClaudeCommand")
+        let codex = connectionBlock("Codex", value: MCPAccess.addCommand(for: .codex, executableURL: executableURL),
+                                    action: #selector(copyCodexCommand), identifier: "mcp.copyCodexCommand")
+        let json = connectionBlock("JSON", value: (try? MCPAccess.configuration(executableURL: executableURL)) ?? "",
+                                   action: #selector(copyConfiguration), identifier: "mcp.copyConfiguration")
         status.font = .systemFont(ofSize: 11)
         status.setContentCompressionResistancePriority(.required, for: .vertical)
         status.identifier = NSUserInterfaceItemIdentifier("mcp.status")
 
-        let stack = NSStackView(views: [enabled, disclosure, connection, command, commands, copy, status])
+        let stack = NSStackView(views: [enabled, disclosure, connection, claude, codex, json, status])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 14
@@ -54,7 +50,7 @@ final class MCPSettingsView: NSView {
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
-        for field in [disclosure, connection, command, status] {
+        for field in [disclosure, connection, claude, codex, json, status] {
             field.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         refresh()
@@ -63,24 +59,30 @@ final class MCPSettingsView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func refresh() {
-        enabled.state = access.isEnabled() ? .on : .off
+        enabled.state = isEnabled ? .on : .off
+        if writeEnabled != nil {
+            showStatus(enabled.state == .on ? L10n.text("Доступ будет включён после завершения настройки.")
+                       : L10n.text("Доступ будет выключен после завершения настройки."))
+            return
+        }
         showStatus(enabled.state == .on ? L10n.text("Доступ включён. Скрытые записи показаны масками; раскрытие — через reveal_clip.")
                    : L10n.text("Доступ выключен. Конфигурацию можно подготовить заранее."))
     }
 
     @objc private func changeAccess() {
         do {
-            try access.setEnabled(enabled.state == .on)
+            if let writeEnabled { try writeEnabled(enabled.state == .on) }
+            else { try access.setEnabled(enabled.state == .on) }
             refresh()
         } catch {
-            enabled.state = access.isEnabled() ? .on : .off
+            enabled.state = isEnabled ? .on : .off
             showStatus(L10n.text("Не удалось сохранить доступ: \(error.localizedDescription)"), isError: true)
         }
     }
 
     @objc private func copyConfiguration() {
         copyConnection({ try MCPAccess.configuration(executableURL: executableURL) },
-                       confirmation: L10n.text("Конфигурация скопирована. Добавьте её в настройки агента."))
+                       identifier: "mcp.copyConfiguration", confirmation: L10n.text("JSON-конфигурация скопирована. Добавьте её в настройки агента."))
     }
 
     @objc private func copyClaudeCommand() { copyCommand(for: .claudeCode) }
@@ -88,18 +90,44 @@ final class MCPSettingsView: NSView {
 
     private func copyCommand(for client: MCPClient) {
         copyConnection({ MCPAccess.addCommand(for: client, executableURL: executableURL) },
-                       confirmation: L10n.text("Команда скопирована. Выполните её в Терминале."))
+                       identifier: client == .claudeCode ? "mcp.copyClaudeCommand" : "mcp.copyCodexCommand",
+                       confirmation: client == .claudeCode
+                        ? L10n.text("Команда для Claude Code скопирована. Выполните её в Терминале.")
+                        : L10n.text("Команда для Codex скопирована. Выполните её в Терминале."))
     }
 
-    private func copyConnection(_ value: () throws -> String, confirmation: String) {
+    private func copyConnection(_ value: () throws -> String, identifier: String, confirmation: String) {
+        confirmations.values.forEach { $0.isHidden = true }
         do {
             guard let onCopyConfiguration else { throw MCPSettingsError.copyUnavailable }
             try onCopyConfiguration(value())
-            showStatus(confirmation + (access.isEnabled() ? ""
+            confirmations[identifier]?.stringValue = confirmation
+            confirmations[identifier]?.textColor = .secondaryLabelColor
+            confirmations[identifier]?.isHidden = false
+            showStatus(confirmation + (isEnabled ? ""
                        : L10n.text(" Чтобы агент мог читать историю, включите доступ.")))
         } catch {
-            showStatus(L10n.text("Не удалось скопировать: \(error.localizedDescription)"), isError: true)
+            let message = L10n.text("Не удалось скопировать: \(error.localizedDescription)")
+            confirmations[identifier]?.stringValue = message
+            confirmations[identifier]?.textColor = .systemRed
+            confirmations[identifier]?.isHidden = false
+            showStatus(message, isError: true)
         }
+    }
+
+    private func connectionBlock(_ title: String, value: String, action: Selector, identifier: String) -> NSView {
+        let code = paragraph(value)
+        code.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        code.isSelectable = true
+        code.lineBreakMode = .byCharWrapping
+        code.identifier = NSUserInterfaceItemIdentifier(identifier + ".value")
+        let button = copyButton(L10n.text("Скопировать"), action: action, identifier: identifier)
+        button.setAccessibilityLabel(L10n.text("Скопировать: \(title)"))
+        let header = NSStackView(views: [SetupUI.text(title, bold: true), NSView(), button])
+        let confirmation = paragraph("")
+        confirmation.isHidden = true
+        confirmations[identifier] = confirmation
+        return SetupUI.card([header, confirmation, code])
     }
 
     private func copyButton(_ title: String, action: Selector, identifier: String) -> NSButton {
