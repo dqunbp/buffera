@@ -191,6 +191,10 @@
     "view": "Preview: {title}",
     "favorite": "In favorites",
     "count": "{visible} of {total} examples · demo data",
-    "touchActive": "Soft touch. Strong memory."
+    "touchActive": "Soft touch. Strong memory.",
+    "touchCta": {
+      "firstLine": "Enough squeezing.",
+      "secondLine": "Put them to work."
+    }
   }
 }

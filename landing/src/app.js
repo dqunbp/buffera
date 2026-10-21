@@ -143,6 +143,7 @@ let frame = 0;
 let lastTime = 0;
 let inView = true;
 let labelTimer;
+let squeezeCount = 0;
 
 function stopSpring() {
   if (frame) cancelAnimationFrame(frame);
@@ -186,10 +187,22 @@ sculpture.addEventListener('pointerleave', () => {
 });
 sculpture.addEventListener('click', () => {
   bodies.forEach((body, index) => { body.vy += index ? 300 : 385; body.vx += index ? 100 : -100; });
-  const label = document.querySelector('#touch-label');
-  label.textContent = messages.touchActive;
-  clearTimeout(labelTimer);
-  labelTimer = setTimeout(() => { label.textContent = touchIdle; }, 2400);
+  if (squeezeCount < 3) {
+    squeezeCount += 1;
+    const label = document.querySelector('#touch-label');
+    clearTimeout(labelTimer);
+    if (squeezeCount === 3) {
+      const { firstLine, secondLine } = messages.touchCta;
+      label.textContent = `${firstLine} ${secondLine}`;
+      label.closest('.touch-caption').classList.add('is-played');
+      document.querySelector('#install-title').replaceChildren(
+        document.createTextNode(firstLine), document.createElement('br'), document.createTextNode(secondLine),
+      );
+    } else {
+      label.textContent = messages.touchActive;
+      labelTimer = setTimeout(() => { label.textContent = touchIdle; }, 2400);
+    }
+  }
   wakeSpring();
 });
 reduceMotion.addEventListener('change', stopSpring);

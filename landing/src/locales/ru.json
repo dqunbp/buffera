@@ -22,7 +22,7 @@
     "sculpture_aria_label": "Потрогать буфера — запустить пружинящую анимацию",
     "orbit_note_text_2": "Всё сохранено",
     "touch_label_text": "Да, их можно потрогать.",
-    "hero_bottom_text": "Большая память. Мягкое прикосновение.",
+    "hero_bottom_text": "Тема сисек наконец раскрыта.",
     "hero_bottom_aria_label": "Перейти к демо",
     "demo_title_text": "Ты это уже",
     "demo_title_text_2": "копировал.",
@@ -191,6 +191,10 @@
     "view": "Посмотреть: {title}",
     "favorite": "В избранном",
     "count": "{visible} из {total} примеров · демонстрационные данные",
-    "touchActive": "Мягкие. Память — крепкая."
+    "touchActive": "Мягкие. Память — крепкая.",
+    "touchCta": {
+      "firstLine": "Хорош сиськи мять.",
+      "secondLine": "Пора пользоваться."
+    }
   }
 }
