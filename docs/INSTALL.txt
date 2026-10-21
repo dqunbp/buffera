@@ -1,0 +1,34 @@
+Buffera for Mac — Apple Silicon, macOS 14 or later
+
+1. Open the DMG and drag Buffera into Applications.
+2. Open Buffera from Applications. Its icon appears in the menu bar.
+3. Press Command + Option + V to open your clipboard history.
+
+This first release is ad-hoc signed, without an Apple Developer ID certificate
+or Apple notarization. macOS may block the first launch. If you downloaded
+Buffera from github.com/dqunbp/buffera and want to open it, first try launching
+the app, then open System Settings > Privacy & Security > Open Anyway.
+Apple's instructions: https://support.apple.com/en-us/102445
+
+The app keeps history locally. Optional AI models are downloaded separately
+when you enable search by meaning or the assistant in Settings.
+Source code and releases: https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+Buffera для Mac — Apple Silicon, macOS 14 или новее
+
+1. Открой DMG и перетащи Buffera в Applications (Программы).
+2. Запусти Buffera из Программ. Значок появится в строке меню.
+3. Нажми Command + Option + V, чтобы открыть историю буфера обмена.
+
+Первый выпуск подписан локальной ad-hoc подписью, без сертификата Developer ID
+и нотарификации Apple. macOS может заблокировать первый запуск. Если файл
+скачан из github.com/dqunbp/buffera и ты хочешь его открыть, сначала попробуй
+запустить приложение, затем открой «Системные настройки → Конфиденциальность
+и безопасность» и разреши запуск Buffera кнопкой «Всё равно открыть».
+Инструкция Apple: https://support.apple.com/ru-ru/102445
+
+История хранится локально. Модели для умных функций скачиваются отдельно,
+когда включаешь поиск по смыслу или помощника в настройках.
+Исходники и новые версии: https://github.com/dqunbp/buffera

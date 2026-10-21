@@ -124,17 +124,20 @@
     "wrap_text_5": "Let Buffera remember the rest.",
     "release_label_text": "Buffera for Mac",
     "install_card_text": "Get Buffera for your Mac.",
-    "install_card_text_2": "The installer, new releases and source code are on GitHub.",
-    "button_text_2": "Download from GitHub",
+    "install_card_text_2": "Open the DMG and drag Buffera into Applications.",
+    "button_text_2": "Download for Mac",
     "text_link_text_2": "Source code on GitHub",
-    "install_requirements_text": "Search by meaning and the assistant: Apple Silicon",
+    "install_requirements_text": "Apple Silicon · DMG download",
     "install_card_text_3": "What do the smart features need?",
     "install_card_text_4": "A Mac with Apple Silicon and a separate model download when you first enable them. After that, search by meaning and the assistant work offline.",
     "footer_text": "Memory. Personality. Curves.",
     "footer_links_text": "Back to top ↑",
     "telegram_label": "Telegram channel @crypto_and_pug",
     "github_profile_label": "@dqunbp on GitHub",
-    "og_image_alt": "Buffera — nice buffers. Great memory. Clipboard history for Mac."
+    "og_image_alt": "Buffera — nice buffers. Great memory. Clipboard history for Mac.",
+    "install_first_launch_title": "If macOS blocks the first launch",
+    "install_first_launch_text": "This first release isn’t notarized by Apple yet. After trying to launch it, open System Settings → Privacy & Security and choose Open Anyway for Buffera.",
+    "install_first_launch_help": "Apple’s instructions"
   },
   "runtime": {
     "samples": [

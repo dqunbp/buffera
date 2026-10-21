@@ -124,17 +124,20 @@
     "wrap_text_5": "Остальное запомнит Buffera.",
     "release_label_text": "Buffera для Mac",
     "install_card_text": "Забирай на свой Mac.",
-    "install_card_text_2": "Установщик, новые версии и исходники — на GitHub.",
-    "button_text_2": "Скачать с GitHub",
+    "install_card_text_2": "Открой DMG и перетащи Buffera в Программы.",
+    "button_text_2": "Скачать для Mac",
     "text_link_text_2": "Исходники на GitHub",
-    "install_requirements_text": "Поиск по смыслу и помощник: Apple Silicon",
+    "install_requirements_text": "Apple Silicon · файл DMG",
     "install_card_text_3": "Что нужно для умных функций?",
     "install_card_text_4": "Mac с Apple Silicon и отдельная загрузка моделей при первом включении. После этого поиск по смыслу и помощник работают без интернета.",
     "footer_text": "С памятью. С характером. С формами.",
     "footer_links_text": "Наверх ↑",
     "telegram_label": "Telegram-канал @crypto_and_pug",
     "github_profile_label": "Профиль @dqunbp на GitHub",
-    "og_image_alt": "Buffera — хорошие буфера. Всё помнят. История буфера обмена для Mac."
+    "og_image_alt": "Buffera — хорошие буфера. Всё помнят. История буфера обмена для Mac.",
+    "install_first_launch_title": "Если macOS блокирует запуск",
+    "install_first_launch_text": "Первый выпуск пока без нотарификации Apple. После попытки запуска открой «Системные настройки → Конфиденциальность и безопасность» и разреши запуск Buffera.",
+    "install_first_launch_help": "Инструкция Apple"
   },
   "runtime": {
     "samples": [
