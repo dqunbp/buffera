@@ -118,8 +118,6 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private let onAction: (ClipCardAction) -> Void
     private let thumbnailView = NSImageView()
     private let contentText = ClipCardView.makeContentText()
-    private var thumbnailWidth: NSLayoutConstraint?
-    private var thumbnailHeight: NSLayoutConstraint?
     private let quickShortcut = NSTextField(labelWithString: "")
     private var buttons: [ClipCardAction: NSButton] = [:]
     private var selected = false
@@ -177,7 +175,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         let width = width.isFinite ? max(1, width) : 1
         let maximumHeight = maximumHeight.isFinite ? max(74, maximumHeight) : 74
         if clip.kind == .image && !clip.isConcealed {
-            return 50 + thumbnailSize(contentHeight: maximumHeight - 50, width: width)
+            return maximumHeight
         }
         let text = makeContentText()
         text.stringValue = shownText(for: clip, revealedText: revealedText)
@@ -243,7 +241,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
             quickShortcut.stringValue = nearbyAnchor ? "●" : ""
             quickShortcut.setAccessibilityLabel(nearbyAnchor ? L10n.text("Опорная запись") : nil)
         }
-        quickShortcut.textColor = nearbyAnchor ? .controlAccentColor : .labelColor
+        quickShortcut.textColor = nearbyAnchor ? BrandIdentity.accentColor : .labelColor
         quickShortcut.toolTip = nearbyAnchor ? L10n.text("Опорная запись — соседи показаны вокруг этого копирования") : nil
         quickShortcut.isHidden = quickNumber == nil && !nearbyAnchor
     }
@@ -338,15 +336,21 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         addSubview(content)
 
         let isImage = clip.kind == .image && !clip.isConcealed
-        let iconSize: CGFloat = isImage ? 56 : 24
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.image = NSImage(systemSymbolName: clip.isConcealed ? "lock.fill" : clip.kind.symbol,
                                       accessibilityDescription: clip.isConcealed ? L10n.text("Скрытая запись") : clip.kind.label)
         thumbnailView.imageScaling = isImage ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
+        if isImage {
+            for axis in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
+                thumbnailView.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1), for: axis)
+                thumbnailView.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: axis)
+            }
+        }
         thumbnailView.contentTintColor = .secondaryLabelColor
         thumbnailView.wantsLayer = true
         thumbnailView.layer?.cornerRadius = 5
         thumbnailView.layer?.masksToBounds = true
+        thumbnailView.setAccessibilityLabel(clip.isConcealed ? L10n.text("Скрытая запись") : clip.kind.label)
         content.addSubview(thumbnailView)
 
         let text = contentText
@@ -355,7 +359,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         if clip.isConcealed && !isRevealed { text.setAccessibilityLabel(L10n.text("Скрытая запись")) }
         // Full content is opened by an explicit preview, never an incidental hover.
         text.toolTip = nil
-        content.addSubview(text)
+        if !isImage { content.addSubview(text) }
 
         quickShortcut.translatesAutoresizingMaskIntoConstraints = false
         quickShortcut.isEditable = false
@@ -393,48 +397,61 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         }
         addSubview(footer)
 
-        thumbnailWidth = thumbnailView.widthAnchor.constraint(equalToConstant: iconSize)
-        thumbnailHeight = thumbnailView.heightAnchor.constraint(equalToConstant: iconSize)
+        let contentInset: CGFloat = isImage ? 2 : 12
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            content.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: contentInset),
+            content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -contentInset),
+            content.topAnchor.constraint(equalTo: topAnchor, constant: isImage ? 2 : 10),
             content.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -6),
             content.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
-            thumbnailView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            thumbnailView.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            thumbnailWidth!, thumbnailHeight!,
-            text.leadingAnchor.constraint(equalTo: thumbnailView.trailingAnchor, constant: 10),
-            text.trailingAnchor.constraint(equalTo: quickShortcut.leadingAnchor, constant: -6),
-            text.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            text.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor),
-            text.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor),
-            quickShortcut.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            quickShortcut.topAnchor.constraint(equalTo: content.topAnchor),
-            quickShortcut.widthAnchor.constraint(equalToConstant: 27),
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
             footer.heightAnchor.constraint(equalToConstant: 26)
         ])
+        if isImage {
+            // The image owns the preview area; shortcut hints overlay it instead
+            // of reserving an empty column beside every thumbnail.
+            quickShortcut.wantsLayer = true
+            quickShortcut.layer?.cornerRadius = 4
+            quickShortcut.layer?.masksToBounds = true
+            quickShortcut.drawsBackground = true
+            quickShortcut.backgroundColor = .controlBackgroundColor
+            NSLayoutConstraint.activate([
+                thumbnailView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+                thumbnailView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+                thumbnailView.topAnchor.constraint(equalTo: content.topAnchor),
+                thumbnailView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+                quickShortcut.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -4),
+                quickShortcut.topAnchor.constraint(equalTo: content.topAnchor, constant: 4),
+                quickShortcut.widthAnchor.constraint(equalToConstant: 27)
+            ])
+        } else {
+            NSLayoutConstraint.activate([
+                thumbnailView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+                thumbnailView.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+                thumbnailView.widthAnchor.constraint(equalToConstant: 24),
+                thumbnailView.heightAnchor.constraint(equalToConstant: 24),
+                text.leadingAnchor.constraint(equalTo: thumbnailView.trailingAnchor, constant: 10),
+                text.trailingAnchor.constraint(equalTo: quickShortcut.leadingAnchor, constant: -6),
+                text.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+                text.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor),
+                text.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor),
+                quickShortcut.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+                quickShortcut.topAnchor.constraint(equalTo: content.topAnchor),
+                quickShortcut.widthAnchor.constraint(equalToConstant: 27)
+            ])
+        }
     }
 
     private func updateContentSizing(for size: NSSize) {
+        guard clip.kind != .image || clip.isConcealed else { return }
         // The action footer remains fixed while extra height goes to the preview.
         let contentHeight = max(24, size.height - 50)
         let lineHeight = Self.lineHeight(for: contentText.font)
         let lines = max(1, min(Self.maximumPreviewLines, Int(floor(contentHeight / lineHeight))))
         if contentText.maximumNumberOfLines != lines { contentText.maximumNumberOfLines = lines }
-        var iconWidth: CGFloat = 24
-        if clip.kind == .image, !clip.isConcealed {
-            // Reserve room for the image label and quick-selection badge in a
-            // narrow column; wider/taller cards can show up to a 144 pt preview.
-            let thumbnailSize = Self.thumbnailSize(contentHeight: contentHeight, width: size.width)
-            iconWidth = thumbnailSize
-            if thumbnailWidth?.constant != thumbnailSize { thumbnailWidth?.constant = thumbnailSize }
-            if thumbnailHeight?.constant != thumbnailSize { thumbnailHeight?.constant = thumbnailSize }
-        }
-        let textWidth = Self.contentTextWidth(cardWidth: size.width, iconWidth: iconWidth)
+        let textWidth = Self.contentTextWidth(cardWidth: size.width, iconWidth: 24)
         if contentText.preferredMaxLayoutWidth != textWidth { contentText.preferredMaxLayoutWidth = textWidth }
     }
 
@@ -469,10 +486,6 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         return max(1, ceil(font.ascender - font.descender + font.leading))
     }
 
-    private static func thumbnailSize(contentHeight: CGFloat, width: CGFloat) -> CGFloat {
-        max(56, min(144, min(contentHeight, width - 147)))
-    }
-
     private func makeButton(_ action: ClipCardAction) -> NSButton {
         let button = ClipCardButton(title: "", target: self, action: #selector(buttonAction(_:)))
         button.tag = action.rawValue
@@ -492,7 +505,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         let label = "\(action.title(for: clip, isRevealed: isRevealed)) (\(action.shortcut))"
         button.toolTip = label
         button.setAccessibilityLabel(label)
-        button.contentTintColor = action == .favorite && clip.isFavorite ? .controlAccentColor : .secondaryLabelColor
+        button.contentTintColor = action == .favorite && clip.isFavorite ? BrandIdentity.accentColor : .secondaryLabelColor
     }
 
     private func metadataText() -> String {
@@ -511,14 +524,15 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
 
     private func updateAppearance() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let base = NSColor.controlBackgroundColor.withAlphaComponent(selected ? 0.65 : 0.45)
+            let base = NSColor.controlBackgroundColor
             layer?.backgroundColor = selected
-                ? NSColor.controlAccentColor.withAlphaComponent(0.08).blended(withFraction: 0.8, of: base)?.cgColor
-                : base.cgColor
-            layer?.borderColor = selected ? NSColor.controlAccentColor.cgColor
-                : (nearbyAnchor ? NSColor.controlAccentColor.withAlphaComponent(0.5)
-                    : NSColor.separatorColor.withAlphaComponent(0.3)).cgColor
-            layer?.borderWidth = selected ? 2 : (nearbyAnchor ? 1 : 0.5)
+                ? (base.blended(withFraction: 0.14, of: BrandIdentity.accentColor) ?? base)
+                    .withAlphaComponent(0.88).cgColor
+                : base.withAlphaComponent(0.55).cgColor
+            layer?.borderColor = selected ? BrandIdentity.accentColor.withAlphaComponent(0.85).cgColor
+                : (nearbyAnchor ? BrandIdentity.accentColor.withAlphaComponent(0.5)
+                    : NSColor.separatorColor.withAlphaComponent(0.2)).cgColor
+            layer?.borderWidth = selected ? 1.5 : (nearbyAnchor ? 1 : 0.5)
         }
     }
 }

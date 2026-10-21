@@ -59,9 +59,9 @@ private final class SidebarFilterRow: NSButton {
     private func updateAppearance() {
         state = selected ? .on : .off
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = selected ? NSColor.controlAccentColor.withAlphaComponent(0.16).cgColor : NSColor.clear.cgColor
+            layer?.backgroundColor = selected ? BrandIdentity.accentColor.withAlphaComponent(0.14).cgColor : NSColor.clear.cgColor
         }
-        contentTintColor = selected ? .controlAccentColor : .labelColor
+        contentTintColor = selected ? BrandIdentity.accentColor : .labelColor
     }
 }
 
@@ -184,7 +184,7 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
         let summary = [contentType?.title, date.isActive ? date.title : nil, source].compactMap { $0 }.joined(separator: ", ")
         toolbarButton.toolTip = summary.isEmpty ? L10n.text("Фильтры") : L10n.text("Фильтры: \(summary)")
         toolbarButton.setAccessibilityLabel(toolbarButton.toolTip)
-        toolbarButton.contentTintColor = hasActiveFilters ? .controlAccentColor : .secondaryLabelColor
+        toolbarButton.contentTintColor = hasActiveFilters ? BrandIdentity.accentColor : .secondaryLabelColor
         sidebarDateButton.title = date.isActive ? date.title : L10n.text("Всё время")
         sidebarDateButton.toolTip = L10n.text("Период: \(sidebarDateButton.title)")
         sidebarDateButton.selected = date.isActive

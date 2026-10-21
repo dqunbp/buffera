@@ -4,6 +4,18 @@ import AppKit
 enum BrandIdentity {
     static let name = "Buffera"
 
+    /// A restrained version of the app icon's violet, with readable active
+    /// controls in both appearances. Native label colors remain unchanged.
+    static let accentColor = NSColor(name: NSColor.Name("BufferaAccent")) { appearance in
+        switch appearance.bestMatch(from: [.aqua, .darkAqua,
+                                           .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua]) {
+        case .darkAqua, .accessibilityHighContrastDarkAqua:
+            return NSColor(srgbRed: 0.72, green: 0.59, blue: 0.87, alpha: 1)
+        default:
+            return NSColor(srgbRed: 0.46, green: 0.31, blue: 0.65, alpha: 1)
+        }
+    }
+
     static func menuBarIcon() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
             drawMark(in: NSRect(x: 0, y: 0, width: 20, height: 18), color: .black)

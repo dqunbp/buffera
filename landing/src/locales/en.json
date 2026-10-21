@@ -32,7 +32,7 @@
     "demo_hint_text": "Try searching the examples",
     "demo_label_text": "Interactive demo",
     "visually_hidden_text": "Search the demo history",
-    "demo_search_placeholder": "Search history…",
+    "demo_search_placeholder": "Search history",
     "demo_filters_aria_label": "Filter the demo history",
     "active_text": "All",
     "demo_filters_text": "Text",
@@ -137,7 +137,27 @@
     "og_image_alt": "Buffera — nice buffers. Great memory. Clipboard history for Mac.",
     "install_first_launch_title": "If macOS blocks the first launch",
     "install_first_launch_text": "This first release isn’t notarized by Apple yet. After trying to launch it, open System Settings → Privacy & Security and choose Open Anyway for Buffera.",
-    "install_first_launch_help": "Apple’s instructions"
+    "install_first_launch_help": "Apple’s instructions",
+    "demo_sample_label": "Sample entries",
+    "demo_sidebar": "Sidebar",
+    "demo_reset": "All history · ⌘0",
+    "demo_settings": "Settings",
+    "demo_pin": "Pin history window",
+    "demo_scope": "History section",
+    "demo_history": "History",
+    "demo_favorites": "Favorites",
+    "demo_back": "‹ Back to history",
+    "demo_period": "Period",
+    "demo_all_time": "All time",
+    "demo_today": "Today",
+    "demo_yesterday": "Yesterday",
+    "demo_apps": "Applications",
+    "demo_shortcuts": "↑↓ select   ↩ copy   Space preview   ⌘D favorite",
+    "demo_appearance": "Appearance",
+    "demo_theme": "Theme",
+    "demo_system": "System",
+    "demo_light": "Light",
+    "demo_dark": "Dark"
   },
   "runtime": {
     "samples": [
@@ -148,8 +168,9 @@
         "source": "Notes",
         "time": "just now",
         "favorite": true,
-        "text": "Meeting agenda: review interface mockups\n\nDiscuss the home screen layout, check the search flow and approve the mockups. This is a demo note.",
-        "keywords": "meeting mockups interface notes design text"
+        "text": "Meeting plan: discuss the interface designs\n\nReview the search flow and agree on the main screen.",
+        "keywords": "meeting mockups interface notes design text",
+        "sourceIcon": "notes"
       },
       {
         "id": "link",
@@ -158,8 +179,9 @@
         "source": "Safari",
         "time": "2 minutes ago",
         "favorite": false,
-        "text": "https://example.com/design?utm_source=newsletter\n\nIn the app, “Remove Tracking Parameters” removes the tracking tag. This is a demo link.",
-        "keywords": "article design link website"
+        "text": "https://example.com/design?utm_source=newsletter",
+        "keywords": "article design link website",
+        "sourceIcon": "safari"
       },
       {
         "id": "image",
@@ -169,7 +191,8 @@
         "time": "12 minutes ago",
         "favorite": false,
         "text": "Text inside the demo screenshot:\n\nPause Café\n12 Example Street\nOpen daily, 09:00–21:00\n\nThis is a fictional example of recognized text.",
-        "keywords": "coffee cafe café address image screenshot pause example street"
+        "keywords": "coffee cafe café address image screenshot pause example street",
+        "sourceIcon": "screenshot"
       },
       {
         "id": "json",
@@ -178,8 +201,9 @@
         "source": "Terminal",
         "time": "24 minutes ago",
         "favorite": true,
-        "text": "{\n  \"idea\": \"save\",\n  \"status\": \"ready\"\n}\n\nBuffera can format valid JSON before copying it.",
-        "keywords": "json code formatting text terminal"
+        "text": "{\"idea\":\"save\",\"status\":\"ready\"}",
+        "keywords": "json code formatting text terminal",
+        "sourceIcon": "terminal"
       }
     ],
     "kindLabels": {
@@ -195,6 +219,45 @@
     "touchCta": {
       "firstLine": "Enough squeezing.",
       "secondLine": "Put them to work."
+    },
+    "ui": {
+      "contentType": "Content type",
+      "types": {
+        "all": "All types",
+        "text": "Text",
+        "link": "Link",
+        "image": "Image",
+        "file": "Files",
+        "data": "Data",
+        "remote": "From devices",
+        "concealed": "Hidden"
+      },
+      "allApps": "All applications",
+      "records": "Entries: {visible}",
+      "addFavorite": "Add to favorites",
+      "removeFavorite": "Remove from favorites",
+      "nearby": "Show nearby",
+      "conceal": "Hide content",
+      "reveal": "Show content",
+      "preview": "Preview",
+      "copyAs": "Copy differently",
+      "copy": "Copy",
+      "finder": "Show in Finder",
+      "save": "Save as…",
+      "hidden": "Content hidden",
+      "copyNotice": "In the installed Buffera app, this button copies the entry. This demo leaves your clipboard unchanged.",
+      "copyAsNotice": "In the installed Buffera app, choose plain text, clean a link, or copy text from an image.",
+      "finderNotice": "In the installed Buffera app, this button reveals the image file in Finder.",
+      "saveNotice": "In the installed Buffera app, you can save this image to a file here.",
+      "pinNotice": "Buffera stays open when you switch to another app.",
+      "unpinNotice": "Buffera hides when you switch to another app.",
+      "nearbyNotice": "Examples copied around this entry.",
+      "imageAlt": "Sample screenshot: Pause café, 12 Example Street",
+      "imageName": "Pause",
+      "imageAddress": "12 Example Street",
+      "imageHours": "Daily, 09:00–21:00",
+      "pin": "Pin history window",
+      "unpin": "Unpin history window"
     }
   }
 }

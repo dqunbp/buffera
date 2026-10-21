@@ -47,7 +47,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let thumbnails = NSCache<NSNumber, NSImage>()
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
-    private let pinButton = NSButton(image: HistoryPanel.anchorImage(), target: nil, action: nil)
+    private let pinButton = NSButton(image: NSImage(systemSymbolName: "pin", accessibilityDescription: nil)!, target: nil, action: nil)
     private let scope = NSSegmentedControl(labels: [L10n.text("История"), L10n.text("Избранное")], trackingMode: .selectOne, target: nil, action: nil)
     private let nearbyBack = NSButton(title: L10n.text("Назад в историю"), target: nil, action: nil)
     private var nearbyState: NearbyHistoryState?
@@ -1253,6 +1253,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         root.addArrangedSubview(searchRow)
         searchRow.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
         scope.selectedSegment = 0; scope.segmentStyle = .rounded
+        scope.selectedSegmentBezelColor = BrandIdentity.accentColor
         scope.target = self; scope.action = #selector(scopeChanged)
         scope.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil), forSegment: 0)
         scope.setImage(NSImage(systemSymbolName: "star", accessibilityDescription: nil), forSegment: 1)
@@ -1328,28 +1329,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             ? L10n.text("Открепить окно: скрывать при переходе в другое приложение")
             : L10n.text("Закрепить окно: оставить открытым при переходе в другое приложение")
         pinButton.setAccessibilityLabel(label)
-        pinButton.contentTintColor = isPinned ? .controlAccentColor : nil
-    }
-
-    private static func anchorImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            NSColor.labelColor.setStroke()
-            let ring = NSBezierPath(ovalIn: NSRect(x: 7, y: 12, width: 4, height: 4))
-            ring.lineWidth = 1.5; ring.stroke()
-            let path = NSBezierPath()
-            path.lineWidth = 1.5; path.lineCapStyle = .round; path.lineJoinStyle = .round
-            path.move(to: NSPoint(x: 9, y: 12)); path.line(to: NSPoint(x: 9, y: 2.5))
-            path.move(to: NSPoint(x: 5, y: 10)); path.line(to: NSPoint(x: 13, y: 10))
-            path.move(to: NSPoint(x: 2, y: 7))
-            path.curve(to: NSPoint(x: 9, y: 2.5), controlPoint1: NSPoint(x: 2, y: 4), controlPoint2: NSPoint(x: 5, y: 2.5))
-            path.curve(to: NSPoint(x: 16, y: 7), controlPoint1: NSPoint(x: 13, y: 2.5), controlPoint2: NSPoint(x: 16, y: 4))
-            path.move(to: NSPoint(x: 1, y: 5)); path.line(to: NSPoint(x: 2, y: 7)); path.line(to: NSPoint(x: 4, y: 6))
-            path.move(to: NSPoint(x: 14, y: 6)); path.line(to: NSPoint(x: 16, y: 7)); path.line(to: NSPoint(x: 17, y: 5))
-            path.stroke()
-            return true
-        }
-        image.isTemplate = true
-        return image
+        pinButton.image = NSImage(systemSymbolName: isPinned ? "pin.fill" : "pin", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .regular))
+        pinButton.contentTintColor = isPinned ? BrandIdentity.accentColor : .secondaryLabelColor
     }
 
     @objc private func showChat() {

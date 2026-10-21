@@ -6,6 +6,8 @@ import BufferaLocalization
 func runLocalizationSmokeTest() throws {
     let activeLanguage = L10n.language
     NSApplication.shared.setActivationPolicy(.prohibited)
+    let originalAppearance = NSApp.appearance
+    defer { NSApp.appearance = originalAppearance }
     let suite = "Buffera.LocalizationUI.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     defaults.setVolatileDomain([:], forName: UserDefaults.argumentDomain)
@@ -18,6 +20,7 @@ func runLocalizationSmokeTest() throws {
     customLimits.save(to: defaults)
     func makeSettings() -> SettingsWindow {
         SettingsWindow(mcpAccess: MCPAccess(directory: directory), languageDefaults: defaults, limitsDefaults: defaults,
+                       themeDefaults: defaults,
                        launchLanguage: .system, frameAutosaveName: nil)
     }
     func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
@@ -28,7 +31,7 @@ func runLocalizationSmokeTest() throws {
     guard let window = controller.window, let content = window.contentView else {
         throw HistoryError.database("Settings window missing")
     }
-    window.appearance = NSAppearance(named: .aqua)
+    InterfaceTheme.system.apply()
     content.layoutSubtreeIfNeeded()
     guard let language = descendants(content).first(where: {
         $0.identifier?.rawValue == "settings.language"
@@ -37,6 +40,41 @@ func runLocalizationSmokeTest() throws {
           let restart = descendants(content).first(where: { $0.identifier?.rawValue == "settings.restart" }) as? NSButton else {
         throw HistoryError.database("Restart controls missing")
     }
+    guard let theme = descendants(content).first(where: {
+        $0.identifier?.rawValue == "settings.theme"
+    }) as? NSPopUpButton else { throw HistoryError.database("Theme selector missing") }
+    let expectedThemes = activeLanguage == "ru" ? ["Системная", "Светлая", "Тёмная"] : ["System", "Light", "Dark"]
+    try check(theme.itemTitles == expectedThemes && theme.indexOfSelectedItem == 0,
+              "Theme options must be translated and initially follow the system")
+    for invalid: Any in ["unknown", 7, true, ["dark"]] {
+        defaults.set(invalid, forKey: InterfaceTheme.key)
+        try check(InterfaceTheme.load(from: defaults) == .system, "Invalid theme must fall back to system")
+    }
+    let expectedAppearances: [NSAppearance.Name?] = [nil, .aqua, .darkAqua]
+    for (index, preference) in InterfaceTheme.allCases.enumerated() {
+        theme.selectItem(at: index)
+        try check(theme.sendAction(theme.action, to: theme.target), "Theme action disconnected")
+        try check(InterfaceTheme.load(from: defaults) == preference, "Theme choice did not persist")
+        try check(NSApp.appearance?.name == expectedAppearances[index], "Theme must apply immediately to the application")
+        try check(notice.isHidden, "Changing theme must not request a restart")
+        let reopened = makeSettings()
+        let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "settings.theme" } as? NSPopUpButton
+        try check(selected?.indexOfSelectedItem == index, "Reopened settings lost the selected theme")
+        if let expected = expectedAppearances[index] {
+            try check(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == expected &&
+                      reopened.window!.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == expected,
+                      "Existing and new windows must inherit the selected application theme")
+        }
+        NSApp.appearance = nil
+        InterfaceTheme.load(from: defaults).apply()
+        try check(NSApp.appearance?.name == expectedAppearances[index], "Saved theme must reapply at launch")
+    }
+    theme.selectItem(at: 0)
+    _ = theme.sendAction(theme.action, to: theme.target)
+    try check(defaults.object(forKey: InterfaceTheme.key) == nil && NSApp.appearance == nil,
+              "System theme must remove the app override")
+    try check(HistoryLimits.load(from: defaults) == customLimits,
+              "Changing theme must preserve unrelated history settings")
     var restartRequests = 0
     controller.onRestart = { restartRequests += 1 }
     try check(notice.isHidden, "Unchanged language must not request restart")
@@ -122,5 +160,5 @@ func runLocalizationSmokeTest() throws {
         let frame = content.convert(view.bounds, from: view)
         try check(content.bounds.insetBy(dx: -1, dy: -1).contains(frame), "History control lies outside the window")
     }
-    print("PASS: \(activeLanguage) settings language selection, persistence, restart action, history size slider and layout")
+    print("PASS: \(activeLanguage) settings theme and language selection, persistence, restart action, history size slider and layout")
 }

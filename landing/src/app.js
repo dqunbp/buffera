@@ -1,135 +1,252 @@
 'use strict';
 
-// The demo is deliberately self-contained: no access to the visitor's clipboard or history.
+// Only synthetic examples. This demo never reads or writes the visitor's clipboard.
 const messages = JSON.parse(document.querySelector('#locale-data').textContent);
-const { samples, kindLabels } = messages;
+const { samples, kindLabels, ui } = messages;
 const locale = document.documentElement.lang;
 const touchIdle = document.querySelector('#touch-label').textContent;
 const formatMessage = (message, values) => message.replace(/\{(\w+)\}/g, (_, key) => values[key]);
-const kindIcons = { text: 'T', link: '↗', image: '▧' };
+const demo = document.querySelector('.demo-window');
 const search = document.querySelector('#demo-search');
 const list = document.querySelector('#demo-items');
 const count = document.querySelector('#demo-count');
 const detail = document.querySelector('#demo-detail');
-const filters = [...document.querySelectorAll('[data-filter]')];
-let filter = 'all';
-let visible = samples;
-let selection = 0;
-let lastOpened = null;
-
+const settings = document.querySelector('.demo-settings');
+const dateFilter = document.querySelector('#demo-date');
+const toast = document.querySelector('.demo-toast');
+const paths = {
+  sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',
+  reset: '<path d="M4 9a8 8 0 1 1 0 7M4 3v6h6"/>',
+  filters: '<path d="M3 6h4m4 0h10M3 12h10m4 0h4M3 18h4m4 0h10"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/>',
+  settings: '<path d="m9 3-.6 3-2 .9L3.8 6 2 9l2.2 2v2L2 15l1.8 3 2.6-.9 2 .9.6 3h6l.6-3 2-.9 2.6.9 1.8-3-2.2-2v-2L22 9l-1.8-3-2.6.9-2-.9L15 3Z"/><circle cx="12" cy="12" r="3"/>',
+  pin: '<path d="m15 3 6 6-3 1-4 4v4l-3-3-7 7 7-7-5-5h4l4-4Z"/>',
+  history: '<path d="M3 10a9 9 0 1 1 1 7M3 4v6h6m3-4v6l4 2"/>',
+  star: '<path d="m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9Z"/>',
+  all: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  text: '<path d="M5 5h14M12 5v14m-4 0h8"/>',
+  link: '<path d="m10 8 3-3a4 4 0 0 1 6 6l-3 3m-2 2-3 3a4 4 0 0 1-6-6l3-3m0 6 8-8"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1"/><path d="m3 17 6-5 4 4 4-7 4 6"/>',
+  file: '<path d="M6 3h8l4 4v14H6Zm8 0v5h4"/>',
+  data: '<path d="m8 5-6 7 6 7m8-14 6 7-6 7M14 3l-4 18"/>',
+  remote: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  concealed: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 10h18"/>',
+  app: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 16 12 7l4 9m-7-3h6"/>',
+  conceal: '<path d="m3 3 18 18M9 5c6-2 11 6 12 7l-4 4M6 6l-5 6s8 11 16 6"/>',
+  reveal: '<path d="M1 12s11-16 22 0c-11 16-22 0-22 0Z"/><circle cx="12" cy="12" r="3"/>',
+  preview: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
+  copyAs: '<path d="M4 5h14M10 5v14m-4 0h7m2-5 3 3 4-6"/>',
+  copy: '<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/>',
+  finder: '<path d="M2 7V4h8l3 3h9v13H2Z"/>',
+  save: '<path d="M12 2v12m-5-5 5 5 5-5M3 14v7h18v-7"/>',
+};
+function icon(name) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  element.setAttribute('viewBox', '0 0 24 24');
+  element.setAttribute('aria-hidden', 'true');
+  element.innerHTML = paths[name] || paths.app; // Static, trusted path definitions only.
+  return element;
+}
+function button(label, iconName, handler, className = 'demo-icon-button') {
+  const element = document.createElement('button');
+  element.type = 'button'; element.className = className;
+  element.setAttribute('aria-label', label); element.title = label;
+  element.append(icon(iconName));
+  element.addEventListener('click', handler);
+  return element;
+}
+for (const element of demo.querySelectorAll('[data-icon]')) {
+  element.append(icon(element.dataset.icon));
+  if (element.hasAttribute('aria-label')) element.title = element.getAttribute('aria-label');
+}
+let filter = 'all', source = 'all', scope = 'history', nearbyID = null;
+let visible = [], selection = 0, lastOpened = null, toastTimer;
+function notify(message) {
+  clearTimeout(toastTimer); toast.textContent = message; toast.hidden = false;
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 4500);
+}
+function screenshot() {
+  const image = document.createElement('img');
+  image.src = new URL(`../demo-${locale}.svg`, location.href).href;
+  image.alt = ui.imageAlt; image.width = 640; image.height = 310;
+  return image;
+}
+function renderSidebar() {
+  const focusedFilter = document.activeElement?.dataset.filter;
+  const focusedSource = document.activeElement?.dataset.source;
+  const kinds = document.querySelector('#demo-kinds'); kinds.replaceChildren();
+  const heading = document.createElement('div'); heading.className = 'demo-sidebar-heading'; heading.textContent = ui.contentType; kinds.append(heading);
+  for (const [value, title] of Object.entries(ui.types)) {
+    const row = button(title, value, () => { filter = value; nearbyID = null; renderDemo(); }, 'demo-sidebar-row');
+    row.append(document.createTextNode(title)); row.dataset.filter = value;
+    row.setAttribute('aria-pressed', String(filter === value)); kinds.append(row);
+  }
+  const sources = document.querySelector('#demo-sources'); sources.replaceChildren();
+  for (const value of ['all', ...new Set(samples.map(item => item.source))]) {
+    const label = value === 'all' ? ui.allApps : value;
+    const row = button(label, value === 'all' ? 'all' : 'app', () => { source = value; nearbyID = null; renderDemo(); }, 'demo-sidebar-row');
+    const sourceIcon = samples.find(item => item.source === value)?.sourceIcon;
+    if (sourceIcon) {
+      const image = document.createElement('img');
+      image.src = new URL(`../app-${sourceIcon}.png`, location.href).href;
+      image.alt = ''; image.width = 16; image.height = 16;
+      image.className = 'demo-app-icon';
+      image.addEventListener('error', () => image.replaceWith(icon('app')), { once: true });
+      row.replaceChildren(image);
+    }
+    row.dataset.source = value; row.append(document.createTextNode(label)); row.setAttribute('aria-pressed', String(source === value)); sources.append(row);
+  }
+  if (focusedFilter) [...kinds.querySelectorAll('button')].find(row => row.dataset.filter === focusedFilter)?.focus({ preventScroll: true });
+  if (focusedSource) [...sources.querySelectorAll('button')].find(row => row.dataset.source === focusedSource)?.focus({ preventScroll: true });
+}
+function toggleFavorite(item) {
+  item.favorite = !item.favorite;
+  const previous = item.id; renderDemo();
+  const row = [...list.children].find(row => row.dataset.id === previous);
+  row?.querySelector('[data-action="favorite"]')?.focus({ preventScroll: true });
+}
+function runAction(action, item, trigger) {
+  if (action === 'favorite') { toggleFavorite(item); return; }
+  if (action === 'preview') { openDetail(item, trigger); return; }
+  if (action === 'conceal') { item.concealed = !item.concealed; renderDemo(); return; }
+  if (action === 'nearby') { nearbyID = item.id; renderDemo(); notify(ui.nearbyNotice); return; }
+  notify(ui[`${action}Notice`]);
+}
 function renderDemo() {
   const query = search.value.trim().toLocaleLowerCase(locale);
-  visible = samples.filter(item => {
-    const matchesFilter = filter === 'all' || (filter === 'favorite' ? item.favorite : item.kind === filter);
-    return matchesFilter && `${item.title} ${item.text} ${item.source} ${item.keywords}`.toLocaleLowerCase(locale).includes(query);
+  const nearbyIndex = samples.findIndex(item => item.id === nearbyID);
+  visible = samples.filter((item, index) => {
+    if (nearbyID) return Math.abs(index - nearbyIndex) <= 1;
+    const matchesKind = filter === 'all' || (filter === 'concealed' ? item.concealed : item.kind === filter);
+    const searchable = item.concealed ? item.source : `${item.text} ${item.source} ${item.keywords}`;
+    return matchesKind && (source === 'all' || item.source === source) && (scope !== 'favorite' || item.favorite)
+      && dateFilter.value !== 'yesterday' && searchable.toLocaleLowerCase(locale).includes(query);
   });
-  selection = 0;
-  list.replaceChildren();
+  selection = 0; list.replaceChildren();
   if (!visible.length) {
-    const empty = document.createElement('p');
-    empty.className = 'demo-empty';
-    empty.textContent = messages.empty;
-    list.append(empty);
+    const empty = document.createElement('p'); empty.className = 'demo-empty'; empty.textContent = messages.empty; list.append(empty);
   }
   visible.forEach((item, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `demo-item${index === selection ? ' selected' : ''}`;
-    button.dataset.id = item.id;
-    button.setAttribute('aria-label', formatMessage(messages.view, { title: item.title }));
-    const icon = document.createElement('span');
-    icon.className = `item-icon ${item.kind}`;
-    icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = kindIcons[item.kind];
-    const content = document.createElement('span');
-    content.className = 'item-content';
-    const title = document.createElement('span');
-    title.className = 'item-title';
-    title.textContent = item.title;
-    const meta = document.createElement('span');
-    meta.className = 'item-meta';
-    for (const value of [item.source, item.time]) {
-      const text = document.createElement('span');
-      text.textContent = value;
-      meta.append(text);
+    const card = document.createElement('article'); card.className = `demo-item${index === selection ? ' selected' : ''}${item.kind === 'image' ? ' image-card' : ''}`;
+    card.tabIndex = 0; card.dataset.id = item.id; card.setAttribute('aria-label', item.concealed ? ui.hidden : item.title);
+    const content = document.createElement('div'); content.className = 'item-content';
+    if (item.kind === 'image') content.append(screenshot());
+    else {
+      content.append(icon(item.concealed ? 'concealed' : item.kind));
+      const text = document.createElement('p'); text.textContent = item.concealed ? ui.hidden : item.text; content.append(text);
     }
-    content.append(title, meta);
-    button.append(icon, content);
-    if (item.favorite) {
-      const star = document.createElement('span');
-      star.className = 'item-favorite';
-      star.textContent = '☆';
-      star.setAttribute('aria-label', messages.favorite);
-      button.append(star);
+    const key = document.createElement('span'); key.className = 'item-key'; key.textContent = `⌘${index + 1}`; content.append(key);
+    const footer = document.createElement('div'); footer.className = 'item-footer';
+    const meta = document.createElement('span'); meta.className = 'item-meta';
+    meta.textContent = `${item.source} · ${item.time}`; meta.title = meta.textContent;
+    const actions = document.createElement('div'); actions.className = 'item-actions';
+    const actionNames = item.kind === 'image' ? ['favorite', 'nearby', 'finder', 'save', 'preview', 'copyAs', 'copy'] : ['favorite', 'nearby', 'conceal', 'preview', 'copyAs', 'copy'];
+    for (const action of actionNames) {
+      const label = action === 'favorite' ? ui[item.favorite ? 'removeFavorite' : 'addFavorite'] : action === 'conceal' ? ui[item.concealed ? 'reveal' : 'conceal'] : ui[action];
+      const symbol = action === 'favorite' ? 'star' : action === 'nearby' ? 'history' : action === 'conceal' && item.concealed ? 'reveal' : action;
+      const control = button(label, symbol, event => { event.stopPropagation(); select(index); runAction(action, item, event.currentTarget); });
+      control.dataset.action = action;
+      if (action === 'favorite') control.setAttribute('aria-pressed', String(item.favorite));
+      actions.append(control);
     }
-    const key = document.createElement('span');
-    key.className = 'item-key';
-    key.textContent = '↵';
-    key.setAttribute('aria-hidden', 'true');
-    button.append(key);
-    button.addEventListener('click', () => openDetail(item, button));
-    button.addEventListener('focus', () => select(index));
-    list.append(button);
+    footer.append(meta, actions); card.append(content, footer);
+    card.addEventListener('click', () => { select(index); card.focus({ preventScroll: true }); });
+    card.addEventListener('dblclick', event => { if (!event.target.closest('button')) notify(ui.copyNotice); });
+    card.addEventListener('focus', () => select(index)); list.append(card);
   });
-  count.textContent = formatMessage(messages.count, { visible: visible.length, total: samples.length });
+  count.textContent = formatMessage(ui.records, { visible: visible.length });
+  demo.querySelector('[data-command="reset"]').hidden = !query && filter === 'all' && source === 'all' && scope === 'history' && dateFilter.value === 'all' && !nearbyID;
+  demo.querySelector('.demo-scopes').hidden = Boolean(nearbyID);
+  demo.querySelector('.demo-nearby-back').hidden = !nearbyID;
+  demo.querySelectorAll('[data-scope]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.scope === scope)));
+  renderSidebar();
 }
-
 function select(index) {
   selection = index;
   [...list.querySelectorAll('.demo-item')].forEach((element, i) => element.classList.toggle('selected', i === index));
 }
-
 function openDetail(item, trigger) {
-  lastOpened = trigger;
+  closeSettings(); toast.hidden = true; lastOpened = trigger;
   detail.querySelector('.detail-kind').textContent = `${kindLabels[item.kind]} · ${item.source}`;
-  detail.querySelector('h3').textContent = item.title;
-  detail.querySelector('p').textContent = item.text;
-  detail.hidden = false;
-  // The detail replaces the demo controls visually and in keyboard navigation.
-  for (const element of document.querySelectorAll('.demo-search, .demo-filters, .demo-items')) element.inert = true;
+  detail.querySelector('h3').textContent = item.concealed ? ui.hidden : item.title;
+  const content = detail.querySelector('.detail-content'); content.replaceChildren();
+  if (item.kind === 'image') content.append(screenshot());
+  else content.textContent = item.concealed ? ui.hidden : item.text;
+  detail.hidden = false; demo.querySelector('.demo-controls').inert = true;
   detail.querySelector('button').focus({ preventScroll: true });
 }
-
 function closeDetail() {
-  detail.hidden = true;
-  for (const element of document.querySelectorAll('.demo-search, .demo-filters, .demo-items')) element.inert = false;
+  detail.hidden = true; demo.querySelector('.demo-controls').inert = false;
   if (lastOpened?.isConnected) lastOpened.focus({ preventScroll: true });
 }
+function closeSettings() {
+  settings.hidden = true; demo.querySelector('[data-command="settings"]').setAttribute('aria-expanded', 'false');
+}
+function toggleSidebar() {
+  demo.classList.remove('filters-open');
+  const collapsed = demo.classList.toggle('sidebar-collapsed');
+  demo.querySelector('[data-command="sidebar"]').setAttribute('aria-expanded', String(!collapsed));
+  demo.querySelector('[data-command="filters"]').setAttribute('aria-expanded', 'false');
+  closeSettings();
+}
+if (matchMedia('(max-width: 600px)').matches) toggleSidebar();
 
-search.addEventListener('input', renderDemo);
-filters.forEach(button => button.addEventListener('click', () => {
-  filter = button.dataset.filter;
-  filters.forEach(other => {
-    const active = other === button;
-    other.classList.toggle('active', active);
-    other.setAttribute('aria-pressed', String(active));
-  });
-  renderDemo();
-}));
+search.addEventListener('input', () => { nearbyID = null; renderDemo(); });
+dateFilter.addEventListener('change', () => { nearbyID = null; renderDemo(); });
+demo.querySelectorAll('[data-scope]').forEach(button => button.addEventListener('click', () => { scope = button.dataset.scope; renderDemo(); }));
+demo.querySelector('.demo-nearby-back').addEventListener('click', () => { nearbyID = null; renderDemo(); });
+demo.querySelector('[data-command="reset"]').addEventListener('click', () => {
+  filter = source = 'all'; scope = 'history'; nearbyID = null; search.value = ''; dateFilter.value = 'all'; renderDemo(); search.focus({ preventScroll: true });
+});
+demo.querySelector('[data-command="sidebar"]').addEventListener('click', toggleSidebar);
+demo.querySelector('[data-command="filters"]').addEventListener('click', event => {
+  closeSettings();
+  const open = demo.classList.toggle('filters-open');
+  event.currentTarget.setAttribute('aria-expanded', String(open));
+});
+demo.querySelector('[data-command="pin"]').addEventListener('click', event => {
+  const button = event.currentTarget, pinned = button.getAttribute('aria-pressed') !== 'true';
+  button.setAttribute('aria-pressed', String(pinned)); button.setAttribute('aria-label', ui[pinned ? 'unpin' : 'pin']); button.title = ui[pinned ? 'unpin' : 'pin']; notify(ui[pinned ? 'pinNotice' : 'unpinNotice']);
+});
+demo.querySelector('[data-command="settings"]').addEventListener('click', event => {
+  demo.classList.remove('filters-open'); demo.querySelector('[data-command="filters"]').setAttribute('aria-expanded', 'false');
+  settings.hidden = !settings.hidden; event.currentTarget.setAttribute('aria-expanded', String(!settings.hidden));
+  if (!settings.hidden) document.querySelector('#demo-theme').focus({ preventScroll: true });
+});
+document.querySelector('#demo-theme').addEventListener('change', event => { demo.dataset.theme = event.target.value; });
+document.addEventListener('click', event => {
+  if (!settings.hidden && !settings.contains(event.target) && !event.target.closest('[data-command="settings"]')) closeSettings();
+});
 detail.querySelector('button').addEventListener('click', closeDetail);
-document.querySelector('.demo-window').addEventListener('keydown', event => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
-    event.preventDefault();
+demo.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
     if (!detail.hidden) closeDetail();
-    search.focus({ preventScroll: true });
-    search.select();
-    return;
+    else if (!settings.hidden) { closeSettings(); demo.querySelector('[data-command="settings"]').focus(); }
+    else if (nearbyID) { nearbyID = null; renderDemo(); }
+    demo.classList.remove('filters-open'); demo.querySelector('[data-command="filters"]').setAttribute('aria-expanded', 'false');
+    toast.hidden = true; event.preventDefault(); return;
   }
   if (!detail.hidden) {
-    if (event.key === 'Escape') { event.preventDefault(); closeDetail(); }
+    if (event.key === 'Tab') { event.preventDefault(); detail.querySelector('button').focus(); }
     return;
   }
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); closeSettings(); search.focus({ preventScroll: true }); search.select(); return; }
+  if (!settings.hidden || event.target.closest('select,button')) return;
   const rows = [...list.querySelectorAll('.demo-item')];
   if (['ArrowDown', 'ArrowUp'].includes(event.key) && rows.length) {
-    event.preventDefault();
-    const index = document.activeElement === search ? 0 : (selection + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
-    select(index);
-    rows[index].focus({ preventScroll: true });
+    event.preventDefault(); select(document.activeElement === search ? 0 : (selection + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length);
+    rows[selection].focus({ preventScroll: true }); rows[selection].scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }
-  if (event.key === 'Enter' && document.activeElement === search && visible.length) {
-    event.preventDefault();
-    openDetail(visible[selection], search);
+  if ((event.metaKey || event.ctrlKey) && event.key === '0') { event.preventDefault(); demo.querySelector('[data-command="reset"]').click(); return; }
+  if (!rows.length) return;
+  if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
+    event.preventDefault(); const index = Number(event.key) - 1;
+    if (rows[index]) { select(index); rows[index].focus({ preventScroll: true }); notify(ui.copyNotice); }
   }
+  if (event.key === 'Enter') { event.preventDefault(); notify(ui.copyNotice); }
+  if (event.key === ' ' && event.target !== search) { event.preventDefault(); openDetail(visible[selection], rows[selection]); }
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); toggleFavorite(visible[selection]); }
 });
 renderDemo();
 

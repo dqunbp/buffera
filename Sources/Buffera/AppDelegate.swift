@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        InterfaceTheme.load().apply()
         buildMenu()
         do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
         catch { showError(error, alert: true); return }

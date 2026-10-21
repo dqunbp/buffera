@@ -66,13 +66,29 @@
     <section class="demo-section" id="try" aria-labelledby="demo-title">
       <div class="wrap demo-layout">
         <div class="section-intro"><span class="small-mark" aria-hidden="true">⌘⌥V</span><h2 id="demo-title">{{page.demo_title_text}}<br> {{page.demo_title_text_2}}</h2><p>{{page.section_intro_text}}</p><p>{{page.section_intro_text_2}}<br> {{page.section_intro_text_3}}</p><div class="demo-hint"><span aria-hidden="true">↘</span> {{page.demo_hint_text}}</div></div>
-        <div class="demo-window">
-          <div class="window-top"><div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div><strong>Buffera</strong><span class="demo-label">{{page.demo_label_text}}</span></div>
-          <div class="demo-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><label class="visually-hidden" for="demo-search">{{page.visually_hidden_text}}</label><input id="demo-search" placeholder="{{page.demo_search_placeholder}}" type="search" autocomplete="off"><kbd>⌘F</kbd></div>
-          <div class="demo-filters" role="group" aria-label="{{page.demo_filters_aria_label}}"><button class="active" type="button" data-filter="all" aria-pressed="true">{{page.active_text}}</button><button type="button" data-filter="text" aria-pressed="false">{{page.demo_filters_text}}</button><button type="button" data-filter="link" aria-pressed="false">{{page.demo_filters_text_2}}</button><button type="button" data-filter="image" aria-pressed="false">{{page.demo_filters_text_3}}</button><button type="button" data-filter="favorite" aria-pressed="false">{{page.demo_filters_text_4}}</button></div>
-          <div id="demo-items" class="demo-items" aria-label="{{page.demo_items_aria_label}}"><p class="demo-fallback">{{page.demo_fallback_text}}</p></div>
-          <div class="demo-bottom"><span id="demo-count" role="status">{{page.demo_items_aria_label}}</span><span>{{page.demo_bottom_text}} <span class="key-separator">/</span> {{page.demo_bottom_text_2}}</span></div>
-          <div id="demo-detail" class="demo-detail" hidden><button type="button" class="detail-close" aria-label="{{page.detail_close_aria_label}}">×</button><span class="detail-kind"></span><h3></h3><p></p><span class="detail-note">{{page.detail_note_text}}</span></div>
+        <div class="demo-preview">
+          <div class="demo-caption"><span>{{page.demo_label_text}}</span><span>{{page.demo_sample_label}}</span></div>
+          <div class="demo-window" data-theme="light">
+            <div class="demo-controls">
+              <div class="demo-toolbar">
+                <button class="demo-icon-button" type="button" data-command="sidebar" data-icon="sidebar" aria-label="{{page.demo_sidebar}}" aria-expanded="true"></button>
+                <div class="demo-search"><span data-icon="search"></span><label class="visually-hidden" for="demo-search">{{page.visually_hidden_text}}</label><input id="demo-search" placeholder="{{page.demo_search_placeholder}}" type="search" autocomplete="off"></div>
+                <button class="demo-icon-button" type="button" data-command="reset" data-icon="reset" aria-label="{{page.demo_reset}}" hidden></button>
+                <button class="demo-icon-button" type="button" data-command="filters" data-icon="filters" aria-label="{{page.demo_filters_aria_label}}" aria-expanded="false"></button>
+                <button class="demo-icon-button" type="button" data-command="settings" data-icon="settings" aria-label="{{page.demo_settings}}" aria-expanded="false"></button>
+                <button class="demo-icon-button" type="button" data-command="pin" data-icon="pin" aria-label="{{page.demo_pin}}" aria-pressed="false"></button>
+              </div>
+              <div class="demo-scope-row"><div class="demo-scopes" role="group" aria-label="{{page.demo_scope}}"><button type="button" data-scope="history" aria-pressed="true"><span data-icon="history"></span>{{page.demo_history}}</button><button type="button" data-scope="favorite" aria-pressed="false"><span data-icon="star"></span>{{page.demo_favorites}}</button></div><button type="button" class="demo-nearby-back" hidden>{{page.demo_back}}</button><span id="demo-count" role="status"></span></div>
+              <div class="demo-body">
+                <aside class="demo-sidebar" aria-label="{{page.demo_filters_aria_label}}"><div id="demo-kinds"></div><div class="demo-sidebar-heading">{{page.demo_period}}</div><label class="demo-date"><span data-icon="calendar"></span><select id="demo-date" aria-label="{{page.demo_period}}"><option value="all">{{page.demo_all_time}}</option><option value="today">{{page.demo_today}}</option><option value="yesterday">{{page.demo_yesterday}}</option></select></label><div class="demo-sidebar-heading">{{page.demo_apps}}</div><div id="demo-sources"></div></aside>
+                <div id="demo-items" class="demo-items" aria-label="{{page.demo_items_aria_label}}"><p class="demo-fallback">{{page.demo_fallback_text}}</p></div>
+              </div>
+              <div class="demo-bottom">{{page.demo_shortcuts}}</div>
+            </div>
+            <div class="demo-settings demo-popover" hidden><strong>{{page.demo_appearance}}</strong><label for="demo-theme">{{page.demo_theme}}</label><select id="demo-theme"><option value="system">{{page.demo_system}}</option><option value="light" selected>{{page.demo_light}}</option><option value="dark">{{page.demo_dark}}</option></select></div>
+            <div id="demo-detail" class="demo-detail" role="dialog" aria-modal="true" aria-labelledby="demo-detail-title" hidden><button type="button" class="detail-close" aria-label="{{page.detail_close_aria_label}}">×</button><span class="detail-kind"></span><h3 id="demo-detail-title"></h3><div class="detail-content"></div><span class="detail-note">{{page.detail_note_text}}</span></div>
+            <div class="demo-toast" role="status" hidden></div>
+          </div>
         </div>
       </div>
     </section>

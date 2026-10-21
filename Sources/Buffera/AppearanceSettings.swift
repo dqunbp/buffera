@@ -23,11 +23,12 @@ final class SettingsWindow: NSWindowController {
     init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
          mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL,
          languageDefaults: UserDefaults = .standard, limitsDefaults: UserDefaults = .standard,
+         themeDefaults: UserDefaults = .standard,
          launchLanguage: LanguagePreference = L10n.preference, frameAutosaveName: String? = "BufferaSettingsWindow") {
         self.limitsDefaults = limitsDefaults
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
                                              mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults,
-                                             limitsDefaults: limitsDefaults, launchLanguage: launchLanguage)
+                                             limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, launchLanguage: launchLanguage)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
@@ -76,6 +77,7 @@ final class SettingsWindow: NSWindowController {
         settings.updateAppearance(HistoryAppearance.load())
         settings.updateLimits(HistoryLimits.load(from: limitsDefaults))
         settings.refreshLanguage()
+        settings.refreshTheme()
         settings.refreshMCPAccess()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
@@ -137,6 +139,8 @@ private final class SettingsContentController: NSViewController {
     private let columns = NSPopUpButton()
     private let rows = NSPopUpButton()
     private let language = NSPopUpButton()
+    private let theme = NSPopUpButton()
+    private let themeDefaults: UserDefaults
     private let languageDefaults: UserDefaults
     private let launchLanguage: LanguagePreference
     private let restartNotice = NSStackView()
@@ -151,11 +155,12 @@ private final class SettingsContentController: NSViewController {
     private var pages: [NSView] = []
 
     init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL,
-         languageDefaults: UserDefaults, limitsDefaults: UserDefaults, launchLanguage: LanguagePreference) {
+         languageDefaults: UserDefaults, limitsDefaults: UserDefaults, themeDefaults: UserDefaults, launchLanguage: LanguagePreference) {
         self.limitsDefaults = limitsDefaults
         self.limits = HistoryLimits.load(from: limitsDefaults)
         self.launchLanguage = launchLanguage
         self.languageDefaults = languageDefaults
+        self.themeDefaults = themeDefaults
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
@@ -268,7 +273,15 @@ private final class SettingsContentController: NSViewController {
         restartNotice.isHidden = LanguagePreference.load(from: languageDefaults) == launchLanguage
     }
 
+    func refreshTheme() {
+        theme.selectItem(at: InterfaceTheme.allCases.firstIndex(of: .load(from: themeDefaults)) ?? 0)
+    }
+
     private func appearancePage() -> NSView {
+        theme.addItems(withTitles: InterfaceTheme.allCases.map(\.title))
+        theme.identifier = NSUserInterfaceItemIdentifier("settings.theme")
+        configure(theme, label: L10n.text("Тема"), action: #selector(themeChanged))
+        refreshTheme()
         language.addItems(withTitles: LanguagePreference.allCases.map(\.title))
         language.selectItem(at: LanguagePreference.allCases.firstIndex(of: .load(from: languageDefaults)) ?? 0)
         language.identifier = NSUserInterfaceItemIdentifier("settings.language")
@@ -282,6 +295,7 @@ private final class SettingsContentController: NSViewController {
         sidebar.target = self; sidebar.action = #selector(appearanceChanged)
         sidebar.font = .systemFont(ofSize: 12)
         let grid = form([
+            [label(L10n.text("Тема")), theme],
             [label(L10n.text("Расположение")), mode],
             [label(L10n.text("Карточки")), columns],
             [label(L10n.text("Видимых строк")), rows],
@@ -473,6 +487,14 @@ private final class SettingsContentController: NSViewController {
     }
 
     @objc private func changeTab() { presentPage(tabs.selectedSegment) }
+
+    @objc private func themeChanged() {
+        let choices = InterfaceTheme.allCases
+        guard choices.indices.contains(theme.indexOfSelectedItem) else { return }
+        let preference = choices[theme.indexOfSelectedItem]
+        preference.save(to: themeDefaults)
+        preference.apply()
+    }
 
     @objc private func languageChanged() {
         let choices = LanguagePreference.allCases

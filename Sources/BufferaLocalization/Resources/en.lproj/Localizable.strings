@@ -442,3 +442,8 @@
 "Язык изменится после перезапуска" = "The language will change after restart";
 "Перезапустить Buffera" = "Restart Buffera";
 "Не удалось подготовить перезапуск. Закройте Buffera и откройте приложение снова." = "Could not prepare to restart. Quit Buffera and open the app again.";
+
+"Тема" = "Theme";
+"Системная" = "System";
+"Светлая" = "Light";
+"Тёмная" = "Dark";

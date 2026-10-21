@@ -189,14 +189,26 @@ imageCard.autoresizingMask = [.width, .height]
 previewHost.addSubview(imageCard)
 imageCard.layoutSubtreeIfNeeded()
 let imageView = descendants(of: imageCard).compactMap { $0 as? NSImageView }.first!
-check(imageView.frame.height == 56, "compact image card retains its thumbnail size")
+check(imageView.frame.width == 226 && imageView.frame.height == 54,
+      "compact image fills the preview area without a reserved label column")
+check(!descendants(of: imageCard).compactMap { $0 as? NSTextField }.contains { $0.stringValue == imageClip.displayTitle },
+      "image cards omit the redundant visible type label")
 let imageButtons = descendants(of: imageCard).compactMap { $0 as? NSButton }
 check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions fit in a compact 230 pt card")
 previewHost.setFrameSize(NSSize(width: 444, height: 208))
 imageCard.layoutSubtreeIfNeeded()
-check(imageView.frame.height == 144, "tall image card expands its thumbnail")
+check(imageView.frame.width == 440 && imageView.frame.height == 166,
+      "tall image card uses the full area beyond the old thumbnail limit")
+check(imageView.imageScaling == .scaleProportionallyUpOrDown,
+      "wide and portrait images preserve their proportions without cropping")
+imageCard.setQuickShortcut(1)
+imageCard.layoutSubtreeIfNeeded()
+let imageBadge = descendants(of: imageCard).compactMap { $0 as? NSTextField }.first { $0.stringValue == "⌘1" }!
+check(imageView.frame.contains(imageBadge.frame) && imageView.frame.width == 440,
+      "quick-selection hint overlays the image without shrinking it")
+imageCard.setQuickShortcut(nil)
 check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions remain inside the card")
