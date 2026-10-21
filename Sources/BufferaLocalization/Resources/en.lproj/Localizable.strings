@@ -447,3 +447,9 @@
 "Системная" = "System";
 "Светлая" = "Light";
 "Тёмная" = "Dark";
+
+/* Drag and drop */
+"Не удалось подготовить содержимое для перетаскивания." = "Could not prepare this item for dragging.";
+"Один из файлов недоступен. Возможно, он перемещён, удалён или нет доступа к нему." = "One of the files is unavailable. It may have been moved, deleted, or access is denied.";
+"Не удалось подготовить файл изображения для перетаскивания." = "Could not prepare an image file for dragging.";
+"Объектов: %1$@" = "Items: %1$@";

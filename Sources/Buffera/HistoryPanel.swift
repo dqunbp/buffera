@@ -67,6 +67,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var shortcutGesture = HistoryShortcutGesture()
     private var shortcutModifiersTimer: Timer?
     private var cardMenuTracking = false
+    private var dragSourceID: Int64?
+    private var dragHistoryDirty = false
+    private var cancelDragPreparation: (() -> Void)?
     private var pendingSelectionID: Int64?
     private var retainedSelectionID: Int64?
     private var retainedRowCount = 150
@@ -91,6 +94,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var requestNearby: ((Int64, Int) -> Void)?
     var onNavigate: (() -> Void)?
     var onConfirm: ((Int64) -> Void)?
+    var requestDragPayload: ((Int64, @escaping (Result<ClipDragPayload, Error>) -> Void) -> Void)?
+    var onDragCompleted: ((Int64) -> Void)?
     var onReveal: ((Int64, Int) -> Void)?
     var onConceal: ((Int64) -> Void)?
     var requestThumbnail: ((Int64, @escaping (NSImage?) -> Void) -> Void)?
@@ -113,7 +118,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isShowingNearby: Bool { nearbyState != nil }
     var isPinned: Bool { pinButton.state == .on }
     var searchMode: HistorySearchMode { semanticSearchAvailable && semanticSearch.state == .on ? .automatic : .literal }
-    var isInteracting: Bool { window.isVisible && !isClosing && (window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
+    var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing }
 
     override init() {
@@ -123,6 +128,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if !window.setFrameUsingName(Self.frameName) { window.center() }
         window.delegate = self
         window.onKeyDown = { [weak self] event in
+            if let self, self.dragSourceID != nil {
+                if event.keyCode == 53 { self.cancelDragPreparation?(); return false }
+                return true
+            }
             guard let self, self.window.isVisible, self.window.attachedSheet == nil,
                   !self.isClosing, !self.filters.isPresenting, !self.cardMenuTracking else { return false }
             return self.handle(event) == nil
@@ -277,6 +286,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receive(_ result: [ClipSummary], total: Int, offset: Int) {
+        if dragSourceID != nil { dragHistoryDirty = true; return }
         if isConfirmingCopyTransform { copyTransformHistoryDirty = true; return }
         guard isAvailableForShortcut, !isShowingNearby else { return }
         if offset == 0, silentSearchRefresh {
@@ -311,6 +321,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     /// Called only after an external copy has committed to history. A filtered
     /// view keeps its previous choice when the new record does not match it.
     func clipboardDidCapture(id: Int64) {
+        if dragSourceID != nil { dragHistoryDirty = true; return }
         if isConfirmingCopyTransform {
             copyTransformHistoryDirty = true
             if isShowingNearby { nearbyState?.needsReload = true }
@@ -526,6 +537,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func close(restoreFocus: Bool = true) {
+        if dragSourceID != nil {
+            cancelDragPreparation?()
+            if dragSourceID != nil { return }
+        }
         cancelShortcutGesture()
         guard !isClosing else { return }
         cancelCopyTransform(refreshHistory: false)
@@ -568,11 +583,20 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         commandHeld = NSEvent.modifierFlags.contains(.command); updateVisibleCards()
     }
     func windowDidResignKey(_ notification: Notification) {
+        if dragSourceID != nil {
+            invalidateReveal()
+            for index in cards.visibleIndices() { cards.card(at: index)?.hideConcealedContent() }
+        }
         closeIfUnfocused()
     }
 
     @objc private func applicationDidResignActive(_ notification: Notification) {
         guard isPinned, window.isVisible, !isClosing else { return }
+        if dragSourceID != nil {
+            invalidateReveal()
+            for index in cards.visibleIndices() { cards.card(at: index)?.hideConcealedContent() }
+            return
+        }
         focusToken += 1
         cancelShortcutGesture()
         dismissPreview()
@@ -588,6 +612,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func closeIfUnfocused() {
+        guard dragSourceID == nil else { return }
         // Filter menus, calendar popovers and save sheets can own keyboard input.
         if !window.isKeyWindow, window.attachedSheet == nil, !filters.isPresenting,
            !cardMenuTracking, !preview.isShown {
@@ -599,7 +624,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
-                  !self.cardMenuTracking, !self.preview.isShown else { return }
+                  self.dragSourceID == nil, !self.cardMenuTracking, !self.preview.isShown else { return }
             guard !self.isPinned else { return }
             self.close(restoreFocus: false)
         }
@@ -1070,6 +1095,23 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             self?.cardMenuTracking = tracking
             if !tracking { self?.closeIfUnfocused() }
         }
+        card.requestDrag = { [weak self, weak card] completion in
+            guard let self, let card, self.isAvailableForShortcut, !self.confirming,
+                  !self.commitWhenLoaded, !self.loading, !self.silentSearchRefresh,
+                  self.pendingFavorites.isEmpty, self.window.attachedSheet == nil,
+                  let request = self.requestDragPayload else {
+                completion(.failure(ClipDragFailure.unreadable)); return
+            }
+            self.cancelShortcutGesture(); self.cancelSearchIndexRefresh(); self.dismissPreview()
+            self.dragSourceID = clip.id; self.dragHistoryDirty = false
+            self.cancelDragPreparation = { [weak card] in card?.cancelDragPreparation() }
+            self.confirming = true
+            self.updateNavigationControls(); self.updateVisibleCards()
+            request(clip.id, completion)
+        }
+        card.onDragFinished = { [weak self] operation, error in
+            self?.dragFinished(id: clip.id, operation: operation, error: error)
+        }
         configure(card, row: row)
         if clip.kind == .image && !clip.isConcealed && thumbnails.object(forKey: NSNumber(value: clip.id)) == nil {
             requestThumbnail?(clip.id) { [weak self, weak card] image in
@@ -1079,6 +1121,27 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             }
         }
         return card
+    }
+
+    private func dragFinished(id: Int64, operation: NSDragOperation, error: Error?) {
+        guard dragSourceID == id else {
+            if let error { status.stringValue = error.localizedDescription }
+            return
+        }
+        dragSourceID = nil; cancelDragPreparation = nil; confirming = false
+        let needsRefresh = dragHistoryDirty
+        dragHistoryDirty = false
+        updateNavigationControls(); updateVisibleCards()
+        if operation.contains(.copy) {
+            recentCaptureID = nil
+            onDragCompleted?(id)
+            close(restoreFocus: false)
+        } else {
+            if needsRefresh { refresh(preservingSelection: true) }
+            if let error { failed(error) }
+            if searchIndexDirty { scheduleSearchIndexRefresh(after: 0.8) }
+            closeIfUnfocused()
+        }
     }
 
     private func configure(_ card: ClipCardView, row: Int) {

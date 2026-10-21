@@ -345,7 +345,7 @@ public final class HistoryStore {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
     }
 
-    /// Call after restoring the clipboard. Usage changes ordering, never the capture date or metadata.
+    /// Call after a successful copy or drop. Usage changes ordering, never the capture date or metadata.
     public func markUsed(id: Int64, date: Date = Date()) throws {
         let statement = try prepare("UPDATE clips SET sort_date=? WHERE id=? RETURNING id")
         defer { sqlite3_finalize(statement) }

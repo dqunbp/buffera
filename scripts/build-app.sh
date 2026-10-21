@@ -11,7 +11,7 @@ if [[ -d "$BUILD_PATH/release/Buffera_BufferaLocalization.bundle" ]]; then
 fi
 swift build -c release --product Buffera --scratch-path "$BUILD_PATH" --cache-path "$PWD/.build/cache" "$@"
 swift build -c release --product BufferaMCP --scratch-path "$BUILD_PATH" --cache-path "$PWD/.build/cache" "$@"
-BIN_DIR=$(swift build -c release --scratch-path "$BUILD_PATH" --show-bin-path)
+BIN_DIR=$(swift build -c release --scratch-path "$BUILD_PATH" "$@" --show-bin-path)
 APP="$PWD/dist/Buffera.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 mkdir -p "$APP/Contents/Resources/SQLiteVec"

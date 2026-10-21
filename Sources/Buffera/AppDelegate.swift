@@ -258,6 +258,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        panel.requestDragPayload = { [weak self] id, completion in
+            guard let self else { completion(.failure(ClipDragFailure.unreadable)); return }
+            self.work.async {
+                let result = Result {
+                    try ClipDragPayload.prepare(self.store.payload(id: id), id: id, exports: self.temporaryImageExports)
+                }
+                DispatchQueue.main.async { completion(result) }
+            }
+        }
+        panel.onDragCompleted = { [weak self] id in self?.recordUse(id: id) }
         panel.onConfirm = { [weak self] id in
             guard let self else { return }
             self.confirmationToken += 1
@@ -466,6 +476,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Normal and transformed copies share suppression and usage ordering.
     private func restoreClipboard(_ payload: ClipPayload, id: Int64) throws {
         try clipboard.restore(payload)
+        recordUse(id: id)
+    }
+
+    /// Only successful clipboard writes and accepted copy drops count as use.
+    private func recordUse(id: Int64) {
         // A capture queued before this restore remains in history, but cannot reclaim selection.
         captureSelectionToken += 1
         // Queue usage before closing so an immediate reopen observes the successful copy.

@@ -131,6 +131,10 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     var onActivate: (() -> Void)?
     var onRequestCopyTransformOperations: (() -> Void)?
     var onCopyTransform: ((CopyTransformOperation) -> Void)?
+    var requestDrag: ClipDragController.Preparation?
+    var onDragFinished: ((NSDragOperation, Error?) -> Void)?
+    private var dragMouseDown: NSEvent?
+    private var dragController: ClipDragController?
 
     override var mouseDownCanMoveWindow: Bool { false }
 
@@ -163,10 +167,33 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard actionsEnabled else { return }
+        dragMouseDown = event.clickCount < 2 ? event : nil
         guard let onSelect else { super.mouseDown(with: event); return }
         onSelect()
         if event.clickCount == 2 { onActivate?() }
     }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard actionsEnabled, dragController == nil, let start = dragMouseDown, let requestDrag,
+              hypot(event.locationInWindow.x - start.locationInWindow.x,
+                    event.locationInWindow.y - start.locationInWindow.y) >= 5 else { return }
+        dragMouseDown = nil
+        let controller = ClipDragController(view: self, clip: clip, event: start) { [weak self] operation, error in
+            guard let self else { return }
+            self.dragController = nil
+            self.onDragFinished?(operation, error)
+        }
+        dragController = controller
+        controller.prepare(using: requestDrag)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        dragMouseDown = nil
+        cancelDragPreparation()
+    }
+
+    func cancelDragPreparation() { dragController?.cancelPreparation() }
 
     /// The docked history sizes records using exactly the text the card exposes.
     /// In particular, a concealed record never leaks its length through layout.

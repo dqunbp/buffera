@@ -40,6 +40,8 @@ for (languages, expected) in [
 }
 check(L10n.text("Настройки", language: "en") == "Settings", "English resource lookup")
 check(L10n.text("Настройки", language: "ru") == "Настройки", "Russian resource lookup")
+check(L10n.text("Объектов: \(3)", language: "en") == "Items: 3", "English multi-item drag preview")
+check(L10n.text("Объектов: \(3)", language: "ru") == "Объектов: 3", "Russian multi-item drag preview")
 check(L10n.text("Настройки \( "Buffera" )", language: "en") == "Buffera Settings",
       "Translations can move interpolation before the text")
 let untrusted = "%1$@ %@ 100% \\n Русский"

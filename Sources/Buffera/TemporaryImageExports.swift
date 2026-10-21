@@ -1,6 +1,6 @@
 import Foundation
 
-/// Disposable files for Finder. Explicit user saves do not go through this cache.
+/// Disposable files for Finder and drag destinations. Explicit user saves do not go through this cache.
 final class TemporaryImageExports {
     private let fileManager: FileManager
     private let directories: [URL]
@@ -31,22 +31,45 @@ final class TemporaryImageExports {
         }
     }
 
+    struct Image {
+        let data: Data
+        let fileExtension: String
+        var itemIndex: Int? = nil
+    }
+
     func file(data: Data, id: Int64, fileExtension: String) throws -> URL {
-        guard id > 0, !data.isEmpty, Int64(data.count) <= maximumBytes,
-              fileExtension.range(of: "^[a-z0-9]{1,10}$", options: .regularExpression) != nil else {
+        try files([Image(data: data, fileExtension: fileExtension)], id: id)[0]
+    }
+
+    /// Export a whole drag together so cache eviction cannot remove another
+    /// image from the same record while preparing its later items.
+    func files(_ images: [Image], id: Int64) throws -> [URL] {
+        guard id > 0, !images.isEmpty,
+              images.reduce(Int64(0), { $0 + Int64($1.data.count) }) <= maximumBytes,
+              images.allSatisfy({ !$0.data.isEmpty && ($0.itemIndex ?? 0) >= 0 &&
+                  $0.fileExtension.range(of: "^[a-z0-9]{1,10}$", options: .regularExpression) != nil }) else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
         lock.lock(); defer { lock.unlock() }
         try prepareDirectory()
-        let url = directory.appendingPathComponent("Buffera-\(id).\(fileExtension)")
-        if let attributes = try attributesIfPresent(url), !isOwnedRegularFile(attributes) {
-            throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
+        let urls = images.map { image in
+            let suffix = image.itemIndex.map { "-\($0)" } ?? ""
+            return directory.appendingPathComponent("Buffera-\(id)\(suffix).\(image.fileExtension)")
         }
-        try prune(excluding: url)
-        try data.write(to: url, options: .atomic)
-        try fileManager.setAttributes([.posixPermissions: 0o600, .modificationDate: Date()], ofItemAtPath: url.path)
-        try prune(excluding: url)
-        return url
+        guard Set(urls).count == urls.count else { throw CocoaError(.fileWriteInvalidFileName) }
+        for url in urls {
+            if let attributes = try attributesIfPresent(url), !isOwnedRegularFile(attributes) {
+                throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
+            }
+        }
+        let protected = Set(urls)
+        try prune(excluding: protected)
+        for (image, url) in zip(images, urls) {
+            try image.data.write(to: url, options: .atomic)
+            try fileManager.setAttributes([.posixPermissions: 0o600, .modificationDate: Date()], ofItemAtPath: url.path)
+        }
+        try prune(excluding: protected)
+        return urls
     }
 
     func cleanup() throws {
@@ -75,7 +98,7 @@ final class TemporaryImageExports {
         let bytes: Int64
     }
 
-    private func prune(excluding protectedURL: URL? = nil) throws {
+    private func prune(excluding protectedURLs: Set<URL> = []) throws {
         let deadline = Date().addingTimeInterval(-maximumAge)
         var entries: [Entry] = []
         var caches = [(directory, "Buffera")]
@@ -85,11 +108,11 @@ final class TemporaryImageExports {
         }
         for (cacheDirectory, prefix) in caches {
             for url in try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil) {
-                guard url.lastPathComponent.range(of: "^\(prefix)-[1-9][0-9]*\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil,
+                guard url.lastPathComponent.range(of: "^\(prefix)-[1-9][0-9]*(?:-[0-9]+)?\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil,
                       let attributes = try attributesIfPresent(url), isOwnedRegularFile(attributes),
                       let modified = attributes[.modificationDate] as? Date,
                       let bytes = attributes[.size] as? NSNumber else { continue }
-                if modified < deadline && url != protectedURL {
+                if modified < deadline && !protectedURLs.contains(url) {
                     try fileManager.removeItem(at: url)
                 } else {
                     entries.append(Entry(url: url, modified: modified, bytes: bytes.int64Value))
@@ -98,7 +121,7 @@ final class TemporaryImageExports {
         }
         // Both generations share one size budget until the old files have expired.
         var total = entries.reduce(Int64(0)) { $0 + $1.bytes }
-        for entry in entries.sorted(by: { $0.modified < $1.modified }) where total > maximumBytes && entry.url != protectedURL {
+        for entry in entries.sorted(by: { $0.modified < $1.modified }) where total > maximumBytes && !protectedURLs.contains(entry.url) {
             try fileManager.removeItem(at: entry.url)
             total -= entry.bytes
         }
