@@ -144,6 +144,11 @@ function renderDemo() {
     }
     const key = document.createElement('span'); key.className = 'item-key'; key.textContent = `⌘${index + 1}`; content.append(key);
     const footer = document.createElement('div'); footer.className = 'item-footer';
+    if (item.kind === 'image') {
+      const type = document.createElement('span'); type.className = 'item-type';
+      type.title = kindLabels.image; type.setAttribute('role', 'img'); type.setAttribute('aria-label', kindLabels.image);
+      type.append(icon('image')); content.append(type);
+    }
     const meta = document.createElement('span'); meta.className = 'item-meta';
     meta.textContent = `${item.source} · ${item.time}`; meta.title = meta.textContent;
     const actions = document.createElement('div'); actions.className = 'item-actions';
@@ -173,6 +178,7 @@ function select(index) {
   [...list.querySelectorAll('.demo-item')].forEach((element, i) => element.classList.toggle('selected', i === index));
 }
 function openDetail(item, trigger) {
+  detail.classList.remove('demo-chat');
   detail.querySelector('.detail-kind').textContent = `${kindLabels[item.kind]} · ${item.source}`;
   detail.querySelector('h3').textContent = item.concealed ? ui.hidden : item.title;
   const content = detail.querySelector('.detail-content'); content.replaceChildren();
@@ -182,20 +188,34 @@ function openDetail(item, trigger) {
   showDetail(trigger);
 }
 function openAskDemo() {
+  detail.classList.add('demo-chat');
   detail.querySelector('.detail-kind').textContent = ui.askExample;
-  detail.querySelector('h3').textContent = askButton.getAttribute('aria-label');
+  const title = detail.querySelector('h3');
+  title.replaceChildren(askButton.querySelector('svg').cloneNode(true), document.createTextNode(askButton.getAttribute('aria-label')));
   const content = detail.querySelector('.detail-content'); content.replaceChildren();
+  const context = document.createElement('p'); context.className = 'demo-chat-context';
+  context.textContent = ui.askContext;
   const question = document.createElement('p'); question.className = 'demo-chat-question';
   question.textContent = ui.askQuestion;
-  const answer = document.createElement('p'); answer.className = 'demo-chat-answer';
+  const answer = document.createElement('div'); answer.className = 'demo-chat-answer';
+  const identity = document.createElement('strong'); identity.className = 'demo-chat-identity';
+  identity.append(askButton.querySelector('svg').cloneNode(true), document.createTextNode('Buffera'));
+  const answerText = document.createElement('p');
   const entry = samples.find(item => item.id === 'image' && !item.concealed);
-  answer.textContent = entry
+  answerText.textContent = entry
     ? formatMessage(ui.askAnswer, { name: ui.imageName, address: ui.imageAddress }) : ui.hidden;
-  content.append(question, answer);
+  answer.append(identity, answerText);
+  content.append(context, question, answer);
   if (entry) {
-    const source = document.createElement('span'); source.className = 'demo-chat-source';
-    source.textContent = `${entry.title} · ${entry.source}`;
-    content.append(source);
+    const sourceLabel = document.createElement('span'); sourceLabel.className = 'demo-chat-source-label';
+    sourceLabel.textContent = ui.askSourceLabel;
+    const source = button(ui.askOpenSource, 'history', () => openDetail(entry, askButton), 'demo-chat-source');
+    const sourceText = document.createElement('span');
+    const sourceTitle = document.createElement('strong'); sourceTitle.textContent = entry.title;
+    const metadata = document.createElement('small'); metadata.textContent = `${entry.source} · ${entry.time}`;
+    const openLabel = document.createElement('span'); openLabel.textContent = ui.askOpenSource;
+    sourceText.append(sourceTitle, metadata, openLabel); source.append(sourceText);
+    answer.append(sourceLabel, source);
   }
   detailNote.textContent = ui.askNote;
   showDetail(askButton);
@@ -259,7 +279,12 @@ demo.addEventListener('keydown', event => {
     toast.hidden = true; event.preventDefault(); return;
   }
   if (!detail.hidden) {
-    if (event.key === 'Tab') { event.preventDefault(); detail.querySelector('button').focus(); }
+    if (event.key === 'Tab') {
+      const controls = [...detail.querySelectorAll('button:not([disabled])')];
+      const current = controls.indexOf(document.activeElement);
+      const next = (current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      event.preventDefault(); controls[next].focus();
+    }
     return;
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); closeSettings(); search.focus({ preventScroll: true }); search.select(); return; }

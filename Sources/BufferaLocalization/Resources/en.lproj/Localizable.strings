@@ -135,6 +135,9 @@
 "LLM с доступом к истории буфера обмена" = "An LLM with access to your clipboard history";
 "Очистить разговор · ⌘N" = "Clear conversation · ⌘N";
 "Что вы хотите узнать?" = "What would you like to know?";
+"Найдите нужное в истории, вспомните команду или разберитесь в сохранённом." = "Find something in your history, recall a command or make sense of saved snippets.";
+"Ответы со ссылками на записи. Всё на вашем Mac." = "Answers with references. Everything on your Mac.";
+"Скрытые записи недоступны помощнику." = "Concealed items stay out of the assistant’s reach.";
 "Здесь работает языковая модель на вашем Mac. Она умеет искать в истории буфера обмена, читать найденные записи и отвечать со ссылками на них. Можно задавать уточняющие вопросы; скрытые записи ей недоступны." = "A language model runs here on your Mac. It can search your clipboard history, read matching items and answer with references. You can ask follow-up questions; concealed items are not accessible to it.";
 "Например: «Найди команду для запуска проекта, которую я копировал вчера»." = "For example: “Find the command to run the project that I copied yesterday.”";
 "Вопрос к Buffera" = "Question for Buffera";

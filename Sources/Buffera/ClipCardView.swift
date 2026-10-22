@@ -445,6 +445,27 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
             footer.heightAnchor.constraint(equalToConstant: 26)
         ])
         if isImage {
+            // Keep a type symbol over the thumbnail without shrinking the preview or action row.
+            let typeBadge = NSBox()
+            typeBadge.boxType = .custom
+            typeBadge.borderWidth = 0
+            typeBadge.cornerRadius = 6
+            typeBadge.fillColor = .controlBackgroundColor
+            typeBadge.contentViewMargins = NSSize(width: 4, height: 4)
+            typeBadge.translatesAutoresizingMaskIntoConstraints = false
+            let typeIcon = NSImageView()
+            typeIcon.image = NSImage(systemSymbolName: clip.kind.symbol, accessibilityDescription: clip.kind.label)
+            typeIcon.contentTintColor = .secondaryLabelColor
+            typeIcon.imageScaling = .scaleProportionallyDown
+            typeIcon.setAccessibilityLabel(clip.kind.label)
+            typeBadge.contentView = typeIcon
+            content.addSubview(typeBadge)
+            NSLayoutConstraint.activate([
+                typeBadge.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
+                typeBadge.topAnchor.constraint(equalTo: content.topAnchor, constant: 6),
+                typeBadge.widthAnchor.constraint(equalToConstant: 24),
+                typeBadge.heightAnchor.constraint(equalToConstant: 24)
+            ])
             // The image owns the preview area; shortcut hints overlay it instead
             // of reserving an empty column beside every thumbnail.
             quickShortcut.wantsLayer = true

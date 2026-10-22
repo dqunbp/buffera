@@ -45,6 +45,8 @@ func runHistoryChatSmokeTest() throws {
     chat.onOpenSource = { opened.append($0) }
     chat.onNewConversation = { resets += 1; chat.resetConversation() }
 
+    // Match show(): AppKit's text interpretation needs the composer as first responder.
+    try check(window.makeFirstResponder(input), "Could not focus the chat composer")
     input.string = "  Найди команду  "
     chat.textDidChange(Notification(name: NSText.didChangeNotification))
     try check(!send.isEnabled, "Disabled model allowed sending")

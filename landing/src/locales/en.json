@@ -261,10 +261,13 @@
       "imageHours": "Daily, 09:00–21:00",
       "pin": "Pin history window",
       "unpin": "Unpin history window",
-      "askExample": "Example conversation",
-      "askQuestion": "Where did we agree to meet?",
-      "askAnswer": "At {name}, {address}. The address is in your saved screenshot.",
-      "askNote": "This is a prepared example using fictional entries. In the app, you can ask your own question about your history."
+      "askExample": "From your clipboard history",
+      "askContext": "The assistant searches what you’ve copied and shows where the answer came from.",
+      "askQuestion": "What meeting address did I copy?",
+      "askAnswer": "You copied a screenshot with the address of {name}: {address}. I found it in your clipboard history.",
+      "askSourceLabel": "Matching item in your history",
+      "askOpenSource": "Open the original item",
+      "askNote": "An example using fictional history. In the app, the assistant searches your clipboard history locally on your Mac."
     }
   }
 }

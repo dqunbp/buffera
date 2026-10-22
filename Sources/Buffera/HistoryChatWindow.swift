@@ -14,7 +14,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     private let messages = NSStackView()
     private let transcriptDocument = ChatDocumentView()
     private let composer = ChatComposer()
-    private let action = NSButton(title: L10n.text("Отправить"), target: nil, action: nil)
+    private let action = HistoryAskButton(title: L10n.text("Отправить"))
     private let newConversation = NSButton(title: L10n.text("Новый разговор"), target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
     private let welcome = NSStackView()
@@ -30,6 +30,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
                                styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                backing: .buffered, defer: false)
         window.title = L10n.text("Спросить Buffera")
+        window.titlebarAppearsTransparent = true
         window.minSize = NSSize(width: 520, height: 460)
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
@@ -52,6 +53,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         window.onNewConversation = { [weak self] in self?.startNewConversation() }
         build()
         updateControls()
+        window.contentView?.layoutSubtreeIfNeeded()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -167,11 +169,14 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
 
     private func updateControls() {
         action.title = busy ? L10n.text("Остановить") : L10n.text("Отправить")
+        action.image = NSImage(systemSymbolName: busy ? "stop.fill" : "arrow.up", accessibilityDescription: nil)
+        action.imagePosition = .imageTrailing
+        action.setAccessibilityLabel(action.title)
         action.isEnabled = busy ? !stopping : enabled && !composer.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         composer.isEditable = !busy
         composer.alphaValue = busy ? 0.65 : 1
         status.stringValue = !enabled && !busy ? unavailableMessage : statusMessage
-        status.textColor = !enabled && !busy ? .secondaryLabelColor : .tertiaryLabelColor
+        status.textColor = .secondaryLabelColor
         newConversation.isEnabled = messages.arrangedSubviews.count > 1
     }
 
@@ -198,11 +203,17 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     @objc private func showFeatures() { onShowFeatures?() }
 
     private func build() {
-        guard let root = window?.contentView else { return }
-        let heading = NSTextField(labelWithString: L10n.text("Локальный ИИ-помощник"))
-        heading.font = .systemFont(ofSize: 16, weight: .semibold)
-        let subtitle = NSTextField(labelWithString: L10n.text("LLM с доступом к истории буфера обмена"))
-        subtitle.font = .systemFont(ofSize: 11)
+        guard let window else { return }
+        let root = HistoryBackdropView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView = root
+        let mark = NSImageView(image: BrandIdentity.appIcon(size: 80))
+        mark.setAccessibilityElement(false)
+        mark.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        mark.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        let heading = NSTextField(labelWithString: L10n.text("Спросить Buffera"))
+        heading.font = .systemFont(ofSize: 19, weight: .semibold)
+        let subtitle = NSTextField(labelWithString: L10n.text("Локальный ИИ-помощник"))
+        subtitle.font = .systemFont(ofSize: 12)
         subtitle.textColor = .secondaryLabelColor
         for label in [heading, subtitle] {
             label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -220,11 +231,22 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         newConversation.action = #selector(startNewConversation)
         newConversation.toolTip = L10n.text("Очистить разговор · ⌘N")
         newConversation.identifier = NSUserInterfaceItemIdentifier("chat.new")
+        newConversation.setAccessibilityLabel(newConversation.title)
+        newConversation.image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: nil)
+        newConversation.imagePosition = .imageOnly
         let models = NSButton(title: L10n.text("Настройки…"), target: self, action: #selector(showFeatures))
         models.bezelStyle = .rounded
         models.controlSize = .small
         models.identifier = NSUserInterfaceItemIdentifier("chat.models")
-        let header = NSStackView(views: [identity, spacer, newConversation, models])
+        models.toolTip = models.title
+        models.setAccessibilityLabel(models.title)
+        models.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        models.imagePosition = .imageOnly
+        for button in [newConversation, models] {
+            button.widthAnchor.constraint(equalToConstant: 32).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        }
+        let header = NSStackView(views: [mark, identity, spacer, newConversation, models])
         header.orientation = .horizontal
         header.spacing = 10
         header.alignment = .centerY
@@ -238,7 +260,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         transcript.documentView = transcriptDocument
         messages.orientation = .vertical
         messages.alignment = .leading
-        messages.spacing = 18
+        messages.spacing = 20
         messages.translatesAutoresizingMaskIntoConstraints = false
         transcriptDocument.addSubview(messages)
         NSLayoutConstraint.activate([
@@ -250,36 +272,53 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         ])
         welcome.orientation = .vertical
         welcome.alignment = .leading
-        welcome.spacing = 10
+        welcome.spacing = 14
+        welcome.edgeInsets = NSEdgeInsets(top: 20, left: 6, bottom: 18, right: 6)
         let welcomeTitle = NSTextField(labelWithString: L10n.text("Что вы хотите узнать?"))
-        welcomeTitle.font = .systemFont(ofSize: 22, weight: .semibold)
-        let welcomeText = ChatWrappingLabel(L10n.text("Здесь работает языковая модель на вашем Mac. Она умеет искать в истории буфера обмена, читать найденные записи и отвечать со ссылками на них. Можно задавать уточняющие вопросы; скрытые записи ей недоступны."))
+        welcomeTitle.font = .systemFont(ofSize: 26, weight: .semibold)
+        let welcomeText = ChatWrappingLabel(L10n.text("Найдите нужное в истории, вспомните команду или разберитесь в сохранённом."))
         welcomeText.textColor = .secondaryLabelColor
         let example = ChatWrappingLabel(L10n.text("Например: «Найди команду для запуска проекта, которую я копировал вчера»."))
-        example.textColor = .secondaryLabelColor
-        example.font = .systemFont(ofSize: 12)
+        example.font = .systemFont(ofSize: 13)
+        let exampleSurface = ChatSurfaceView(.source)
+        example.translatesAutoresizingMaskIntoConstraints = false
+        exampleSurface.addSubview(example)
+        NSLayoutConstraint.activate([
+            example.leadingAnchor.constraint(equalTo: exampleSurface.leadingAnchor, constant: 16),
+            example.trailingAnchor.constraint(equalTo: exampleSurface.trailingAnchor, constant: -16),
+            example.topAnchor.constraint(equalTo: exampleSurface.topAnchor, constant: 14),
+            example.bottomAnchor.constraint(equalTo: exampleSurface.bottomAnchor, constant: -14)
+        ])
+        let reassurance = ChatWrappingLabel(L10n.text("Ответы со ссылками на записи. Всё на вашем Mac.") + "\n" + L10n.text("Скрытые записи недоступны помощнику."))
+        reassurance.font = .systemFont(ofSize: 12)
+        reassurance.textColor = .secondaryLabelColor
         welcome.addArrangedSubview(welcomeTitle)
         welcome.addArrangedSubview(welcomeText)
-        welcome.addArrangedSubview(example)
+        welcome.addArrangedSubview(exampleSurface)
+        welcome.addArrangedSubview(reassurance)
         messages.addArrangedSubview(welcome)
         welcome.widthAnchor.constraint(equalTo: messages.widthAnchor).isActive = true
-        welcomeText.widthAnchor.constraint(equalTo: welcome.widthAnchor).isActive = true
-        example.widthAnchor.constraint(equalTo: welcome.widthAnchor).isActive = true
+        for view in [welcomeText, exampleSurface, reassurance] {
+            view.widthAnchor.constraint(equalTo: welcome.widthAnchor, constant: -12).isActive = true
+        }
 
         status.font = .systemFont(ofSize: 11)
         status.maximumNumberOfLines = 2
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         status.identifier = NSUserInterfaceItemIdentifier("chat.status")
+        let inputSurface = ChatSurfaceView(.composer)
+        inputSurface.identifier = NSUserInterfaceItemIdentifier("chat.composer")
         let inputScroll = NSScrollView()
         inputScroll.hasVerticalScroller = true
         inputScroll.autohidesScrollers = true
-        inputScroll.borderType = .bezelBorder
-        inputScroll.drawsBackground = true
-        inputScroll.backgroundColor = .textBackgroundColor
+        inputScroll.borderType = .noBorder
+        inputScroll.drawsBackground = false
         composer.delegate = self
         composer.font = .systemFont(ofSize: 14)
         composer.textColor = .textColor
-        composer.backgroundColor = .textBackgroundColor
+        composer.drawsBackground = false
+        composer.insertionPointColor = BrandIdentity.accentColor
+        composer.onFocusChanged = { [weak inputSurface] focused in inputSurface?.focused = focused }
         composer.isRichText = false
         composer.importsGraphics = false
         composer.isAutomaticQuoteSubstitutionEnabled = false
@@ -303,10 +342,9 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         inputScroll.documentView = composer
         let hint = NSTextField(labelWithString: L10n.text("Enter — отправить · Shift+Enter — новая строка"))
         hint.font = .systemFont(ofSize: 11)
-        hint.textColor = .tertiaryLabelColor
+        hint.textColor = .secondaryLabelColor
         hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        action.bezelStyle = .rounded
         action.target = self
         action.action = #selector(performAction)
         action.identifier = NSUserInterfaceItemIdentifier("chat.send")
@@ -316,9 +354,11 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
         footer.distribution = .fill
         footer.spacing = 14
         hint.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let separator = NSBox()
-        separator.boxType = .separator
-        for view in [header, separator, transcript, status, inputScroll, footer] {
+        for view in [inputScroll, footer] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            inputSurface.addSubview(view)
+        }
+        for view in [header, transcript, status, inputSurface] {
             view.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(view)
         }
@@ -326,24 +366,25 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
             header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             header.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
             header.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
-            separator.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            separator.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 15),
             transcript.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             transcript.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            transcript.topAnchor.constraint(equalTo: separator.bottomAnchor),
+            transcript.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 14),
             transcript.bottomAnchor.constraint(equalTo: status.topAnchor, constant: -8),
             transcript.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
             status.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             status.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            status.bottomAnchor.constraint(equalTo: inputScroll.topAnchor, constant: -8),
-            inputScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
-            inputScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            inputScroll.heightAnchor.constraint(equalToConstant: 82),
-            inputScroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -9),
-            footer.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
-            footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -14)
+            status.bottomAnchor.constraint(equalTo: inputSurface.topAnchor, constant: -8),
+            inputSurface.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
+            inputSurface.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+            inputSurface.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
+            inputScroll.topAnchor.constraint(equalTo: inputSurface.topAnchor, constant: 4),
+            inputScroll.leadingAnchor.constraint(equalTo: inputSurface.leadingAnchor, constant: 4),
+            inputScroll.trailingAnchor.constraint(equalTo: inputSurface.trailingAnchor, constant: -4),
+            inputScroll.heightAnchor.constraint(equalToConstant: 70),
+            inputScroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -4),
+            footer.leadingAnchor.constraint(equalTo: inputSurface.leadingAnchor, constant: 16),
+            footer.trailingAnchor.constraint(equalTo: inputSurface.trailingAnchor, constant: -12),
+            footer.bottomAnchor.constraint(equalTo: inputSurface.bottomAnchor, constant: -12)
         ])
     }
 }
@@ -366,6 +407,29 @@ private final class ChatPanel: NSWindow {
 
 private final class ChatComposer: NSTextView {
     var onSend: (() -> Void)?
+    var onFocusChanged: ((Bool) -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { onFocusChanged?(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { onFocusChanged?(false) }
+        return accepted
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        if string.isEmpty {
+            let placeholder = L10n.text("Напишите вопрос об истории.")
+            (placeholder as NSString).draw(at: NSPoint(x: textContainerInset.width + (textContainer?.lineFragmentPadding ?? 0),
+                                                       y: textContainerInset.height),
+                withAttributes: [.font: font ?? .systemFont(ofSize: 14), .foregroundColor: NSColor.placeholderTextColor])
+        }
+    }
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
@@ -425,25 +489,39 @@ private final class ChatMessageView: NSView {
         self.text = text
         body = ChatWrappingLabel(text.isEmpty ? L10n.text("Готовлю ответ…") : text)
         super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = 10
-        layer?.backgroundColor = (isQuestion ? NSColor.controlAccentColor.withAlphaComponent(0.08) : NSColor.controlBackgroundColor).cgColor
+        identifier = NSUserInterfaceItemIdentifier(isQuestion ? "chat.question" : "chat.answer")
+        let bubble = ChatSurfaceView(isQuestion ? .question : .answer)
+        bubble.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(bubble)
         let heading = NSTextField(labelWithString: role)
-        heading.font = .systemFont(ofSize: 11, weight: .semibold)
-        heading.textColor = .secondaryLabelColor
+        heading.font = .systemFont(ofSize: 12, weight: .semibold)
+        heading.textColor = isQuestion ? .secondaryLabelColor : BrandIdentity.accentColor
         body.textColor = text.isEmpty ? .secondaryLabelColor : .labelColor
         content.orientation = .vertical
         content.alignment = .leading
-        content.spacing = 9
+        content.spacing = 11
         content.translatesAutoresizingMaskIntoConstraints = false
-        content.addArrangedSubview(heading)
+        if isQuestion {
+            content.addArrangedSubview(heading)
+        } else {
+            let mark = NSImageView(image: BrandIdentity.menuBarIcon())
+            mark.contentTintColor = BrandIdentity.accentColor
+            mark.setAccessibilityElement(false)
+            let identity = NSStackView(views: [mark, heading])
+            identity.spacing = 6
+            content.addArrangedSubview(identity)
+        }
         content.addArrangedSubview(body)
-        addSubview(content)
+        bubble.addSubview(content)
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
-            content.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            content.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
+            bubble.topAnchor.constraint(equalTo: topAnchor),
+            bubble.bottomAnchor.constraint(equalTo: bottomAnchor),
+            bubble.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bubble.widthAnchor.constraint(equalTo: widthAnchor, multiplier: isQuestion ? 0.86 : 1),
+            content.leadingAnchor.constraint(equalTo: bubble.leadingAnchor, constant: 18),
+            content.trailingAnchor.constraint(equalTo: bubble.trailingAnchor, constant: -18),
+            content.topAnchor.constraint(equalTo: bubble.topAnchor, constant: 15),
+            content.bottomAnchor.constraint(equalTo: bubble.bottomAnchor, constant: -17),
             body.widthAnchor.constraint(equalTo: content.widthAnchor)
         ])
     }
@@ -487,12 +565,21 @@ private final class ChatMessageView: NSView {
             let row = NSStackView(views: [button, detail])
             row.orientation = .vertical
             row.alignment = .leading
-            row.spacing = 2
-            content.addArrangedSubview(row)
-            row.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            row.spacing = 4
+            let surface = ChatSurfaceView(.source)
+            row.translatesAutoresizingMaskIntoConstraints = false
+            surface.addSubview(row)
+            content.addArrangedSubview(surface)
+            NSLayoutConstraint.activate([
+                surface.widthAnchor.constraint(equalTo: content.widthAnchor),
+                row.leadingAnchor.constraint(equalTo: surface.leadingAnchor, constant: 12),
+                row.trailingAnchor.constraint(equalTo: surface.trailingAnchor, constant: -12),
+                row.topAnchor.constraint(equalTo: surface.topAnchor, constant: 10),
+                row.bottomAnchor.constraint(equalTo: surface.bottomAnchor, constant: -10)
+            ])
             button.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true
             detail.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true
-            sourceViews.append(row)
+            sourceViews.append(surface)
         }
     }
 }
@@ -514,7 +601,7 @@ private final class ChatSourceButton: NSButton {
         isBordered = false
         alignment = .left
         lineBreakMode = .byTruncatingTail
-        contentTintColor = .controlAccentColor
+        contentTintColor = BrandIdentity.accentColor
         image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: nil)
         imagePosition = .imageLeading
         toolTip = L10n.text("\(name)\n\(detail)\nОткрыть в истории")

@@ -205,7 +205,7 @@ final class HistoryAskButton: NSButton {
     private func updateLabel() {
         attributedTitle = NSAttributedString(string: title, attributes: [
             .font: font ?? NSFont.systemFont(ofSize: 12, weight: .semibold),
-            .foregroundColor: NSColor.white.withAlphaComponent(isEnabled ? 1 : 0.65)
+            .foregroundColor: NSColor.white.withAlphaComponent(isEnabled ? 1 : 0.72)
         ])
     }
 
@@ -231,7 +231,7 @@ final class HistoryAskButton: NSButton {
         let opaque = HistorySurfaceAppearance.requiresOpaque
         let pressed = cell?.isHighlighted == true
         let highlight: CGFloat = hovered && isEnabled && !pressed ? 0.035 : 0
-        let alpha: CGFloat = opaque ? 1 : (isEnabled ? 0.94 : 0.42)
+        let alpha: CGFloat = opaque ? 1 : (isEnabled ? 0.94 : 0.58)
         let top = NSColor(srgbRed: 0.55 + highlight, green: 0.38 + highlight,
                           blue: 0.75 + highlight, alpha: alpha)
         let bottom = NSColor(srgbRed: 0.37, green: 0.23, blue: 0.58, alpha: alpha)
@@ -245,7 +245,11 @@ final class HistoryAskButton: NSButton {
         NSColor.white.withAlphaComponent(opaque ? 0.65 : 0.3).setStroke()
         shape.lineWidth = 1
         shape.stroke()
-        cell?.drawInterior(withFrame: bounds.insetBy(dx: 10, dy: 0), in: self)
+        // Use our disabled palette instead of AppKit's dark disabled text over violet.
+        // Only the drawing copy is enabled; the actual control stays noninteractive.
+        let interior = cell?.copy() as? NSButtonCell
+        interior?.isEnabled = true
+        interior?.drawInterior(withFrame: bounds.insetBy(dx: 10, dy: 0), in: self)
     }
 
     override var focusRingMaskBounds: NSRect { bounds }
