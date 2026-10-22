@@ -31,7 +31,7 @@ final class SettingsWindow: NSWindowController {
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
                                              mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults,
                                              limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, shortcutDefaults: shortcutDefaults, launchLanguage: launchLanguage)
-        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 590),
+        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 620),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
         window.isReleasedWhenClosed = false
@@ -46,10 +46,10 @@ final class SettingsWindow: NSWindowController {
         } else {
             window.center()
         }
-        // Older saved frames predate the always-visible model names and sizes.
-        if window.contentLayoutRect.height < 590 {
+        // Preserve page space when migrating frames from before the support footer.
+        if window.contentLayoutRect.height < 620 {
             let top = window.frame.maxY
-            window.setContentSize(NSSize(width: 620, height: 590))
+            window.setContentSize(NSSize(width: 620, height: 620))
             let bottom = window.screen?.visibleFrame.minY ?? 0
             window.setFrameOrigin(NSPoint(x: window.frame.minX, y: max(bottom, top - window.frame.height)))
         }
@@ -221,7 +221,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 590))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 620))
         let icon = NSImageView(image: BrandIdentity.appIcon(size: 64))
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.setAccessibilityLabel(BrandIdentity.name)
@@ -249,8 +249,10 @@ private final class SettingsContentController: NSViewController {
         let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
         setupButton.bezelStyle = .inline
         saveNotice.font = .systemFont(ofSize: 11); saveNotice.textColor = .tertiaryLabelColor
-        let footer = NSStackView(views: [saveNotice, setupButton])
+        let footerNotes = vertical([saveNotice, setupButton], spacing: 3)
+        let footer = NSStackView(views: [footerNotes, NSView(), SupportBufferaButton()])
         footer.spacing = 18
+        footer.alignment = .centerY
         footer.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(footer)
         NSLayoutConstraint.activate([
@@ -262,7 +264,8 @@ private final class SettingsContentController: NSViewController {
             body.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
             body.topAnchor.constraint(equalTo: tabs.bottomAnchor, constant: 22),
             body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -14),
-            footer.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            footer.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
+            footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
         pages = [appearancePage(), historyPage(), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models]

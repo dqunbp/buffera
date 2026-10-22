@@ -552,3 +552,9 @@
 "Применить" = "Apply";
 "По умолчанию" = "Restore Defaults";
 "Сочетания применяются без перезапуска" = "Shortcuts apply without restarting";
+
+/* Voluntary support */
+"Поддержать Buffera 💜" = "Support Buffera 💜";
+"Поддержать разработку через Tribute — откроется в браузере" = "Support development on Tribute — opens in your browser";
+"Не удалось открыть браузер" = "Could not open your browser";
+"Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Open this link in your browser to support Buffera: %1$@";

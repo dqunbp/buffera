@@ -10,6 +10,8 @@
 
 [Скачать Buffera для Apple Silicon](https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg) · [Все выпуски](https://github.com/dqunbp/buffera/releases) · [Сайт](https://buffera-soft-touch.dqunbp.chatgpt.site)
 
+Поддержать разработку можно через кнопку внизу настроек или пункт меню значка Buffera. Они открывают [страницу Tribute](https://web.tribute.tg/d/SHI) в браузере. Донат добровольный и не открывает дополнительные функции.
+
 Готовая сборка требует Mac с Apple Silicon и macOS 14 или новее. Открой DMG и перетащи Buffera в Программы. Модели для умных функций скачиваются отдельно в настройках приложения.
 
 Первый выпуск подписан ad-hoc, без Developer ID и нотарификации Apple. Если macOS блокирует запуск, после первой попытки открой «Системные настройки → Конфиденциальность и безопасность» и разреши запуск Buffera. [Инструкция Apple](https://support.apple.com/ru-ru/102445), [подробности установки на русском и английском](docs/INSTALL.txt).

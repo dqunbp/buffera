@@ -1,0 +1,7 @@
+Generated with the built-in image_gen tool.
+
+Use case: ads-marketing.
+Create a polished landscape donation cover for the macOS app Buffera, approximately 3:2 aspect ratio, high resolution.
+Input image 1 is the exact existing Buffera app icon: preserve its distinctive white continuous two-bowl curved mark, purple rounded-square tile, proportions and identity. Do not invent or replace the logo. Input image 2 is ONLY a reference for the existing brand palette and soft visual mood; do not copy its slogan or its large oval objects.
+Design: restrained, warm, beautifully typeset brand cover on a very pale lavender background (#eee9f8), soft studio lighting and subtle violet shadows. Main centered composition: the recognizable purple Buffera app icon above a large bold dark-plum lowercase wordmark "buffera", and a smaller clear Russian caption "Поддержать разработку" below. Icon should feel tactile with very subtle depth, front-facing, not rotated. Plenty of calm negative space. Logo and all lettering contained within central 70% width and 70% height so the composition tolerates platform crops. Typography should resemble clean Helvetica Neue, strong crisp legibility, careful spacing. Gentle background tonal variation, no visual clutter.
+Only text verbatim: "buffera" and "Поддержать разработку". No extra slogans, payment icons, coins, hearts, coffee cups, buttons, UI mockups, watermarks or device frames. Final image opaque.

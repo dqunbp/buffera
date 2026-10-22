@@ -65,6 +65,7 @@ export function renderPage(template, locale, lang, assetVersion = 'local', { isR
   const values = {
     lang,
     assetVersion,
+    supportUrl: 'https://web.tribute.tg/d/SHI',
     assetPrefix: isRoot ? './' : '../',
     canonical: `${siteOrigin}/${lang}/`,
     defaultUrl: `${siteOrigin}/`,

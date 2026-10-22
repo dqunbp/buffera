@@ -179,6 +179,59 @@ h3 {
   padding-block:10px;
 }
 
+/* A soft violet key: a little give on hover, a physical press on activation. */
+.support-button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:48px;
+  max-width:100%;
+  padding:11px 20px;
+  border:1px solid #b79bd4;
+  border-radius:17px;
+  background:linear-gradient(165deg,#f3eaff 0%,#e6d5f8 58%,#d8bced 100%);
+  color:#43245e;
+  box-shadow:inset 0 1px 0 #ffffffeb,inset 0 -2px 0 #b99bd04d,0 4px 0 #b79acb,0 9px 18px -9px #69418b66;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.35;
+  text-align:center;
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+
+.support-heart {
+  display:inline-block;
+  font-size:21px;
+  line-height:1;
+  transform:rotate(-9deg);
+  transition:transform .3s cubic-bezier(.2,.8,.3,1.5);
+}
+
+@media(hover:hover) {
+  .support-button:hover {
+    transform:translateY(-2px);
+    box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 #b99bd04d,0 6px 0 #b79acb,0 13px 22px -9px #69418b66;
+  }
+  .support-button:hover .support-heart { transform:rotate(8deg) scale(1.16); }
+}
+
+.support-button:active {
+  transform:translateY(3px);
+  box-shadow:inset 0 1px 3px #70409620,0 1px 0 #b79acb;
+}
+
+.install-support { margin-top:30px; }
+.install-support p { margin-top:13px; font-size:13px; color:#665170; }
+
+@media(prefers-reduced-motion:reduce) {
+  .support-button:hover,.support-button:active,.support-button .support-heart { transform:none; }
+}
+
+@media(prefers-contrast:more) {
+  .support-button { border:2px solid #43245e; background:#eee3fc; box-shadow:none; }
+}
+
 .text-link:hover {
   border-color:var(--ink);
 }

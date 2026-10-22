@@ -853,6 +853,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         _ = add(L10n.text("Папка данных…"), #selector(revealData))
         _ = add(L10n.text("Клавиши и справка…"), #selector(help))
+        menu.addItem(SupportBuffera.menuItem())
         errorItem = add(L10n.text("Последняя ошибка…"), #selector(showLastError)); errorItem.isHidden = true
         menu.addItem(.separator()); _ = add(L10n.text("Завершить \(BrandIdentity.name)"), #selector(quit))
         statusItem.menu = menu
@@ -867,6 +868,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appearanceItem.target = self; appMenu.addItem(appearanceItem); appMenu.addItem(.separator())
         let helpItem = NSMenuItem(title: L10n.text("Клавиши и справка…"), action: #selector(help), keyEquivalent: "")
         helpItem.target = self; appMenu.addItem(helpItem); appMenu.addItem(.separator())
+        appMenu.addItem(SupportBuffera.menuItem())
+        appMenu.addItem(.separator())
         let quitItem = NSMenuItem(title: L10n.text("Завершить \(BrandIdentity.name)"), action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self; appMenu.addItem(quitItem); appItem.submenu = appMenu; mainMenu.addItem(appItem)
         let windowItem = NSMenuItem(); let windowMenu = NSMenu(title: L10n.text("Окно"))

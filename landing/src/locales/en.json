@@ -163,7 +163,10 @@
     "demo_dark": "Dark",
     "demo_semantic": "Include semantic search",
     "demo_semantic_hint": "Try “address”: with this checked, you’ll find the screenshot of the meeting place. The demo matches curated example topics.",
-    "demo_ask": "Ask"
+    "demo_ask": "Ask",
+    "support_button": "Support Buffera",
+    "support_hint": "Support development on Tribute — opens in a new tab",
+    "support_note": "Give your favorite clipboard a little love."
   },
   "runtime": {
     "samples": [
