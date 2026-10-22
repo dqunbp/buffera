@@ -310,6 +310,42 @@ renderDemo();
 const sculpture = document.querySelector('#sculpture');
 const forms = [...sculpture.querySelectorAll('.soft-form')];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+// Measure the stationary stage, so the tilting badge never feeds back into pointer geometry.
+const badgeStage = document.querySelector('.build-badge-stage');
+const fineHover = matchMedia('(hover: hover) and (pointer: fine)');
+let badgeFrame = 0;
+let badgePointer = { x: 0, y: 0 };
+function resetBadge() {
+  if (badgeFrame) cancelAnimationFrame(badgeFrame);
+  badgeFrame = 0;
+  badgeStage.classList.remove('is-hovered');
+  badgeStage.style.removeProperty('--badge-rx');
+  badgeStage.style.removeProperty('--badge-ry');
+}
+function moveBadge(event) {
+  if (event.pointerType === 'touch' || reduceMotion.matches || !fineHover.matches) return;
+  badgePointer = { x: event.clientX, y: event.clientY };
+  badgeStage.classList.add('is-hovered');
+  if (badgeFrame) return;
+  badgeFrame = requestAnimationFrame(() => {
+    badgeFrame = 0;
+    const rect = badgeStage.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(-1, Math.min(1, (badgePointer.x - rect.left) / rect.width * 2 - 1));
+    const y = Math.max(-1, Math.min(1, (badgePointer.y - rect.top) / rect.height * 2 - 1));
+    badgeStage.style.setProperty('--badge-rx', `${(-y * 8).toFixed(2)}deg`);
+    badgeStage.style.setProperty('--badge-ry', `${(x * 10).toFixed(2)}deg`);
+  });
+}
+badgeStage.addEventListener('pointerenter', moveBadge);
+badgeStage.addEventListener('pointermove', moveBadge);
+badgeStage.addEventListener('pointerleave', resetBadge);
+badgeStage.addEventListener('pointercancel', resetBadge);
+reduceMotion.addEventListener('change', resetBadge);
+fineHover.addEventListener('change', resetBadge);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetBadge(); });
+
 const bodies = forms.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 }));
 let target = { x: 0, y: 0 };
 let frame = 0;
