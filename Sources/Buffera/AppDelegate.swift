@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "local.buffera.app", category: "confirmation")
     private let temporaryImageExports = TemporaryImageExports()
     private var exportCleanupTimer: Timer?
+    private var secretMaintenanceTimer: DispatchSourceTimer?
     private var lastError: Error?
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
@@ -90,9 +91,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboard.savesConcealed = SecretHistoryMode.load() == .encrypted
         // Queued before capture/indexing, so old plaintext secrets are protected first.
         work.async {
-            do { try self.store.protectLegacySecrets() }
+            do {
+                try self.store.protectLegacySecrets()
+                self.store.performSecretMaintenance()
+            }
             catch { DispatchQueue.main.async { self.showError(error, alert: true) } }
         }
+        // One serial owner for mutations and cleanup flags. Busy/failed cleanup
+        // retries at most once per 30 seconds, independently of further captures.
+        let maintenance = DispatchSource.makeTimerSource(queue: work)
+        maintenance.schedule(deadline: .now() + 30, repeating: 30, leeway: .seconds(5))
+        maintenance.setEventHandler { [weak self] in self?.store.performSecretMaintenance() }
+        secretMaintenanceTimer = maintenance
+        maintenance.resume()
         let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
         let preparationMonitor = BackgroundPreparationMonitor()
         self.preparationMonitor = preparationMonitor
@@ -197,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         clipboard.paused = true
+        secretMaintenanceTimer?.cancel()
         clipboardSession.stop()
         preparationMonitor?.stop()
         imageTextIndexer?.stop()
@@ -280,7 +292,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { completion(.failure(ClipDragFailure.unreadable)); return }
             self.work.async {
                 let result = Result {
-                    try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports)
+                    try self.retrySecretAccess(id: id)
+                    return try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports)
                 }
                 DispatchQueue.main.async { completion(result) }
             }
@@ -293,7 +306,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Confirmation owns a snapshot of the choice. Search refreshes must
             // not silently drop it; only closing/reopening the panel cancels it.
             self.work.async {
-                let result = Result { try self.store.restorablePayload(id: id) }
+                let result = Result {
+                    try self.retrySecretAccess(id: id)
+                    return try self.store.restorablePayload(id: id)
+                }
                 DispatchQueue.main.async {
                     guard token == self.confirmationToken, self.panel.window.isVisible else {
                         self.logger.notice("Confirm cancelled"); return
@@ -367,6 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onConceal = { [weak self] id in
             guard let self else { return }
             self.work.async {
+                self.secretKeys.retryAccess()
                 do {
                     try self.store.conceal(id: id)
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
@@ -541,10 +558,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Only an explicit operation on a secret retries denied Keychain access.
+    /// Ordinary preview/export/copy actions must preserve the background backoff.
+    private func retrySecretAccess(id: Int64) throws {
+        if try store.summary(id: id).isConcealed { secretKeys.retryAccess() }
+    }
+
     private func loadPayload(_ id: Int64, completion: @escaping (ClipPayload) -> Void) {
         let current = generation
         work.async {
-            let result = Result { try self.store.payload(id: id) }
+            let result = Result {
+                try self.retrySecretAccess(id: id)
+                return try self.store.payload(id: id)
+            }
             DispatchQueue.main.async {
                 guard current == self.generation else { return }
                 switch result {
@@ -745,7 +771,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.onSecretHistoryChange = { [weak self] mode, completion in
                 guard let self else { completion(.failure(SecretStorageError.keyUnavailable)); return }
                 self.work.async {
-                    let result = Result { if mode == .encrypted { try self.store.prepareSecretStorage() } }
+                    let result = Result {
+                        if mode == .encrypted {
+                            self.secretKeys.retryAccess()
+                            try self.store.prepareSecretStorage()
+                        }
+                    }
                     DispatchQueue.main.async {
                         if case .success = result {
                             self.clipboard.savesConcealed = mode == .encrypted

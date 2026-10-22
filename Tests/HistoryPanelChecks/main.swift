@@ -899,6 +899,56 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
 }
 for (passed, message) in selectionLifecycleChecks() { check(passed, message) }
 
+func previewPrivacyChecks() {
+    let ordinaryText = "Ordinary preview selection fixture"
+    let secretText = "Secret preview selection fixture"
+    let secret = ClipSummary(id: 2, date: Date(), kind: .text, title: "Hidden", text: "",
+                             source: "Panel Fixture App", byteCount: 32, isConcealed: true)
+    let value = PanelHarness(rows: [fixture(1), secret])
+    defer { value.panel.close(restoreFocus: false); value.finish() }
+    value.panel.onPreview = { [weak value] clip, token in
+        value?.panel.showPreview(.text(ordinaryText), id: clip.id, token: token)
+    }
+    value.panel.onReveal = { [weak value] id, token in
+        value?.panel.showConcealedText(secretText, id: id, token: token)
+    }
+    func key(_ code: UInt16, characters: String, flags: NSEvent.ModifierFlags = []) {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                    windowNumber: value.panel.window.windowNumber, context: nil,
+                                    characters: characters, charactersIgnoringModifiers: characters,
+                                    isARepeat: false, keyCode: code)!
+        check(value.panel.window.onKeyDown?(event) == true, "preview fixture handles its history keyboard action")
+    }
+    func previewText(_ expected: String) -> NSTextView {
+        for window in NSApp.windows { window.alphaValue = 0 }
+        let text = NSApp.windows.compactMap(\.contentView).flatMap { descendants(of: $0) }
+            .compactMap { $0 as? NSTextView }.first { $0.string == expected }
+        guard let text else { fatalError("Preview text was not presented") }
+        return text
+    }
+    let copy = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+    key(16, characters: "y", flags: .command)
+    let ordinary = previewText(ordinaryText)
+    ordinary.selectAll(nil)
+    check(ordinary.isSelectable && ordinary.selectedRange().length == (ordinaryText as NSString).length
+          && ordinary.validateMenuItem(copy), "ordinary preview text retains native selection copying")
+    key(53, characters: "\u{1b}")
+    value.panel.move(1)
+    key(4, characters: "h", flags: [.command, .shift])
+    key(16, characters: "y", flags: .command)
+    let hidden = previewText(secretText)
+    hidden.selectAll(nil)
+    check(!hidden.isSelectable && hidden.selectedRange().length == 0 && !hidden.validateMenuItem(copy),
+          "revealed secret preview cannot select or copy plaintext through the native text view")
+    check(value.confirmations.isEmpty, "revealing and inspecting a secret never copies it implicitly")
+    let enter = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                windowNumber: hidden.window!.windowNumber, context: nil,
+                                characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
+    NSApp.sendEvent(enter)
+    check(value.confirmations == [secret.id], "Enter in secret preview retains the normal history confirmation path")
+}
+previewPrivacyChecks()
+
 func nearbyChecks() -> [(Bool, String)] {
     let defaults = UserDefaults.standard
     let keys = ["historyAppearance.mode", "historyAppearance.columns", "historyAppearance.visibleRows",

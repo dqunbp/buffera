@@ -1023,7 +1023,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
               !confirming, !commitWhenLoaded,
               let row = rows.firstIndex(where: { $0.id == id }),
               let card = cards.card(at: row) else { return }
-        preview.show(content, title: selected?.isConcealed == true ? L10n.text("Скрытая запись") : (selected?.kind.label ?? L10n.text("Просмотр")), relativeTo: card)
+        preview.show(content, title: selected?.isConcealed == true ? L10n.text("Скрытая запись") : (selected?.kind.label ?? L10n.text("Просмотр")),
+                     isConcealed: selected?.isConcealed == true, relativeTo: card)
     }
 
     private func dismissPreview() { previewToken += 1; previewRequestPending = false; preview.close() }

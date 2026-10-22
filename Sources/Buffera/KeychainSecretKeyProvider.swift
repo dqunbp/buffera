@@ -7,12 +7,29 @@ import BufferaCore
 /// The MCP executable never constructs this provider or receives a key.
 final class KeychainSecretKeyProvider {
     private var cache: [String: Data] = [:]
+    private var accessUnavailable = false
     private let keychain: SecKeychain?
     init(keychain: SecKeychain? = nil) { self.keychain = keychain }
     private let service = "app.buffera.secret-history.v1"
 
+    /// Called on the history queue before an explicit user request to access secrets.
+    /// Successfully loaded keys stay cached; a retry never replaces an existing key.
+    func retryAccess() { accessUnavailable = false }
+
     func key(identifier: String, create: Bool) throws -> Data {
         if let cached = cache[identifier] { return cached }
+        // A failed creation may be followed by a different provisional identifier.
+        // Block all uncached background access until the user explicitly retries.
+        guard !accessUnavailable else { throw SecretStorageError.keyUnavailable }
+        do {
+            return try loadKey(identifier: identifier, create: create)
+        } catch SecretStorageError.keyUnavailable {
+            accessUnavailable = true
+            throw SecretStorageError.keyUnavailable
+        }
+    }
+
+    private func loadKey(identifier: String, create: Bool) throws -> Data {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

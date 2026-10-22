@@ -205,12 +205,13 @@ func runSemanticIndexChecks() -> Int {
                 DROP TABLE clip_embedding_jobs;
                 DROP TABLE embedding_index;
                 DROP TABLE secret_storage;
+                DROP TABLE secret_maintenance;
                 ALTER TABLE payloads DROP COLUMN encoding;
                 PRAGMA user_version=6;
                 """)
             try checkThrows(try makeTestHistoryStore(url: fixture.url, mode: .readOnly))
             fixture.store = try makeTestHistoryStore(url: fixture.url)
-            try checkEqual(try fixture.scalar("PRAGMA user_version"), 8)
+            try checkEqual(try fixture.scalar("PRAGMA user_version"), 9)
             try checkEqual(try fixture.store.summary(id: id).text, "migration fixture")
             try checkEqual(try fixture.store.embeddingIndexIdentity(), nil)
             try fixture.configure()

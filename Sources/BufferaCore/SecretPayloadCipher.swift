@@ -20,38 +20,48 @@ public final class SecretPayloadCipher {
     private let provider: KeyProvider
     public init(keyProvider: @escaping KeyProvider) { provider = keyProvider }
 
-    private func key(_ identifier: String, create: Bool = false) throws -> SymmetricKey {
+    /// Resolve external key access before entering a storage transaction. The
+    /// prepared value performs cryptography without calling the provider again.
+    func prepare(identifier: String, create: Bool = false) throws -> PreparedKey {
         let data = try provider(identifier, create)
         guard data.count == 32 else { throw SecretStorageError.keyUnavailable }
-        return SymmetricKey(data: data)
+        return PreparedKey(identifier: identifier, master: SymmetricKey(data: data))
     }
 
-    func prepare(identifier: String, create: Bool) throws { _ = try key(identifier, create: create) }
+    struct PreparedKey {
+        let identifier: String
+        private let fingerprintKey: SymmetricKey
+        private let encryptionKey: SymmetricKey
 
-    private func derivedKey(_ identifier: String, purpose: String) throws -> SymmetricKey {
-        HKDF<SHA256>.deriveKey(inputKeyMaterial: try key(identifier), salt: Data("Buffera.secret.v1".utf8),
-                              info: Data(purpose.utf8), outputByteCount: 32)
-    }
+        fileprivate init(identifier: String, master: SymmetricKey) {
+            self.identifier = identifier
+            func derive(_ purpose: String) -> SymmetricKey {
+                HKDF<SHA256>.deriveKey(inputKeyMaterial: master, salt: Data("Buffera.secret.v1".utf8),
+                                      info: Data(purpose.utf8), outputByteCount: 32)
+            }
+            fingerprintKey = derive("fingerprint")
+            encryptionKey = derive("encryption")
+        }
 
-    func fingerprint(_ plain: String, identifier: String) throws -> String {
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(("Buffera.secret.fingerprint.v1:" + plain).utf8),
-                                                 using: try derivedKey(identifier, purpose: "fingerprint"))
-        return "secret-v1:" + mac.map { String(format: "%02x", $0) }.joined()
-    }
+        func fingerprint(_ plain: String) -> String {
+            let mac = HMAC<SHA256>.authenticationCode(for: Data(("Buffera.secret.fingerprint.v1:" + plain).utf8),
+                                                     using: fingerprintKey)
+            return "secret-v1:" + mac.map { String(format: "%02x", $0) }.joined()
+        }
 
-    private func context(_ fingerprint: String) -> Data { Data(("Buffera.payload.aes-gcm.v1:" + fingerprint).utf8) }
+        private func context(_ fingerprint: String) -> Data { Data(("Buffera.payload.aes-gcm.v1:" + fingerprint).utf8) }
 
-    func seal(_ data: Data, fingerprint: String, identifier: String) throws -> Data {
-        // CryptoKit generates a fresh random nonce for every write.
-        let box = try AES.GCM.seal(data, using: derivedKey(identifier, purpose: "encryption"), authenticating: context(fingerprint))
-        guard let combined = box.combined else { throw SecretStorageError.invalidCiphertext }
-        return combined
-    }
+        func seal(_ data: Data, fingerprint: String) throws -> Data {
+            // CryptoKit generates a fresh random nonce for every write.
+            let box = try AES.GCM.seal(data, using: encryptionKey, authenticating: context(fingerprint))
+            guard let combined = box.combined else { throw SecretStorageError.invalidCiphertext }
+            return combined
+        }
 
-    func open(_ data: Data, fingerprint: String, identifier: String) throws -> Data {
-        let key = try derivedKey(identifier, purpose: "encryption")
-        do {
-            return try AES.GCM.open(AES.GCM.SealedBox(combined: data), using: key, authenticating: context(fingerprint))
-        } catch { throw SecretStorageError.invalidCiphertext }
+        func open(_ data: Data, fingerprint: String) throws -> Data {
+            do {
+                return try AES.GCM.open(AES.GCM.SealedBox(combined: data), using: encryptionKey, authenticating: context(fingerprint))
+            } catch { throw SecretStorageError.invalidCiphertext }
+        }
     }
 }

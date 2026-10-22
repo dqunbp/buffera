@@ -386,6 +386,102 @@ do {
 }
 
 do {
+    let directory = root("diagnostic-on")
+    let file = partial(directory, role: .assistant).deletingPathExtension()
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fullPayload.write(to: file)
+    let model = descriptor(role: .assistant)
+    let manager = try LocalModelManager(rootURL: directory, descriptors: [model])
+    manager.setEnabled(true, for: .assistant)
+    check(waitFor(manager, role: .assistant) { $0.isReadyForUse }, "assistant is ready before diagnostic")
+    let access = LocalModelReadAccess(rootURL: directory, descriptor: model)
+    var published: [LocalModelSnapshot] = []
+    manager.onChange = { published.append(contentsOf: $0) }
+    let observerDeadline = Date().addingTimeInterval(2)
+    while published.isEmpty && Date() < observerDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    published.removeAll()
+    let receiptURL = directory.appendingPathComponent("state.json")
+    let receiptBeforeDiagnostic = try Data(contentsOf: receiptURL)
+    var results: [Result<URL, Error>] = []
+    for _ in 0..<2 {
+        manager.verifyInstalledModel(for: .assistant) { results.append($0) }
+    }
+    let diagnosticDeadline = Date().addingTimeInterval(2)
+    while results.count < 2 && Date() < diagnosticDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    check(results.count == 2 && results.allSatisfy { (try? $0.get()) == file },
+          "concurrent diagnostics of a ready model each complete successfully")
+    check(!published.isEmpty && published.allSatisfy(\.isReadyForUse),
+          "diagnostics never publish unavailable assistant state that would stop an active chat")
+    check((try? access.enabledAssistant().fileURL) == file && manager.modelURL(for: .assistant) == file,
+          "successful diagnostics keep the assistant available to receipt readers and its manager")
+    check((try? Data(contentsOf: receiptURL)) == receiptBeforeDiagnostic,
+          "successful diagnostics do not change the readiness receipt")
+    var corrupted = fullPayload
+    corrupted[corrupted.count / 2] ^= 0xff
+    try corrupted.write(to: file)
+    var corruptionResult: Result<URL, Error>?
+    manager.verifyInstalledModel(for: .assistant) { corruptionResult = $0 }
+    let corruptionDeadline = Date().addingTimeInterval(2)
+    while corruptionResult == nil && Date() < corruptionDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    let corruptionRejected: Bool
+    if case .failure = corruptionResult { corruptionRejected = true }
+    else { corruptionRejected = false }
+    check(corruptionRejected && manager.snapshots[0].state == .failed &&
+          !manager.snapshots[0].isReadyForUse && manager.modelURL(for: .assistant) == nil &&
+          (try? access.enabledAssistant()) == nil,
+          "failed diagnostics revoke a previously ready assistant in memory and its receipt")
+    manager.onChange = nil
+    manager.shutdown()
+}
+
+do {
+    for action in ["disable", "remove", "shutdown"] {
+        let directory = root("diagnostic-\(action)")
+        let file = partial(directory).deletingPathExtension()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fullPayload.write(to: file)
+        let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+        manager.setEnabled(true, for: .embedding)
+        check(waitFor(manager) { $0.isReadyForUse }, "model is ready before diagnostic \(action)")
+        var results: [Result<URL, Error>] = []
+        manager.verifyInstalledModel(for: .embedding) { results.append($0) }
+        manager.verifyInstalledModel(for: .embedding) { results.append($0) }
+        switch action {
+        case "disable": manager.setEnabled(false, for: .embedding)
+        case "remove": manager.remove(.embedding)
+        default: manager.shutdown()
+        }
+        let deadline = Date().addingTimeInterval(2)
+        while results.count < 2 && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        // Drain any stale verification callback before asserting the final state.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        check(results.count == 2, "diagnostic \(action) completes every joined request exactly once")
+        let snapshot = manager.snapshots[0]
+        if action == "remove" {
+            check(snapshot.state == .notDownloaded && !snapshot.isEnabled &&
+                  !FileManager.default.fileExists(atPath: file.path),
+                  "late diagnostic completion cannot revive a removed model")
+        } else {
+            check(snapshot.state == .downloaded && manager.modelURL(for: .embedding) == file,
+                  "diagnostic \(action) does not turn an already verified model into a paused download")
+            if action == "disable" {
+                check(!snapshot.isEnabled && !snapshot.isReadyForUse,
+                      "late diagnostic completion cannot re-enable a disabled feature")
+            }
+        }
+        if action != "shutdown" { manager.shutdown() }
+    }
+}
+
+do {
     let directory = root("modified-file")
     let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
     manager.download(.embedding)

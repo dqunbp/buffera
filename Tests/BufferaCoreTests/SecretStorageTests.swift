@@ -8,7 +8,9 @@ private final class SecretFixture {
     var store: HistoryStore!
     var keyAvailable = true
     var creations = 0
+    var onKeyAccess: (() throws -> Void)?
     lazy var cipher = SecretPayloadCipher { [unowned self] _, create in
+        try self.onKeyAccess?()
         if create { self.creations += 1 }
         guard self.keyAvailable else { throw SecretStorageError.keyUnavailable }
         return Data(repeating: 0x36, count: 32)
@@ -30,6 +32,15 @@ private final class SecretFixture {
     }
     func execute(_ sql: String) throws {
         try raw { try checkEqual(sqlite3_exec($0, sql, nil, nil, nil), SQLITE_OK) }
+    }
+    func scalar(_ sql: String) throws -> Int {
+        try raw { db in
+            var statement: OpaquePointer?
+            try checkEqual(sqlite3_prepare_v2(db, sql, -1, &statement, nil), SQLITE_OK)
+            defer { sqlite3_finalize(statement) }
+            try checkEqual(sqlite3_step(statement), SQLITE_ROW)
+            return Int(sqlite3_column_int(statement, 0))
+        }
     }
     func stored(_ id: Int64) throws -> (data: Data, encoding: Int32, fingerprint: String) {
         try raw { db in
@@ -152,6 +163,7 @@ func runSecretStorageChecks() -> Int {
             try checkEqual(try f.store.payload(id: id), f.payload(value))
             try checkEqual(try f.store.payload(id: ordinary), f.payload("keep-normal"))
             try f.store.protectLegacySecrets() // idempotent
+            try check(!f.store.performSecretMaintenance())
             for file in [f.url, URL(fileURLWithPath: f.url.path + "-wal")] where FileManager.default.fileExists(atPath: file.path) {
                 let bytes = try Data(contentsOf: file)
                 try check(bytes.range(of: Data(value.utf8)) == nil)
@@ -169,6 +181,115 @@ func runSecretStorageChecks() -> Int {
             try checkEqual(try f.store.count(), 1)
             try check(try f.store.summary(id: secret).isFavorite)
             try checkEqual(try f.store.payload(id: secret), f.payload(value))
+        }),
+        ("key access never holds a write transaction or payload read snapshot", { f in
+            f.onKeyAccess = { [unowned f] in
+                try f.raw { db in
+                    sqlite3_busy_timeout(db, 0)
+                    // A write transaction or any active payload read snapshot
+                    // on the store connection prevents this TRUNCATE.
+                    try checkEqual(sqlite3_wal_checkpoint_v2(db, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil), SQLITE_OK)
+                    try checkEqual(sqlite3_exec(db, "BEGIN IMMEDIATE; ROLLBACK", nil, nil, nil), SQLITE_OK)
+                }
+            }
+            try f.store.prepareSecretStorage()
+            let secret = try f.insert("preflight-secret")
+            try checkEqual(try f.insert("preflight-secret", secret: false), secret)
+            let ordinary = try f.insert("preflight-conceal", secret: false)
+            try f.store.conceal(id: ordinary)
+            _ = try f.store.payload(id: secret)
+            _ = try f.store.restorablePayload(id: secret)
+            _ = try f.store.revealedContent(id: secret)
+            let legacy = try f.insert("preflight-legacy", secret: false)
+            try f.execute("UPDATE clips SET is_concealed=1 WHERE id=\(legacy)")
+            try f.store.protectLegacySecrets()
+        }),
+        ("key metadata SQL errors cannot save an open duplicate of a secret", { f in
+            let id = try f.insert("protected-dedup-sql-failure")
+            try f.execute("ALTER TABLE secret_storage RENAME COLUMN key_id TO broken_key_id")
+            try checkThrows(try f.insert("protected-dedup-sql-failure", secret: false))
+            try checkEqual(try f.store.count(), 1)
+            try check(try f.store.summary(id: id).isConcealed)
+            try f.execute("ALTER TABLE secret_storage RENAME COLUMN broken_key_id TO key_id")
+            try checkEqual(try f.store.payload(id: id), f.payload("protected-dedup-sql-failure"))
+        }),
+        ("cleanup failure cannot turn committed concealment or promotion into failure", { f in
+            try f.execute("""
+                CREATE TRIGGER fail_cleanup BEFORE UPDATE ON secret_maintenance
+                WHEN NEW.needs_checkpoint=0 BEGIN SELECT RAISE(ABORT,'fixture cleanup failure'); END;
+                """)
+            let id = try f.insert("commit-before-maintenance", secret: false)
+            try f.store.conceal(id: id)
+            try check(try f.store.summary(id: id).isConcealed)
+            try check(f.store.performSecretMaintenance())
+            try checkEqual(try f.stored(id).encoding, 1)
+            let promoted = try f.insert("promotion-before-maintenance", secret: false)
+            try checkEqual(try f.insert("promotion-before-maintenance"), promoted)
+            try check(f.store.performSecretMaintenance())
+            try checkEqual(try f.scalar("SELECT needs_checkpoint FROM secret_maintenance"), 1)
+            try f.execute("DROP TRIGGER fail_cleanup")
+            try check(!f.store.performSecretMaintenance())
+        }),
+        ("busy readers defer cleanup without blocking; retry erases plaintext without VACUUM", { f in
+            let value = "checkpoint-secret-fixture-9382745"
+            let id = try f.insert(value, secret: false)
+            let schema = try f.scalar("PRAGMA schema_version")
+            try f.raw { reader in
+                try checkEqual(sqlite3_exec(reader, "BEGIN; SELECT * FROM clips", nil, nil, nil), SQLITE_OK)
+                try f.store.conceal(id: id)
+                let start = Date()
+                try check(f.store.performSecretMaintenance())
+                try check(Date().timeIntervalSince(start) < 1)
+                try checkEqual(try f.scalar("SELECT needs_checkpoint FROM secret_maintenance"), 1)
+                _ = try f.insert("ordinary-during-cleanup", secret: false)
+                try checkEqual(sqlite3_exec(reader, "COMMIT", nil, nil, nil), SQLITE_OK)
+            }
+            // The durable request survives restart and does not require another secret operation.
+            f.store = nil; f.store = try HistoryStore(url: f.url, secretCipher: f.cipher)
+            try check(!f.store.performSecretMaintenance())
+            try checkEqual(try f.scalar("PRAGMA schema_version"), schema) // VACUUM would change this.
+            try checkEqual(try f.scalar("SELECT needs_checkpoint + needs_vacuum FROM secret_maintenance"), 0)
+            for file in [f.url, URL(fileURLWithPath: f.url.path + "-wal")] where FileManager.default.fileExists(atPath: file.path) {
+                try check(try Data(contentsOf: file).range(of: Data(value.utf8)) == nil)
+            }
+        }),
+        ("concealment schedules metadata cleanup even when a damaged payload is missing", { f in
+            let value = "metadata-without-payload-837492"
+            let id = try f.insert(value, secret: false)
+            try f.execute("DELETE FROM payloads WHERE clip_id=\(id)")
+            try f.store.conceal(id: id)
+            try check(try f.store.summary(id: id).isConcealed)
+            try checkEqual(try f.scalar("SELECT needs_checkpoint FROM secret_maintenance"), 1)
+            try check(!f.store.performSecretMaintenance())
+            for file in [f.url, URL(fileURLWithPath: f.url.path + "-wal")] where FileManager.default.fileExists(atPath: file.path) {
+                try check(try Data(contentsOf: file).range(of: Data(value.utf8)) == nil)
+            }
+        }),
+        ("v8 migration vacuums old free pages even without key metadata, only once", { f in
+            f.store = nil
+            let marker = "old-deleted-secret-1928374"
+            try f.execute("""
+                PRAGMA secure_delete=OFF;
+                CREATE TABLE old_data(value TEXT);
+                INSERT INTO old_data VALUES('\(String(repeating: marker, count: 500))');
+                DELETE FROM old_data;
+                DROP TABLE old_data;
+                DROP TABLE secret_maintenance;
+                PRAGMA user_version=8;
+                PRAGMA wal_checkpoint(TRUNCATE);
+                """)
+            try check(try Data(contentsOf: f.url).range(of: Data(marker.utf8)) != nil)
+            f.store = try HistoryStore(url: f.url, secretCipher: f.cipher)
+            try checkEqual(try f.scalar("SELECT COUNT(*) FROM secret_storage"), 0)
+            try checkEqual(try f.scalar("SELECT needs_vacuum FROM secret_maintenance"), 1)
+            try check(!f.store.performSecretMaintenance())
+            let schema = try f.scalar("PRAGMA schema_version")
+            try check(!f.store.performSecretMaintenance())
+            try checkEqual(try f.scalar("PRAGMA schema_version"), schema)
+            try checkEqual(f.creations, 0)
+            for file in [f.url, URL(fileURLWithPath: f.url.path + "-wal")] where FileManager.default.fileExists(atPath: file.path) {
+                try check(try Data(contentsOf: file).range(of: Data(marker.utf8)) == nil)
+            }
         })
     ]
     var failures = 0

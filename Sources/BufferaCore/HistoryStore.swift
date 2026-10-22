@@ -9,7 +9,7 @@ public final class HistoryStore {
 
     var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private static let schemaVersion = 8
+    private static let schemaVersion = 9
     let secretCipher: SecretPayloadCipher?
     static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
     // Storage/search sentinel: presentation translates it through ClipSummary.displayTitle.
@@ -137,6 +137,20 @@ public final class HistoryStore {
                 PRAGMA user_version=8;
                 """)
             }
+            if version < 9 {
+                // Unlike key metadata, maintenance must exist even in an old
+                // database that has never stored an encrypted secret.
+                try execute("""
+                CREATE TABLE secret_maintenance (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                    needs_checkpoint INTEGER NOT NULL CHECK(needs_checkpoint IN (0,1)),
+                    needs_vacuum INTEGER NOT NULL CHECK(needs_vacuum IN (0,1))
+                );
+                INSERT INTO secret_maintenance VALUES(1,\(version > 0 ? 1 : 0),\(version > 0 ? 1 : 0));
+                UPDATE secret_storage SET needs_cleanup=0;
+                PRAGMA user_version=9;
+                """)
+            }
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -171,9 +185,10 @@ public final class HistoryStore {
         guard !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else { throw HistoryError.invalidPayload }
         let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
         let encoded = try encoder.encode(payload)
+        let key = try insertionKey(payload, isConcealed: isConcealed)
         try execute("BEGIN IMMEDIATE")
         do {
-            let stored = try prepareStoredPayload(payload, encoded: encoded, isConcealed: isConcealed)
+            let stored = try prepareStoredPayload(payload, encoded: encoded, isConcealed: isConcealed, key: key)
             let fingerprint = stored.fingerprint, storedData = stored.data
             let effectiveConcealed = stored.isConcealed
             let storedTitle = effectiveConcealed ? Self.concealedTitle : title
@@ -210,7 +225,6 @@ public final class HistoryStore {
             try syncEmbeddingJob(id: id)
             try prune(maxCount: maxCount, maxBytes: maxBytes)
             try execute("COMMIT")
-            if effectiveConcealed { try cleanupSecretRemnants() }
             return id
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -349,13 +363,22 @@ public final class HistoryStore {
     }
 
     public func payload(id: Int64) throws -> ClipPayload {
+        let record = try storedPayload(id: id)
+        return try decodePayload(record.data, encoding: record.encoding, fingerprint: record.fingerprint, concealed: record.concealed)
+    }
+
+    /// Copy both payload and privacy metadata in one statement, then release its
+    /// read lock before decoding or asking the Keychain for access.
+    func storedPayload(id: Int64) throws -> (data: Data, encoding: Int32, fingerprint: String, concealed: Bool) {
         let statement = try prepare("SELECT payloads.data,payloads.encoding,clips.fingerprint,clips.is_concealed FROM payloads JOIN clips ON clips.id=payloads.clip_id WHERE clip_id=?")
         defer { sqlite3_finalize(statement) }
         try bind([.integer(id)], to: statement)
-        guard sqlite3_step(statement) == SQLITE_ROW else { throw HistoryError.missing }
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { throw HistoryError.missing }
+        guard status == SQLITE_ROW else { throw failure() }
         guard let bytes = sqlite3_column_blob(statement, 0) else { throw HistoryError.invalidPayload }
         let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0)))
-        return try decodePayload(data, encoding: sqlite3_column_int(statement, 1), fingerprint: string(statement, 2), concealed: sqlite3_column_int(statement, 3) != 0)
+        return (data, sqlite3_column_int(statement, 1), string(statement, 2), sqlite3_column_int(statement, 3) != 0)
     }
 
     public func delete(id: Int64) throws {
@@ -388,6 +411,8 @@ public final class HistoryStore {
     }
 
     public func conceal(id: Int64) throws {
+        _ = try summary(id: id)
+        let key = try prepareSecretKey(create: true)
         try execute("BEGIN IMMEDIATE")
         do {
             let source: String
@@ -400,15 +425,18 @@ public final class HistoryStore {
                 guard status == SQLITE_ROW else { throw failure() }
                 source = string(statement, 0)
             }
-            try encryptStoredPayload(id: id)
+            try registerSecretKey(key)
+            try encryptStoredPayload(id: id, key: key)
             let statement = try prepare("UPDATE clips SET is_concealed=1,title=?,text='',search=? WHERE id=?")
             defer { sqlite3_finalize(statement) }
             try bind([.text(Self.concealedTitle), .text(Self.concealedSearch(source: source)), .integer(id)], to: statement)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
             try deleteImageText(id: id)
             try syncEmbeddingJob(id: id)
+            // Metadata can contain plaintext even if a damaged record has lost
+            // its payload. Concealment always leaves a durable cleanup request.
+            try requestSecretCleanup()
             try execute("COMMIT")
-            try cleanupSecretRemnants()
         } catch { try? execute("ROLLBACK"); throw error }
     }
 

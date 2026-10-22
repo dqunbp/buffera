@@ -76,14 +76,14 @@ final class ClipPreview: NSObject, NSPopoverDelegate {
 
     deinit { removeKeyMonitor() }
 
-    func show(_ content: ClipPreviewContent, title: String, relativeTo view: NSView) {
+    func show(_ content: ClipPreviewContent, title: String, isConcealed: Bool, relativeTo view: NSView) {
         guard let window = view.window, window.isVisible else { return }
         close()
         parentWindow = window
         let screenSize = window.screen?.visibleFrame.size ?? NSSize(width: 1_024, height: 768)
         let size = NSSize(width: min(520, max(240, screenSize.width - 48)),
                           height: min(420, max(200, screenSize.height - 48)))
-        let controller = PreviewViewController(content: content, title: title, size: size)
+        let controller = PreviewViewController(content: content, title: title, isConcealed: isConcealed, size: size)
         popover.contentViewController = controller
         popover.contentSize = size
         popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxX)
@@ -143,11 +143,12 @@ final class ClipPreview: NSObject, NSPopoverDelegate {
 private final class PreviewViewController: NSViewController {
     private let content: ClipPreviewContent
     private let heading: String
+    private let isConcealed: Bool
     private let size: NSSize
     private(set) var textView: NSTextView?
 
-    init(content: ClipPreviewContent, title: String, size: NSSize) {
-        self.content = content; heading = title; self.size = size
+    init(content: ClipPreviewContent, title: String, isConcealed: Bool, size: NSSize) {
+        self.content = content; heading = title; self.isConcealed = isConcealed; self.size = size
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -172,7 +173,9 @@ private final class PreviewViewController: NSViewController {
             scroll.drawsBackground = false
             let text = NSTextView(frame: NSRect(x: 0, y: 0, width: size.width - 32, height: size.height - 84))
             text.string = value
-            text.isEditable = false; text.isSelectable = true; text.isRichText = false
+            // Native selection copying drops the secret marker. Enter uses the
+            // history confirmation path, which restores every privacy marker.
+            text.isEditable = false; text.isSelectable = !isConcealed; text.isRichText = false
             text.drawsBackground = false
             text.font = .systemFont(ofSize: 13)
             text.textColor = .labelColor

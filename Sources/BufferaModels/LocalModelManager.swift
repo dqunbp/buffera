@@ -125,7 +125,7 @@ public final class LocalModelManager: @unchecked Sendable {
                 DispatchQueue.main.async { completion(.failure(CancellationError())) }
                 return
             }
-            if entry.state == .verifying {
+            if entry.verification != nil {
                 entry.verificationRequests.append(completion)
                 return
             }
@@ -137,6 +137,9 @@ public final class LocalModelManager: @unchecked Sendable {
                 entry.generation = UUID()
                 self.verify(entry, at: self.fileURL(entry))
             } catch {
+                if entry.state == .downloaded && !entry.needsVerification {
+                    self.fail(entry, error)
+                }
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
@@ -256,9 +259,9 @@ public final class LocalModelManager: @unchecked Sendable {
                 self.startDownload(entry)
                 return
             }
-            if !enabled && [.downloading, .verifying].contains(entry.state) {
+            if !enabled && (entry.verification != nil || [.downloading, .verifying].contains(entry.state)) {
                 self.cancel(entry)
-                entry.state = .paused
+                if entry.state != .downloaded { entry.state = .paused }
             }
             self.saveAndPublish(entry)
         }
@@ -267,9 +270,10 @@ public final class LocalModelManager: @unchecked Sendable {
     public func shutdown() {
         queue.sync {
             stopped = true
-            for entry in entries.values where entry.state == .downloading || entry.state == .verifying {
+            for entry in entries.values
+            where entry.verification != nil || entry.state == .downloading || entry.state == .verifying {
                 cancel(entry)
-                entry.state = .paused
+                if entry.state != .downloaded { entry.state = .paused }
             }
             do { try persist() }
             catch {
@@ -280,15 +284,22 @@ public final class LocalModelManager: @unchecked Sendable {
     }
 
     private func verify(_ entry: Entry, at url: URL) {
-        entry.state = .verifying
-        entry.needsVerification = true
+        // A diagnostic must not revoke a file already verified in this process:
+        // observers and receipt readers would stop active inference immediately.
+        // ModelStorage still checks file identity and rejects changed/corrupt files.
+        let remainsAvailable = entry.state == .downloaded && !entry.needsVerification
+            && url == fileURL(entry)
+        if !remainsAvailable {
+            entry.state = .verifying
+            entry.needsVerification = true
+        }
         entry.error = nil
         let generation = entry.generation
         let token = ModelVerification()
         entry.verification = token
         let descriptor = entry.descriptor
-        saveAndPublish(entry)
-        guard entry.state == .verifying else { return }
+        if !remainsAvailable { saveAndPublish(entry) }
+        guard entry.verification === token else { return }
         DispatchQueue.global(qos: .utility).async { [weak self, weak entry] in
             let result = Result { _ = try ModelStorage.verify(url, descriptor: descriptor, token: token) }
             self?.queue.async { [weak self, weak entry] in
@@ -306,7 +317,8 @@ public final class LocalModelManager: @unchecked Sendable {
                     entry.state = .downloaded
                     entry.needsVerification = false
                     entry.received = descriptor.byteCount
-                    self.saveAndPublish(entry)
+                    if remainsAvailable { self.publish() }
+                    else { self.saveAndPublish(entry) }
                     if entry.state == .downloaded {
                         self.finishVerificationRequests(entry, result: .success(destination))
                     }
