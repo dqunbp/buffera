@@ -176,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.applyShortcuts(hotKeys.preferences)
         hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
-            if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat) }
+            if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat, fromGlobalShortcut: true) }
             else if delta > 0, !isRepeat { self.open(fromShortcut: true) }
         }
         registerShortcuts()

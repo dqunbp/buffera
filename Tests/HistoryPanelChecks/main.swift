@@ -790,6 +790,24 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     results.append((reopened.panel.window.isVisible && reopened.confirmations.isEmpty,
                     "a queued blur from an older presentation cannot close a newly reopened panel"))
 
+    let unfocused = harness()
+    unfocused.panel.open(fromShortcut: true)
+    unfocused.panel.receive(clips, total: clips.count, offset: 0)
+    // Simulate an opening activation that has not handed keyboard focus over.
+    // Keep the initial modifier hold active to catch accidental quick-copy.
+    unfocused.panel.window.resignKey()
+    let requestsBeforeRecovery = unfocused.requests.count
+    unfocused.panel.shortcutPressed(1, fromGlobalShortcut: true)
+    unfocused.panel.window.onFlagsChanged?([])
+    flushMainQueue()
+    results.append((unfocused.panel.window.isVisible
+                    && unfocused.panel.window.firstResponder === unfocused.cards
+                    && unfocused.panel.selected?.id == 1
+                    && unfocused.requests.count == requestsBeforeRecovery
+                    && unfocused.confirmations.isEmpty,
+                    "an unfocused unpinned panel recovers without navigation or quick-copy during the opening hold"))
+    unfocused.panel.close(restoreFocus: false)
+
     let pinned = harness()
     let pinButton = descendants(of: pinned.panel.window.contentView!).compactMap { $0 as? NSButton }
         .first { $0.identifier?.rawValue == "history.pin" }!

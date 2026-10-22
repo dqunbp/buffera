@@ -241,10 +241,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
     }
 
-    func shortcutPressed(_ delta: Int, isRepeat: Bool = false) {
+    func shortcutPressed(_ delta: Int, isRepeat: Bool = false, fromGlobalShortcut: Bool = false) {
         guard !isRepeat, isAvailableForShortcut, !confirming, !commitWhenLoaded,
               !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
-        if isPinned, !window.isKeyWindow, !shortcutGesture.isActive {
+        // A visible panel may never have received focus after app activation.
+        // Recover focus before interpreting another global press as navigation.
+        if !window.isKeyWindow, fromGlobalShortcut || (isPinned && !shortcutGesture.isActive) {
             cancelShortcutGesture()
             rememberPreviousApp()
             presentationToken += 1
