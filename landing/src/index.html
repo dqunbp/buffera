@@ -43,12 +43,6 @@
   <main id="main">
     <section class="hero wrap" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <div class="build-badge-stage"><div class="build-badge" role="img" aria-label="{{page.build_badge_label}}">
-          <span class="build-badge-logo"><img src="{{assetPrefix}}openai-mark.svg" width="30" height="30" alt=""></span>
-          <span class="build-badge-copy" aria-hidden="true"><span>{{page.build_badge_caption}}</span><strong>GPT Astra</strong></span>
-          <span class="build-badge-mode" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5c.6 4.7 2.3 6.4 7 7-4.7.6-6.4 2.3-7 7-.6-4.7-2.3-6.4-7-7 4.7-.6 6.4-2.3 7-7Zm9-4c.4 2.7 1.3 3.6 4 4-2.7.4-3.6 1.3-4 4-.4-2.7-1.3-3.6-4-4 2.7-.4 3.6-1.3 4-4Zm1 14c.3 2 1 2.7 3 3-2 .3-2.7 1-3 3-.3-2-1-2.7-3-3 2-.3 2.7-1 3-3Z"/></svg>Ultra</span>
-          <span class="build-badge-glint" aria-hidden="true"></span>
-        </div></div>
         <h1 id="hero-title">{{page.hero_title_text}}<br> {{page.hero_title_text_2}}<br> {{page.hero_title_text_3}}</h1>
         <p class="hero-description">{{page.hero_description_text}}<br> {{page.hero_description_text_2}}</p>
         <div class="hero-actions"><a class="button button-dark" href="#install">{{page.button_text}} <span aria-hidden="true">↗</span></a><a class="text-link" href="#try">{{page.text_link_text}} <span aria-hidden="true">↓</span></a></div>
@@ -65,7 +59,18 @@
         <span class="orbit-note note-kept" aria-hidden="true"><span>✓</span> {{page.orbit_note_text_2}}</span>
         <div class="touch-caption"><svg viewBox="0 0 65 40" aria-hidden="true"><path d="M3 33C39 40 61 26 47 5m-5 9 5-9 10 3"/></svg><span id="touch-label" role="status">{{page.touch_label_text}}</span></div>
       </div>
-      <div class="hero-bottom"><span>{{page.hero_bottom_text}}</span><a href="#try" aria-label="{{page.hero_bottom_aria_label}}">↓</a></div>
+      <div class="hero-bottom">
+        <span>{{page.hero_bottom_text}}</span>
+        <a class="build-badge-stage" href="https://openai.com/index/gpt-6-astra/" target="_blank" rel="noopener noreferrer" aria-label="{{page.build_badge_label}}. {{page.build_badge_link}}" title="{{page.build_badge_link}}">
+          <div class="build-badge" aria-hidden="true">
+            <span class="build-badge-logo"><img src="{{assetPrefix}}openai-mark.svg" width="30" height="30" alt=""></span>
+            <span class="build-badge-copy"><span>{{page.build_badge_caption}}</span><strong>GPT Astra</strong></span>
+            <span class="build-badge-mode"><svg viewBox="0 0 24 24"><path d="M9 5c.6 4.7 2.3 6.4 7 7-4.7.6-6.4 2.3-7 7-.6-4.7-2.3-6.4-7-7 4.7-.6 6.4-2.3 7-7Zm9-4c.4 2.7 1.3 3.6 4 4-2.7.4-3.6 1.3-4 4-.4-2.7-1.3-3.6-4-4 2.7-.4 3.6-1.3 4-4Zm1 14c.3 2 1 2.7 3 3-2 .3-2.7 1-3 3-.3-2-1-2.7-3-3 2-.3 2.7-1 3-3Z"/></svg>Ultra</span>
+            <span class="build-badge-glint"></span>
+          </div>
+        </a>
+        <a class="hero-scroll" href="#try" aria-label="{{page.hero_bottom_aria_label}}">↓</a>
+      </div>
     </section>
 
     <section class="demo-section" id="try" aria-labelledby="demo-title">

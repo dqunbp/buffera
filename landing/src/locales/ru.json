@@ -132,6 +132,7 @@
     "install_card_text_4": "Mac с Apple Silicon и отдельная загрузка моделей при первом включении. После этого поиск по смыслу и помощник работают без интернета.",
     "build_badge_caption": "Сделано с",
     "build_badge_label": "Сделано с GPT Astra от OpenAI в режиме Ultra",
+    "build_badge_link": "Об Astra на сайте OpenAI — откроется в новой вкладке",
     "footer_text": "С памятью. С характером. С формами.",
     "footer_links_text": "Наверх ↑",
     "telegram_label": "Telegram-канал @crypto_and_pug",
