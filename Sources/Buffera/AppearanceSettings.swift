@@ -8,6 +8,7 @@ final class SettingsWindow: NSWindowController {
     var onShortcutsChange: ((ShortcutPreferences) throws -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onSecretHistoryChange: SecretHistorySettingsView.Apply?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -63,6 +64,10 @@ final class SettingsWindow: NSWindowController {
         settings.onShowSetup = { [weak self] in self?.onShowSetup?() }
         settings.onRestart = { [weak self] in self?.onRestart?() }
         settings.onLimitsChange = { [weak self] value in self?.onLimitsChange?(value) }
+        settings.onSecretHistoryChange = { [weak self] mode, completion in
+            guard let apply = self?.onSecretHistoryChange else { completion(.failure(SecretStorageError.keyUnavailable)); return }
+            apply(mode, completion)
+        }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
         settings.onCopyMCPConfiguration = { [weak self] configuration in
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
@@ -87,6 +92,7 @@ final class SettingsWindow: NSWindowController {
         settings.refreshTheme()
         settings.refreshShortcuts()
         settings.refreshMCPAccess()
+        settings.refreshSecrets()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
@@ -129,6 +135,7 @@ private final class SettingsContentController: NSViewController {
     var onShortcutsChange: ((ShortcutPreferences) throws -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
+    var onSecretHistoryChange: SecretHistorySettingsView.Apply?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -143,6 +150,7 @@ private final class SettingsContentController: NSViewController {
     private let shortcutDefaults: UserDefaults
     private let shortcutSettings: ShortcutSettingsView
     private let mcp: MCPSettingsView
+    private let secrets: SecretHistorySettingsView
     private let models: ModelSettingsView
     private var appearance = HistoryAppearance.load()
     private var limits: HistoryLimits
@@ -172,6 +180,7 @@ private final class SettingsContentController: NSViewController {
         self.shortcutDefaults = shortcutDefaults
         shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
         self.limitsDefaults = limitsDefaults
+        secrets = SecretHistorySettingsView(defaults: limitsDefaults)
         self.limits = HistoryLimits.load(from: limitsDefaults)
         self.launchLanguage = launchLanguage
         self.languageDefaults = languageDefaults
@@ -179,6 +188,10 @@ private final class SettingsContentController: NSViewController {
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
+        secrets.onApply = { [weak self] mode, completion in
+            guard let apply = self?.onSecretHistoryChange else { completion(.failure(SecretStorageError.keyUnavailable)); return }
+            apply(mode, completion)
+        }
         shortcutSettings.onApply = { [weak self] value in
             guard let self, let apply = self.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
             try apply(value)
@@ -268,7 +281,7 @@ private final class SettingsContentController: NSViewController {
             footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), historyPage(), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models]
+        pages = [appearancePage(), SetupUI.scroll(historyPage()), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)
@@ -348,6 +361,8 @@ private final class SettingsContentController: NSViewController {
         return page
     }
 
+    func refreshSecrets() { secrets.refresh() }
+
     private func historyPage() -> NSView {
         configure(count, label: L10n.text("Лимит записей"), action: #selector(countLimitChanged))
         count.identifier = NSUserInterfaceItemIdentifier("settings.countLimit")
@@ -376,9 +391,9 @@ private final class SettingsContentController: NSViewController {
         folder.bezelStyle = .rounded
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         folder.imagePosition = .imageLeading
-        let storage = paragraph(L10n.text("История хранится локально. Маскировка скрывает содержимое в интерфейсе, но не шифрует базу."))
-        let page = vertical([grid, note, ocr, folder, storage], spacing: 14)
-        for child in [grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let storage = paragraph(L10n.text("История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится."))
+        let page = vertical([secrets, grid, note, ocr, folder, storage], spacing: 14)
+        for child in [secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 

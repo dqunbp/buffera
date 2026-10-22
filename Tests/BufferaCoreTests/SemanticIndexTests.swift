@@ -7,7 +7,7 @@ private final class SemanticFixture {
     var store: HistoryStore!
     let identity = EmbeddingIndexIdentity(fingerprint: "fixture-model-revision-prompt-chunks-v1", dimensions: 2)
     var url: URL { directory.appendingPathComponent("history.sqlite") }
-    init() throws { store = try HistoryStore(url: url) }
+    init() throws { store = try makeTestHistoryStore(url: url) }
     deinit { store = nil; try? FileManager.default.removeItem(at: directory) }
     @discardableResult func insert(_ text: String, kind: ClipKind = .text, source: String = "Fixture",
                                   concealed: Bool = false, remote: Bool = false, time: Double = 100,
@@ -61,7 +61,7 @@ func runSemanticIndexChecks() -> Int {
             try check(try fixture.store.failEmbedding(failed))
             try checkEqual(try fixture.store.embeddingProgress(), EmbeddingProgress(complete: 1, failed: 1, truncated: 1))
             try checkEqual(try fixture.scalar("SELECT COUNT(*) FROM clip_embedding_jobs WHERE content_fingerprint=''"), 0)
-            fixture.store = nil; fixture.store = try HistoryStore(url: fixture.url)
+            fixture.store = nil; fixture.store = try makeTestHistoryStore(url: fixture.url)
             try fixture.configure()
             try checkEqual(try fixture.store.nextPendingEmbedding()?.clipID, nil)
             try fixture.store.retryFailedEmbeddings(); try fixture.finish(first)
@@ -190,7 +190,7 @@ func runSemanticIndexChecks() -> Int {
             try check(job.isTruncated); try check(job.text.utf8.count <= 128 * 1024)
             try check(!job.text.contains("\u{FFFD}"))
             try check(try fixture.store.completeEmbedding(job, vectors: [[1, 0]]))
-            fixture.store = nil; fixture.store = try HistoryStore(url: fixture.url)
+            fixture.store = nil; fixture.store = try makeTestHistoryStore(url: fixture.url)
             try checkEqual(try fixture.store.embeddingProgress(), EmbeddingProgress(complete: 1, truncated: 1))
             try fixture.store.clearEmbeddings()
             try checkEqual(try fixture.store.embeddingProgress(), EmbeddingProgress())
@@ -204,16 +204,18 @@ func runSemanticIndexChecks() -> Int {
                 DROP TABLE clip_embedding_chunks;
                 DROP TABLE clip_embedding_jobs;
                 DROP TABLE embedding_index;
+                DROP TABLE secret_storage;
+                ALTER TABLE payloads DROP COLUMN encoding;
                 PRAGMA user_version=6;
                 """)
-            try checkThrows(try HistoryStore(url: fixture.url, mode: .readOnly))
-            fixture.store = try HistoryStore(url: fixture.url)
-            try checkEqual(try fixture.scalar("PRAGMA user_version"), 7)
+            try checkThrows(try makeTestHistoryStore(url: fixture.url, mode: .readOnly))
+            fixture.store = try makeTestHistoryStore(url: fixture.url)
+            try checkEqual(try fixture.scalar("PRAGMA user_version"), 8)
             try checkEqual(try fixture.store.summary(id: id).text, "migration fixture")
             try checkEqual(try fixture.store.embeddingIndexIdentity(), nil)
             try fixture.configure()
             try checkEqual(try fixture.store.nextPendingEmbedding()?.clipID, id)
-            let reader = try HistoryStore(url: fixture.url, mode: .readOnly)
+            let reader = try makeTestHistoryStore(url: fixture.url, mode: .readOnly)
             try checkThrows(try reader.configureEmbeddingIndex(.init(fingerprint: "different", dimensions: 2)))
             try checkEqual(try reader.embeddingProgress().pending, 1)
         })

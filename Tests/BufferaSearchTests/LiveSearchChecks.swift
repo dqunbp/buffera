@@ -33,7 +33,7 @@ func runLiveSearchChecks(arguments: [String]) async throws {
     }
     let enabledReceipt = try receipt(enabled: true)
     let database = root.appendingPathComponent("history.sqlite")
-    let store = try HistoryStore(url: database)
+    let store = try makeTestHistoryStore(url: database)
     func insert(_ text: String, source: String, concealed: Bool = false) throws -> Int64 {
         try store.insert(payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text",
             data: Data(text.utf8))]]), kind: .text, title: text, text: text, source: source,

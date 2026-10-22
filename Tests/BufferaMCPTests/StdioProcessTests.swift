@@ -11,14 +11,11 @@ final class StdioProcessTests {
         defer { fixture.cleanup() }
         try await fixture.withConnection { connection in
             let (tools, cursor) = try await connection.client.listTools()
-            try checkEqual(Set(tools.map(\.name)), ["search_history", "read_clip", "get_neighbors", "reveal_clip"])
+            try checkEqual(Set(tools.map(\.name)), ["search_history", "read_clip", "get_neighbors"])
             try checkNil(cursor)
 
             var result = try await connection.call("search_history", ["query": "Buffera MCP fixture"])
             try checkEqual(result.isError, true)
-            let disabledReveal = try await connection.call("reveal_clip", ["id": .string(String(fixture.hiddenID))])
-            try checkEqual(disabledReveal.isError, true)
-            try checkNil(disabledReveal.structuredContent)
             try fixture.access.setEnabled(true)
             result = try await connection.call("search_history", ["query": "Buffera MCP fixture"])
             try checkEqual(result.isError, false)
@@ -40,12 +37,12 @@ final class StdioProcessTests {
             let filtered = try await connection.call("search_history", ["concealed_only": true])
             try checkEqual(filtered.structuredContent?.objectValue?["total"], 1)
             try checkEqual(filtered.structuredContent?.objectValue?["items"]?.arrayValue?.first?.objectValue?["id"], .string(String(fixture.hiddenID)))
-            let revealed = try await connection.call("reveal_clip", ["id": .string(String(fixture.hiddenID)), "limit": 7])
-            try checkEqual(revealed.structuredContent?.objectValue?["text"], "Buffera")
-            try checkEqual(revealed.structuredContent?.objectValue?["next_offset"], 7)
-            try checkEqual(revealed.structuredContent?.objectValue?["item"]?.objectValue?["is_concealed"], true)
-            let maskedAgain = try await connection.call("read_clip", ["id": .string(String(fixture.hiddenID))])
-            try checkEqual(maskedAgain.structuredContent?.objectValue?["text"], "")
+            do {
+                _ = try await connection.call("reveal_clip", ["id": .string(String(fixture.hiddenID))])
+                try checkFail("Removed reveal tool must reject direct calls")
+            } catch let error as MCPError {
+                guard case .invalidParams = error else { return try checkFail("Unexpected error: \(error)") }
+            }
 
             do {
                 _ = try await connection.call("search_history", ["include_hidden": true])
@@ -57,9 +54,6 @@ final class StdioProcessTests {
             try fixture.access.setEnabled(false)
             let revoked = try await connection.call("read_clip", ["id": .string(String(fixture.firstID))])
             try checkEqual(revoked.isError, true)
-            let revokedReveal = try await connection.call("reveal_clip", ["id": .string(String(fixture.hiddenID))])
-            try checkEqual(revokedReveal.isError, true)
-            try checkNil(revokedReveal.structuredContent)
             await connection.client.disconnect()
             try connection.input.fileHandleForWriting.close()
             for _ in 0..<100 where connection.process.isRunning {
@@ -75,17 +69,18 @@ final class StdioProcessTests {
         defer { fixture.cleanup() }
         try fixture.access.setEnabled(true)
         try await fixture.withConnection { connection in
-            // All responses exceed a pipe buffer. Concurrent reads/reveals exercise transport backpressure.
+            // Large visible responses and a masked response exercise concurrent transport framing.
             async let first = connection.call("read_clip", ["id": .string(String(fixture.firstID)), "limit": 32_000])
             async let second = connection.call("read_clip", ["id": .string(String(fixture.secondID)), "limit": 32_000])
-            async let concealed = connection.call("reveal_clip", ["id": .string(String(fixture.hiddenID)), "limit": 32_000])
+            async let concealed = connection.call("read_clip", ["id": .string(String(fixture.hiddenID)), "limit": 32_000])
             let results = try await [first, second, concealed]
             try checkEqual(results[0].structuredContent?.objectValue?["text"]?.stringValue,
                            String(fixture.firstText.prefix(32_000)))
             try checkEqual(results[1].structuredContent?.objectValue?["text"]?.stringValue,
                            String(fixture.secondText.prefix(32_000)))
             try checkEqual(results[2].structuredContent?.objectValue?["text"]?.stringValue,
-                           String(fixture.hiddenText.prefix(32_000)))
+                           "")
+            try checkEqual(results[2].structuredContent?.objectValue?["content_kind"], "masked")
         }
     }
 }
@@ -103,7 +98,7 @@ final class ProcessFixture {
 
     init() throws {
         access = MCPAccess(directory: directory)
-        store = try HistoryStore(url: access.databaseURL)
+        store = try makeTestHistoryStore(url: access.databaseURL)
         let writer = store
         func insert(_ text: String, hidden: Bool = false) throws -> Int64 {
             try writer.insert(payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text", data: Data(text.utf8))]]),

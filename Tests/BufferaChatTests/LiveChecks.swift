@@ -19,7 +19,7 @@ func runLiveChatCheck(arguments: [String]) async throws {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let database = root.appendingPathComponent("history.sqlite")
-    let store = try HistoryStore(url: database)
+    let store = try makeTestHistoryStore(url: database)
     func insert(_ text: String, seconds: TimeInterval, hidden: Bool = false) throws -> Int64 {
         try store.insert(payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text",
             data: Data(text.utf8))]]), kind: .text, title: text, text: text, source: "Safari",

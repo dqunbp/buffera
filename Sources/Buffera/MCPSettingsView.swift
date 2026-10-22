@@ -26,7 +26,7 @@ final class MCPSettingsView: NSView {
         enabled.action = #selector(changeAccess)
         enabled.font = .systemFont(ofSize: 12)
         enabled.identifier = NSUserInterfaceItemIdentifier("mcp.enabled")
-        let disclosure = paragraph(L10n.text("Агент сможет читать историю и отдельно раскрывать скрытые записи. Инструкция просит его получить ваше согласие, если оно ещё не дано. Прочитанное попадёт в контекст агента."))
+        let disclosure = paragraph(L10n.text("Агент сможет читать обычные записи истории. Скрытые записи видны только как карточки без содержимого. Прочитанное попадёт в контекст агента."))
         let connection = paragraph(L10n.text("Скопируйте команду для своего агента и выполните её в Терминале. Агент сам запускает локальный файл через stdio. Для ручного подключения доступна конфигурация JSON."))
         let claude = connectionBlock("Claude Code", value: MCPAccess.addCommand(for: .claudeCode, executableURL: executableURL),
                                      action: #selector(copyClaudeCommand), identifier: "mcp.copyClaudeCommand")
@@ -65,7 +65,7 @@ final class MCPSettingsView: NSView {
                        : L10n.text("Доступ будет выключен после завершения настройки."))
             return
         }
-        showStatus(enabled.state == .on ? L10n.text("Доступ включён. Скрытые записи показаны масками; раскрытие — через reveal_clip.")
+        showStatus(enabled.state == .on ? L10n.text("Доступ включён. Содержимое скрытых записей недоступно агентам.")
                    : L10n.text("Доступ выключен. Конфигурацию можно подготовить заранее."))
     }
 

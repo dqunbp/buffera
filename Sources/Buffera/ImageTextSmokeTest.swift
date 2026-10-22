@@ -98,7 +98,8 @@ private func imageTextSearchSmokeCheck(payload: ClipPayload, text: String, suppo
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("BufferaOCRSmoke-" + UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     try autoreleasepool {
-        let store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        let store = try HistoryStore(url: directory.appendingPathComponent("history.sqlite"),
+                                     secretCipher: SecretPayloadCipher { _, _ in Data(repeating: 0x42, count: 32) })
         let id = try store.insert(payload: payload, kind: .image, title: "Картинка", text: "", source: "Smoke")
         var filters = [SearchFilter()]
         filters[0].query = "clipboard search"

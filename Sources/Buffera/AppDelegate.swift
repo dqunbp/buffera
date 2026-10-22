@@ -9,6 +9,7 @@ import os
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var store: HistoryStore!
+    private let secretKeys = KeychainSecretKeyProvider()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
     private let clipboard = ClipboardService()
     private let clipboardSession = ClipboardSessionMonitor()
@@ -81,8 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         InterfaceTheme.load().apply()
         buildMenu()
-        do { store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite")) }
+        do {
+            store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite"),
+                                     secretCipher: SecretPayloadCipher(keyProvider: secretKeys.key))
+        }
         catch { showError(error, alert: true); return }
+        clipboard.savesConcealed = SecretHistoryMode.load() == .encrypted
+        // Queued before capture/indexing, so old plaintext secrets are protected first.
+        work.async {
+            do { try self.store.protectLegacySecrets() }
+            catch { DispatchQueue.main.async { self.showError(error, alert: true) } }
+        }
         let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
         let preparationMonitor = BackgroundPreparationMonitor()
         self.preparationMonitor = preparationMonitor
@@ -270,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { completion(.failure(ClipDragFailure.unreadable)); return }
             self.work.async {
                 let result = Result {
-                    try ClipDragPayload.prepare(self.store.payload(id: id), id: id, exports: self.temporaryImageExports)
+                    try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports)
                 }
                 DispatchQueue.main.async { completion(result) }
             }
@@ -283,7 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Confirmation owns a snapshot of the choice. Search refreshes must
             // not silently drop it; only closing/reopening the panel cancels it.
             self.work.async {
-                let result = Result { try self.store.payload(id: id) }
+                let result = Result { try self.store.restorablePayload(id: id) }
                 DispatchQueue.main.async {
                     guard token == self.confirmationToken, self.panel.window.isVisible else {
                         self.logger.notice("Confirm cancelled"); return
@@ -732,6 +742,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.panel.applyShortcuts(value)
                 self.updateShortcutMenu()
             }
+            controller.onSecretHistoryChange = { [weak self] mode, completion in
+                guard let self else { completion(.failure(SecretStorageError.keyUnavailable)); return }
+                self.work.async {
+                    let result = Result { if mode == .encrypted { try self.store.prepareSecretStorage() } }
+                    DispatchQueue.main.async {
+                        if case .success = result {
+                            self.clipboard.savesConcealed = mode == .encrypted
+                            self.clipboard.discardPendingChanges()
+                        }
+                        completion(result)
+                    }
+                }
+            }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onShowSetup = { [weak self] in self?.showSetup() }
             controller.onRestart = { [weak self] in
@@ -813,7 +836,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
 
-        Помеченные пароли скрыты точками. Кнопка глаза раскрывает скрытую запись или скрывает обычный текст. Маскировка не шифрует локальную базу.
+        В настройках истории выберите: не сохранять секреты или сохранять их зашифрованными. Сохранённые секреты скрыты точками. Кнопка глаза раскрывает секрет или шифрует и скрывает обычный текст.
         """)
         alert.runModal()
     }

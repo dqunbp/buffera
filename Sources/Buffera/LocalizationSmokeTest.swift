@@ -125,6 +125,39 @@ func runLocalizationSmokeTest() throws {
     }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
+    guard let secrets = descendants(content).first(where: { $0.identifier?.rawValue == "settings.secretHistoryMode" }) as? NSPopUpButton else {
+        throw HistoryError.database("Secret history selector missing")
+    }
+    let secretTitles = activeLanguage == "ru"
+        ? ["Не сохранять секреты", "Сохранять секреты зашифрованными"]
+        : ["Do not save secrets", "Save secrets encrypted"]
+    try check(secrets.itemTitles == secretTitles && secrets.indexOfSelectedItem == 0,
+              "Secret storage defaults or translations are incorrect")
+    var finishSecretChange: ((Result<Void, Error>) -> Void)?
+    controller.onSecretHistoryChange = { _, completion in finishSecretChange = completion }
+    secrets.selectItem(at: 1)
+    try check(secrets.sendAction(secrets.action, to: secrets.target), "Secret setting is disconnected")
+    try check(!secrets.isEnabled && SecretHistoryMode.load(from: defaults) == .skip,
+              "Secret setting persisted before key preparation completed")
+    finishSecretChange?(.failure(SecretStorageError.keyUnavailable))
+    try check(secrets.isEnabled && secrets.indexOfSelectedItem == 0 && SecretHistoryMode.load(from: defaults) == .skip,
+              "Failed key preparation changed the selected policy")
+    secrets.selectItem(at: 1)
+    _ = secrets.sendAction(secrets.action, to: secrets.target)
+    finishSecretChange?(.success(()))
+    try check(secrets.indexOfSelectedItem == 1 && SecretHistoryMode.load(from: defaults) == .encrypted,
+              "Successful secret setting did not persist")
+    let secretReopened = makeSettings()
+    let secretTabs = descendants(secretReopened.window!.contentView!).compactMap { $0 as? NSSegmentedControl }.first!
+    secretTabs.selectedSegment = 1
+    _ = secretTabs.sendAction(secretTabs.action, to: secretTabs.target)
+    let restoredSecrets = descendants(secretReopened.window!.contentView!).first { $0.identifier?.rawValue == "settings.secretHistoryMode" } as? NSPopUpButton
+    try check(restoredSecrets?.indexOfSelectedItem == 1, "Reopened settings lost secret storage mode")
+    secrets.selectItem(at: 0)
+    _ = secrets.sendAction(secrets.action, to: secrets.target)
+    finishSecretChange?(.success(()))
+    try check(SecretHistoryMode.load(from: defaults) == .skip, "Disabling secret capture did not persist")
+    try check(HistoryLimits.load(from: defaults) == customLimits, "Secret setting changed ordinary history limits")
     content.layoutSubtreeIfNeeded()
     guard let slider = descendants(content).first(where: { $0.identifier?.rawValue == "settings.byteLimit" }) as? NSSlider,
           let count = descendants(content).first(where: { $0.identifier?.rawValue == "settings.countLimit" }) as? NSPopUpButton,

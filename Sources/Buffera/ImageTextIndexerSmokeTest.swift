@@ -6,7 +6,8 @@ func runImageTextIndexerChecks() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Buffera-indexer-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
-    let store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite"))
+    let store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite"),
+                                     secretCipher: SecretPayloadCipher { _, _ in Data(repeating: 0x42, count: 32) })
     let storage = DispatchQueue(label: "app.buffera.indexer-check.storage")
     let callbacks = DispatchQueue(label: "app.buffera.indexer-check.callbacks")
     let firstStarted = DispatchSemaphore(value: 0), firstRelease = DispatchSemaphore(value: 0)

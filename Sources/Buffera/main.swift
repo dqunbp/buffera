@@ -1,6 +1,9 @@
 import AppKit
 
-if CommandLine.arguments.contains("--shortcuts-ui-smoke-test") {
+if CommandLine.arguments.contains("--secret-keychain-smoke-test") {
+    do { try runSecretKeychainSmokeTest(); print("PASS: isolated Keychain secret storage, reopen and missing-key behavior") }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--shortcuts-ui-smoke-test") {
     do { try runShortcutSmokeTest() }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else if CommandLine.arguments.contains("--setup-ui-smoke-test") {

@@ -41,19 +41,10 @@ func runRawJSONChecks() async throws {
         }
         let toolList = try connection.request("tools/list", parameters: [:])
         let listed = (toolList["result"] as? [String: Any])?["tools"] as? [[String: Any]]
-        try checkEqual(listed?.count, 4)
-        let revealTool = listed?.first { $0["name"] as? String == "reveal_clip" }
-        let schema = revealTool?["inputSchema"] as? [String: Any]
-        try checkEqual(Set((schema?["properties"] as? [String: Any] ?? [:]).keys), ["id", "offset", "limit"])
-        let description = (revealTool?["description"] as? String ?? "")
-            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        for phrase in ["Before calling, ask", "already authorized", "general permission", "Do not ask again",
-                       "conversation context", "stays concealed"] {
-            try checkTrue(description.contains(phrase), "Reveal description must communicate \(phrase)")
-        }
+        try checkEqual(Set((listed ?? []).compactMap { $0["name"] as? String }),
+                           ["search_history", "read_clip", "get_neighbors"])
         for tool in listed ?? [] {
-            let metadata = tool["_meta"] as? [String: Any]
-            try checkNil(metadata?["anthropic/requiresUserInteraction"])
+            try checkFalse((tool["description"] as? String ?? "").contains("reveal_clip"))
         }
         let search = try rawStructuredResult(connection.call("search_history", arguments: ["concealed_only": true]))
         try checkEqual(search["total"] as? Int, 1)
@@ -76,16 +67,13 @@ func runRawJSONChecks() async throws {
             let json = String(decoding: try JSONSerialization.data(withJSONObject: response), as: UTF8.self)
             try checkFalse(json.contains("hidden-marker"))
         }
-        let revealed = try rawStructuredResult(connection.call("reveal_clip", arguments: [
+        let removedReveal = try connection.call("reveal_clip", arguments: [
             "id": String(fixture.hiddenID), "offset": 7, "limit": 32_000
-        ]))
-        try checkEqual(revealed["text"] as? String, String(fixture.hiddenText.dropFirst(7).prefix(32_000)))
-        try checkEqual(revealed["total_characters"] as? Int, fixture.hiddenText.count)
-        try checkEqual(revealed["next_offset"] as? Int, 32_007)
-        try checkRawMaskedItem(revealed["item"] as? [String: Any], id: fixture.hiddenID)
-        let afterReveal = try rawStructuredResult(connection.call("read_clip", arguments: ["id": String(fixture.hiddenID)]))
-        try checkEqual(afterReveal["content_kind"] as? String, "masked")
-        try checkEqual(afterReveal["text"] as? String, "")
+        ])
+        try checkEqual((removedReveal["error"] as? [String: Any])?["code"] as? Int, -32602)
+        try checkNil(removedReveal["result"])
+        try checkFalse(String(decoding: try JSONSerialization.data(withJSONObject: removedReveal),
+                             as: UTF8.self).contains("hidden-marker"))
         let secretQuery = try rawStructuredResult(connection.call("search_history", arguments: ["query": "hidden-marker"]))
         try checkEqual(secretQuery["total"] as? Int, 0)
         try checkTrue(try fixture.store.summary(id: fixture.hiddenID).isConcealed)
@@ -108,10 +96,6 @@ func runRawJSONChecks() async throws {
         let disabledResult = disabled["result"] as? [String: Any]
         try checkEqual(disabledResult?["isError"] as? Bool, true)
         try checkNil(disabledResult?["structuredContent"])
-        let disabledReveal = try connection.call("reveal_clip", arguments: ["id": String(fixture.hiddenID)])
-        let disabledRevealResult = disabledReveal["result"] as? [String: Any]
-        try checkEqual(disabledRevealResult?["isError"] as? Bool, true)
-        try checkNil(disabledRevealResult?["structuredContent"])
         print("PASS: raw JSON preserves data URL queries and results, numeric types and errors")
     }.value
 }

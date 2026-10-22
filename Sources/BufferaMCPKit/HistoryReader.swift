@@ -170,24 +170,14 @@ public actor HistoryReader {
     }
 
     public func read(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {
-        try read(id: id, offset: offset, limit: limit, reveal: false)
-    }
-
-    /// The caller chooses this explicit tool after applying its consent instructions.
-    /// This operation never changes concealment or records a persistent grant.
-    public func reveal(id: Int64, offset: Int = 0, limit: Int = 8_000) throws -> HistoryReadResult {
-        try read(id: id, offset: offset, limit: limit, reveal: true)
-    }
-
-    private func read(id: Int64, offset: Int, limit: Int, reveal: Bool) throws -> HistoryReadResult {
         try validateID(id)
         try validate(limit, in: 1...32_000, name: "limit")
         guard offset >= 0 else { throw HistoryReaderError.invalidArgument("offset должен быть не меньше 0.") }
         return try withAccess { store in
             let summary = try store.summary(id: id)
-            if summary.isConcealed && !reveal { return masked(summary) }
+            if summary.isConcealed { return masked(summary) }
             do {
-                let content = try (reveal ? store.revealedContent(id: id) : store.visibleContent(id: id))
+                let content = try store.visibleContent(id: id)
                 let decoded = try decode(content)
                 let total = decoded.text.count
                 guard offset <= total else {
@@ -199,7 +189,7 @@ public actor HistoryReader {
                 let next = offset + chunk.characters
                 // Decoding may take time. Recheck deletion/concealment before releasing content.
                 let current = try store.summary(id: id)
-                if current.isConcealed && !reveal { return masked(current) }
+                if current.isConcealed { return masked(current) }
                 return HistoryReadResult(
                     item: HistoryItem(current), text: chunk.text,
                     contentKind: decoded.kind, offset: offset, totalCharacters: total,
@@ -207,7 +197,7 @@ public actor HistoryReader {
                 )
             } catch {
                 // Concurrent concealment also masks decoding/offset errors, which can reveal a length.
-                if !reveal, let current = try? store.summary(id: id), current.isConcealed {
+                if let current = try? store.summary(id: id), current.isConcealed {
                     return masked(current)
                 }
                 throw error
@@ -218,7 +208,7 @@ public actor HistoryReader {
     private func masked(_ summary: ClipSummary) -> HistoryReadResult {
         HistoryReadResult(item: HistoryItem(summary), text: "", contentKind: .masked, offset: 0,
                           totalCharacters: nil, nextOffset: nil, isComplete: false,
-                          note: "Содержимое скрыто. Для раскрытия используйте reveal_clip согласно его инструкции о согласии пользователя.")
+                          note: "Содержимое скрытой записи недоступно через MCP.")
     }
 
     public func nearby(id: Int64, before: Int = 10, after: Int = 10) throws -> HistoryNeighborsResult {

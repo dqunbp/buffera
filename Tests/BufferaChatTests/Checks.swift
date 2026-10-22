@@ -75,7 +75,7 @@ final class EventBuffer: @unchecked Sendable {
         defer { try? FileManager.default.removeItem(at: root) }
         try await runSharedEmbeddingChecks(root: root)
         let database = root.appendingPathComponent("history.sqlite")
-        let store = try HistoryStore(url: database)
+        let store = try makeTestHistoryStore(url: database)
         func insert(_ text: String, source: String = "Fixture", date: Date = Date(),
                     hidden: Bool = false) throws -> Int64 {
             try store.insert(payload: ClipPayload(items: [[Representation(type: "public.utf8-plain-text",
@@ -173,7 +173,7 @@ final class EventBuffer: @unchecked Sendable {
             .init(text: #"{"tool":"read_clip","arguments":{"id":""# + String(hiddenDuring) + #""}}"#),
             .init(text: finish), .init(text: "MUST_NOT_STREAM")])
         await race.configure(beforeToken: {
-            let writer = try HistoryStore(url: database)
+            let writer = try makeTestHistoryStore(url: database)
             try writer.conceal(id: hiddenDuring)
         })
         let guarded = EventBuffer()

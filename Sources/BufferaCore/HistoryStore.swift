@@ -9,7 +9,8 @@ public final class HistoryStore {
 
     var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private static let schemaVersion = 7
+    private static let schemaVersion = 8
+    let secretCipher: SecretPayloadCipher?
     static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
     // Storage/search sentinel: presentation translates it through ClipSummary.displayTitle.
     public static let concealedTitle = "Скрытая запись"
@@ -17,7 +18,8 @@ public final class HistoryStore {
         SearchFilter.normalize(concealedTitle + " " + source)
     }
 
-    public init(url: URL, mode: OpenMode = .readWrite) throws {
+    public init(url: URL, mode: OpenMode = .readWrite, secretCipher: SecretPayloadCipher? = nil) throws {
+        self.secretCipher = secretCipher
         if mode == .readWrite {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                    attributes: [.posixPermissions: 0o700])
@@ -43,6 +45,7 @@ public final class HistoryStore {
             } else {
                 try execute("PRAGMA journal_mode=WAL")
                 try execute("PRAGMA foreign_keys=ON")
+                try execute("PRAGMA secure_delete=ON")
                 try migrate()
             }
         } catch { sqlite3_close(db); db = nil; throw error }
@@ -127,6 +130,13 @@ public final class HistoryStore {
                 PRAGMA user_version=7;
                 """)
             }
+            if version < 8 {
+                try execute("""
+                ALTER TABLE payloads ADD COLUMN encoding INTEGER NOT NULL DEFAULT 0 CHECK(encoding IN (0,1));
+                CREATE TABLE secret_storage (singleton INTEGER PRIMARY KEY CHECK(singleton=1), key_id TEXT NOT NULL, needs_cleanup INTEGER NOT NULL DEFAULT 0 CHECK(needs_cleanup IN (0,1)));
+                PRAGMA user_version=8;
+                """)
+            }
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -161,16 +171,19 @@ public final class HistoryStore {
         guard !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else { throw HistoryError.invalidPayload }
         let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
         let encoded = try encoder.encode(payload)
-        let storedTitle = isConcealed ? Self.concealedTitle : title
-        let storedText = isConcealed ? "" : text
-        let concealedSearch = Self.concealedSearch(source: source)
-        let storedSearch = isConcealed ? concealedSearch : SearchFilter.normalize(title + " " + text + " " + source)
         try execute("BEGIN IMMEDIATE")
         do {
+            let stored = try prepareStoredPayload(payload, encoded: encoded, isConcealed: isConcealed)
+            let fingerprint = stored.fingerprint, storedData = stored.data
+            let effectiveConcealed = stored.isConcealed
+            let storedTitle = effectiveConcealed ? Self.concealedTitle : title
+            let storedText = effectiveConcealed ? "" : text
+            let concealedSearch = Self.concealedSearch(source: source)
+            let storedSearch = effectiveConcealed ? concealedSearch : SearchFilter.normalize(title + " " + text + " " + source)
             let statement = try prepare("""
                 INSERT INTO clips(fingerprint,date,sort_date,kind,title,text,source,search,bytes,is_concealed,is_remote) VALUES(?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(fingerprint) DO UPDATE SET date=excluded.date, sort_date=excluded.sort_date,
-                    source=excluded.source, is_remote=excluded.is_remote,
+                    source=excluded.source, is_remote=excluded.is_remote, bytes=excluded.bytes,
                     is_concealed=MAX(clips.is_concealed,excluded.is_concealed),
                     title=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN ? ELSE clips.title END,
                     text=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN '' ELSE clips.text END,
@@ -178,21 +191,26 @@ public final class HistoryStore {
                 RETURNING id
                 """)
             defer { sqlite3_finalize(statement) }
-            try bind([.text(payload.fingerprint), .number(date.timeIntervalSince1970), .number(date.timeIntervalSince1970), .text(kind.rawValue),
+            try bind([.text(fingerprint), .number(date.timeIntervalSince1970), .number(date.timeIntervalSince1970), .text(kind.rawValue),
                       .text(storedTitle), .text(storedText), .text(source), .text(storedSearch),
-                      .integer(Int64(encoded.count)), .integer(isConcealed ? 1 : 0), .integer(isRemote ? 1 : 0),
+                      .integer(Int64(storedData.count)), .integer(effectiveConcealed ? 1 : 0), .integer(isRemote ? 1 : 0),
                       .text(Self.concealedTitle), .text(concealedSearch)], to: statement)
             guard sqlite3_step(statement) == SQLITE_ROW else { throw failure() }
             let id = sqlite3_column_int64(statement, 0)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
-            let blob = try prepare("INSERT OR IGNORE INTO payloads(clip_id,data) VALUES(?,?)")
+            let blob = try prepare("""
+                INSERT INTO payloads(clip_id,data,encoding) VALUES(?,?,?)
+                ON CONFLICT(clip_id) DO UPDATE SET data=excluded.data,encoding=excluded.encoding
+                WHERE excluded.encoding=1
+                """)
             defer { sqlite3_finalize(blob) }
-            try bind([.integer(id), .blob(encoded)], to: blob)
+            try bind([.integer(id), .blob(storedData), .integer(effectiveConcealed ? 1 : 0)], to: blob)
             guard sqlite3_step(blob) == SQLITE_DONE else { throw failure() }
             try syncImageTextJob(id: id)
             try syncEmbeddingJob(id: id)
             try prune(maxCount: maxCount, maxBytes: maxBytes)
             try execute("COMMIT")
+            if effectiveConcealed { try cleanupSecretRemnants() }
             return id
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -249,11 +267,11 @@ public final class HistoryStore {
     }
 
     private func content(id: Int64, includeConcealed: Bool) throws -> ClipContent {
-        let record: (ClipSummary, Data?, String?) = try withReadSnapshot {
+        let record: (ClipSummary, Data?, String?, Int32, String) = try withReadSnapshot {
             let columns = Self.summaryColumns.split(separator: ",").map { "clips.\($0)" }.joined(separator: ",")
             let visibility = includeConcealed ? "" : " AND clips.is_concealed=0"
             let statement = try prepare("""
-                SELECT \(columns),payloads.data,clip_ocr.status,clip_ocr.text
+                SELECT \(columns),payloads.data,clip_ocr.status,clip_ocr.text,payloads.encoding,clips.fingerprint
                 FROM clips
                 LEFT JOIN payloads ON payloads.clip_id=clips.id AND clips.kind IN ('text','link','file')
                 LEFT JOIN clip_ocr ON clip_ocr.clip_id=clips.id AND clips.kind='image'
@@ -271,11 +289,13 @@ public final class HistoryStore {
                 data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 10)))
             }
             let imageText = clip.kind == .image && string(statement, 11) == "complete" ? string(statement, 12) : nil
+            let encoding = sqlite3_column_int(statement, 13)
+            let fingerprint = string(statement, 14)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
-            return (clip, data, imageText)
+            return (clip, data, imageText, encoding, fingerprint)
         }
         // Release the read transaction before property-list decoding.
-        let payload = try record.1.map { try PropertyListDecoder().decode(ClipPayload.self, from: $0) }
+        let payload = try record.1.map { try decodePayload($0, encoding: record.3, fingerprint: record.4, concealed: record.0.isConcealed) }
         return ClipContent(summary: record.0, payload: payload, imageText: record.2)
     }
 
@@ -329,13 +349,13 @@ public final class HistoryStore {
     }
 
     public func payload(id: Int64) throws -> ClipPayload {
-        let statement = try prepare("SELECT data FROM payloads WHERE clip_id=?")
+        let statement = try prepare("SELECT payloads.data,payloads.encoding,clips.fingerprint,clips.is_concealed FROM payloads JOIN clips ON clips.id=payloads.clip_id WHERE clip_id=?")
         defer { sqlite3_finalize(statement) }
         try bind([.integer(id)], to: statement)
         guard sqlite3_step(statement) == SQLITE_ROW else { throw HistoryError.missing }
         guard let bytes = sqlite3_column_blob(statement, 0) else { throw HistoryError.invalidPayload }
         let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0)))
-        return try PropertyListDecoder().decode(ClipPayload.self, from: data)
+        return try decodePayload(data, encoding: sqlite3_column_int(statement, 1), fingerprint: string(statement, 2), concealed: sqlite3_column_int(statement, 3) != 0)
     }
 
     public func delete(id: Int64) throws {
@@ -380,6 +400,7 @@ public final class HistoryStore {
                 guard status == SQLITE_ROW else { throw failure() }
                 source = string(statement, 0)
             }
+            try encryptStoredPayload(id: id)
             let statement = try prepare("UPDATE clips SET is_concealed=1,title=?,text='',search=? WHERE id=?")
             defer { sqlite3_finalize(statement) }
             try bind([.text(Self.concealedTitle), .text(Self.concealedSearch(source: source)), .integer(id)], to: statement)
@@ -387,6 +408,7 @@ public final class HistoryStore {
             try deleteImageText(id: id)
             try syncEmbeddingJob(id: id)
             try execute("COMMIT")
+            try cleanupSecretRemnants()
         } catch { try? execute("ROLLBACK"); throw error }
     }
 

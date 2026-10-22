@@ -103,4 +103,5 @@ for (name, run) in checks {
 }
 print("\(checks.count - failures)/\(checks.count) checks passed")
 failures += runSemanticIndexChecks()
+failures += runSecretStorageChecks()
 exit(failures == 0 ? 0 : 1)

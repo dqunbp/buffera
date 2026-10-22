@@ -15,14 +15,8 @@ func runToolArgumentChecks() async throws {
             ("read_clip", ["id": "9223372036854775808"]),
             ("read_clip", ["id": "01"]),
             ("read_clip", ["id": "-1"]),
-            ("reveal_clip", [:]),
-            ("reveal_clip", ["id": 12]),
-            ("reveal_clip", ["id": "9223372036854775808"]),
-            ("reveal_clip", ["id": "01"]),
-            ("reveal_clip", ["id": "-1"]),
-            ("reveal_clip", ["id": "1", "offset": -1]),
-            ("reveal_clip", ["id": "1", "limit": 32_001]),
-            ("reveal_clip", ["id": "1", "reason": "unsupported argument"]),
+            ("read_clip", ["id": .string(String(fixture.hiddenID)), "reveal": true]),
+            ("read_clip", ["id": .string(String(fixture.hiddenID)), "include_concealed": true]),
             ("search_history", ["limit": true]),
             ("search_history", ["limit": 51]),
             ("search_history", ["favorites_only": "true"]),
@@ -75,8 +69,6 @@ func runToolArgumentChecks() async throws {
         }
         let maximumID = try await connection.call("read_clip", ["id": "9223372036854775807"])
         try checkEqual(maximumID.isError, true, "Valid Int64 ID reaches the missing-record path")
-        let missingReveal = try await connection.call("reveal_clip", ["id": "9223372036854775807"])
-        try checkEqual(missingReveal.isError, true)
         let (tools, _) = try await connection.client.listTools()
         for tool in tools {
             try checkEqual(tool.annotations.readOnlyHint, true)

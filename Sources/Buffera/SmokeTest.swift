@@ -24,12 +24,24 @@ func runSmokeTest() throws {
                                  samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     let imagePayload = ClipPayload(items: [[Representation(type: NSPasteboard.PasteboardType.tiff.rawValue, data: bitmap.tiffRepresentation!)]])
     guard let (png, ext) = ClipboardService.imageData(imagePayload), ext == "png", NSBitmapImageRep(data: png)?.pixelsWide == 2 else { throw ClipboardFailure.noImage }
+    let provider = SecretPromiseFixture()
+    let promised = NSPasteboardItem()
+    promised.setDataProvider(provider, forTypes: [.string])
+    promised.setString("", forType: .init("org.nspasteboard.ConcealedType"))
+    pasteboard.clearContents()
+    guard pasteboard.writeObjects([promised]), try service.capture() == nil, provider.reads == 0 else {
+        throw HistoryError.database("Skip mode requested promised secret bytes")
+    }
     for marker in ["org.nspasteboard.ConcealedType", "com.agilebits.onepassword"] {
         let sensitive = NSPasteboardItem(); sensitive.setString("smoke-secret-fixture", forType: .string)
         sensitive.setString("", forType: .init(marker))
         let companion = NSPasteboardItem(); companion.setString("smoke-second-value", forType: .string)
         pasteboard.clearContents()
-        guard pasteboard.writeObjects([sensitive, companion]), let clip = try service.capture(),
+        guard pasteboard.writeObjects([sensitive, companion]) else { throw ClipboardFailure.writeFailed }
+        service.savesConcealed = false
+        guard try service.capture() == nil else { throw HistoryError.database("Secret captured in skip mode") }
+        service.savesConcealed = true
+        guard let clip = try service.capture(),
               clip.isConcealed, clip.title == "Скрытая запись", clip.text.isEmpty,
               ClipboardService.revealedText(clip.payload) == "smoke-secret-fixture\nsmoke-second-value" else {
             throw HistoryError.database("Concealed group was not retained and masked")
@@ -95,6 +107,7 @@ private func runCaptureOriginAndSessionChecks() throws {
             throw HistoryError.database("Explicit unknown source was attributed to the foreground app")
         }
     }
+    service.savesConcealed = true
     for concealed in [false, true] {
         var markers = ["com.apple.is-remote-clipboard": "", "org.nspasteboard.source": "com.apple.finder"]
         if concealed { markers["org.nspasteboard.ConcealedType"] = "" }
@@ -195,5 +208,13 @@ private func runPreviewSmokeChecks() throws {
     guard case .text(let summary) = ClipPreviewContent.decode(binary, kind: .other),
           summary.contains("synthetic.binary"), !summary.contains("\u{0}") else {
         throw HistoryError.database("Preview did not summarize binary formats without displaying raw data")
+    }
+}
+
+private final class SecretPromiseFixture: NSObject, NSPasteboardItemDataProvider {
+    var reads = 0
+    func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+        reads += 1
+        item.setString("promised-secret-fixture", forType: type)
     }
 }
