@@ -157,7 +157,10 @@
     "demo_theme": "Theme",
     "demo_system": "System",
     "demo_light": "Light",
-    "demo_dark": "Dark"
+    "demo_dark": "Dark",
+    "demo_semantic": "Include semantic search",
+    "demo_semantic_hint": "Try “address”: with this checked, you’ll find the screenshot of the meeting place. The demo matches curated example topics.",
+    "demo_ask": "Ask"
   },
   "runtime": {
     "samples": [
@@ -257,7 +260,11 @@
       "imageAddress": "12 Example Street",
       "imageHours": "Daily, 09:00–21:00",
       "pin": "Pin history window",
-      "unpin": "Unpin history window"
+      "unpin": "Unpin history window",
+      "askExample": "Example conversation",
+      "askQuestion": "Where did we agree to meet?",
+      "askAnswer": "At {name}, {address}. The address is in your saved screenshot.",
+      "askNote": "This is a prepared example using fictional entries. In the app, you can ask your own question about your history."
     }
   }
 }

@@ -76,7 +76,7 @@ check(snapshot(filters).remoteOnly && !snapshot(filters).concealedOnly && change
       "sidebar device type changes the search filter once")
 check(filters.hasActiveFilters && remote.state == .on && toolbar.toolTip!.contains("С устройств"),
       "device type updates sidebar selection and toolbar summary")
-check(toolbar.contentTintColor == .controlAccentColor, "active type gives the toolbar its active tint")
+check(toolbar.contentTintColor == BrandIdentity.accentColor, "active type gives the toolbar its active tint")
 checkType("С устройств", in: filters)
 
 invoke(typeItem("Скрытые", in: filters))

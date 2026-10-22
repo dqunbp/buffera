@@ -26,7 +26,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let logger = Logger(subsystem: "local.buffera.app", category: "panel")
     private let search = NSSearchField()
     private let semanticSearch = NSButton(checkboxWithTitle: L10n.text("Искать также по смыслу"), target: nil, action: nil)
-    private let chatButton = NSButton(title: L10n.text("Спросить"), target: nil, action: nil)
+    private let chatButton = HistoryAskButton(title: L10n.text("Спросить"))
     private let semanticSetup = NSButton(title: L10n.text("Поиск по смыслу · выключен — настроить"), target: nil, action: nil)
     private let searchOptionsRow = NSStackView()
     private var semanticSearchAvailable = false
@@ -1351,9 +1351,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         window.isOpaque = false; window.backgroundColor = .clear
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { window.standardWindowButton(button)?.isHidden = true }
-        let background = NSVisualEffectView(frame: window.contentView!.bounds)
-        background.material = .popover; background.blendingMode = .behindWindow; background.state = .active
-        background.wantsLayer = true; background.layer?.cornerRadius = 12; background.layer?.masksToBounds = true
+        let background = HistoryBackdropView(frame: window.contentView!.bounds)
         window.contentView = background
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 10
         root.edgeInsets = NSEdgeInsets(top: 16, left: 14, bottom: 10, right: 14)
@@ -1380,8 +1378,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         searchRow.alignment = .centerY
         search.setContentHuggingPriority(.defaultLow, for: .horizontal)
         search.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        root.addArrangedSubview(searchRow)
-        searchRow.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
+        let toolbar = HistoryGlassToolbar(controls: searchRow)
+        root.addArrangedSubview(toolbar)
+        toolbar.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
         scope.selectedSegment = 0; scope.segmentStyle = .rounded
         scope.selectedSegmentBezelColor = BrandIdentity.accentColor
         scope.target = self; scope.action = #selector(scopeChanged)
@@ -1408,10 +1407,6 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.setAccessibilityLabel(L10n.text("Назад в историю"))
         nearbyBack.isHidden = true
         chatButton.target = self; chatButton.action = #selector(showChat)
-        chatButton.bezelStyle = .rounded; chatButton.controlSize = .small
-        chatButton.font = .systemFont(ofSize: 12)
-        chatButton.image = NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
-        chatButton.imagePosition = .imageLeading
         chatButton.toolTip = L10n.text("Спросить Buffera о том, что вы копировали")
         chatButton.setAccessibilityLabel(L10n.text("Спросить Buffera"))
         chatButton.identifier = NSUserInterfaceItemIdentifier("history.chat")
@@ -1422,8 +1417,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         searchOptionsRow.identifier = NSUserInterfaceItemIdentifier("history.searchOptions")
         searchOptionsRow.spacing = 8; searchOptionsRow.distribution = .fill; searchOptionsRow.alignment = .centerY
         root.addArrangedSubview(searchOptionsRow)
-        searchOptionsRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
-        root.setCustomSpacing(6, after: searchRow)
+        searchOptionsRow.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
+        root.setCustomSpacing(6, after: toolbar)
         root.setCustomSpacing(8, after: searchOptionsRow)
         semanticSetup.target = self; semanticSetup.action = #selector(setupSemanticSearch)
         semanticSetup.bezelStyle = .inline; semanticSetup.controlSize = .small
@@ -1443,16 +1438,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyHeading.widthAnchor.constraint(equalTo: nearbyHeader.widthAnchor, constant: -24).isActive = true
         nearbyActions.widthAnchor.constraint(equalTo: nearbyHeading.widthAnchor).isActive = true
         root.addArrangedSubview(nearbyHeader)
-        nearbyHeader.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        nearbyHeader.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
         nearbyHeader.identifier = .init("history.nearbyHeader"); nearbyHeader.isHidden = true
         let scopeRow = NSStackView(views: [scope, status]); scopeRow.spacing = 8; scopeRow.distribution = .fill
         scope.widthAnchor.constraint(equalToConstant: 210).isActive = true
         root.addArrangedSubview(scopeRow)
-        scopeRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        scopeRow.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
         contentRow.orientation = .horizontal; contentRow.alignment = .top; contentRow.distribution = .fill; contentRow.spacing = 12
         contentRow.addArrangedSubview(filters.sidebar); contentRow.addArrangedSubview(cards)
         root.addArrangedSubview(contentRow)
-        contentRow.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        contentRow.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
         bodyMinimumHeight = contentRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 320)
         bodyMinimumHeight.isActive = true
         sidebarWidth = filters.sidebar.widthAnchor.constraint(equalToConstant: 170)
@@ -1464,7 +1459,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         hint.stringValue = L10n.text("↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное")
         root.addArrangedSubview(hint)
-        hint.widthAnchor.constraint(equalTo: searchRow.widthAnchor).isActive = true
+        hint.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
         updateNavigationControls()
     }
 

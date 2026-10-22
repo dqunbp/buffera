@@ -6,7 +6,7 @@ const source = new URL('./src/', import.meta.url);
 const output = new URL('./dist/', import.meta.url);
 const locales = await loadLocales();
 const template = await readFile(new URL('index.html', source), 'utf8');
-const files = ['styles.css', 'app.js', 'favicon.svg', 'demo-ru.svg', 'demo-en.svg', 'app-notes.png', 'app-safari.png', 'app-screenshot.png', 'app-terminal.png'];
+const files = ['styles.css', 'app.js', 'favicon.svg', 'brand-pattern.svg', 'demo-ru.svg', 'demo-en.svg', 'app-notes.png', 'app-safari.png', 'app-screenshot.png', 'app-terminal.png'];
 const assetContents = await Promise.all(files.map(file => readFile(new URL(file, source))));
 const assetVersion = createHash('sha256').update(Buffer.concat(assetContents)).digest('hex').slice(0, 12);
 

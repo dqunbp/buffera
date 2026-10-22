@@ -223,13 +223,17 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         self.onAction = onAction
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
         build(revealedText: revealedText)
         if let thumbnail { setThumbnail(thumbnail) }
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(updateAppearance),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         updateAppearance()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    deinit { NSWorkspace.shared.notificationCenter.removeObserver(self) }
 
     func setSelected(_ selected: Bool) {
         self.selected = selected
@@ -553,16 +557,17 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         return source.isEmpty ? date : "\(source)   \(date)"
     }
 
-    private func updateAppearance() {
+    @objc private func updateAppearance() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             let base = NSColor.controlBackgroundColor
+            let opaque = HistorySurfaceAppearance.requiresOpaque
             layer?.backgroundColor = selected
                 ? (base.blended(withFraction: 0.14, of: BrandIdentity.accentColor) ?? base)
-                    .withAlphaComponent(0.88).cgColor
-                : base.withAlphaComponent(0.55).cgColor
+                    .withAlphaComponent(opaque ? 1 : 0.68).cgColor
+                : base.withAlphaComponent(opaque ? 1 : 0.56).cgColor
             layer?.borderColor = selected ? BrandIdentity.accentColor.withAlphaComponent(0.85).cgColor
                 : (nearbyAnchor ? BrandIdentity.accentColor.withAlphaComponent(0.5)
-                    : NSColor.separatorColor.withAlphaComponent(0.2)).cgColor
+                    : NSColor.separatorColor.withAlphaComponent(0.5)).cgColor
             layer?.borderWidth = selected ? 1.5 : (nearbyAnchor ? 1 : 0.5)
         }
     }

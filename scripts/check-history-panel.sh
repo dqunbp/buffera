@@ -30,12 +30,13 @@ swiftc -I "$CHECK_DIR" -I "$BIN_DIR/Modules" -L "$CHECK_DIR" -lBufferaCore -lBuf
   Sources/Buffera/ShortcutPreferences.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift \
   Sources/Buffera/ClipCardView.swift Sources/Buffera/ClipDragController.swift \
   Sources/Buffera/ClipDragPayload.swift Sources/Buffera/TemporaryImageExports.swift Sources/Buffera/HistoryFilters.swift \
-  Sources/Buffera/HistoryAppearance.swift Sources/Buffera/InterfaceTheme.swift Sources/Buffera/BrandIdentity.swift \
+  Sources/Buffera/HistoryAppearance.swift Sources/Buffera/HistorySurface.swift Sources/Buffera/InterfaceTheme.swift Sources/Buffera/BrandIdentity.swift \
   Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift \
   Sources/Buffera/ClipboardService.swift Sources/Buffera/ClipboardSessionMonitor.swift "Tests/$test/"*.swift \
   -o "$CHECK_DIR/$test"
 "$CHECK_DIR/$test" -interfaceLanguage ru -AppleLanguages "(ru)" -nearby.hideIntroduction YES
-if [[ "$test" != HistoryCardsChecks ]]; then
+# Cards are locale-independent; the legacy filter fixture uses Russian labels.
+if [[ "$test" != HistoryCardsChecks && "$test" != HistoryFiltersChecks ]]; then
   "$CHECK_DIR/$test" -interfaceLanguage en -AppleLanguages "(en)" -nearby.hideIntroduction YES
 fi
 done

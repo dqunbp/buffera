@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {{languageRedirect}}
-  <meta name="theme-color" content="#eee9f8">
+  <meta name="theme-color" content="#f5f3f8">
   <meta name="description" content="{{page.html_content}}">
   <meta property="og:title" content="{{page.html_content_2}}">
   <meta property="og:description" content="{{page.html_content_3}}">
@@ -77,6 +77,10 @@
                 <button class="demo-icon-button" type="button" data-command="filters" data-icon="filters" aria-label="{{page.demo_filters_aria_label}}" aria-expanded="false"></button>
                 <button class="demo-icon-button" type="button" data-command="settings" data-icon="settings" aria-label="{{page.demo_settings}}" aria-expanded="false"></button>
                 <button class="demo-icon-button" type="button" data-command="pin" data-icon="pin" aria-label="{{page.demo_pin}}" aria-pressed="false"></button>
+              </div>
+              <div class="demo-options-row">
+                <label class="demo-semantic" title="{{page.demo_semantic_hint}}"><input id="demo-semantic" type="checkbox" checked><span>{{page.demo_semantic}}</span></label>
+                <button class="demo-ask" type="button" data-command="ask" aria-label="{{page.feature_kicker_text_2}}" aria-haspopup="dialog"><svg viewBox="0 0 40 36" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg>{{page.demo_ask}}</button>
               </div>
               <div class="demo-scope-row"><div class="demo-scopes" role="group" aria-label="{{page.demo_scope}}"><button type="button" data-scope="history" aria-pressed="true"><span data-icon="history"></span>{{page.demo_history}}</button><button type="button" data-scope="favorite" aria-pressed="false"><span data-icon="star"></span>{{page.demo_favorites}}</button></div><button type="button" class="demo-nearby-back" hidden>{{page.demo_back}}</button><span id="demo-count" role="status"></span></div>
               <div class="demo-body">

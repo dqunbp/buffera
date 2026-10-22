@@ -36,6 +36,12 @@ enum HistoryDateFilter {
     var isActive: Bool { if case .all = self { return false }; return true }
 }
 
+private final class SidebarFilterCell: NSButtonCell {
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        super.drawInterior(withFrame: cellFrame.insetBy(dx: 8, dy: 0), in: controlView)
+    }
+}
+
 private final class SidebarFilterRow: NSButton {
     let value: String?
     var selected = false { didSet { updateAppearance() } }
@@ -44,6 +50,7 @@ private final class SidebarFilterRow: NSButton {
     init(title: String, image: NSImage?, value: String?) {
         self.value = value
         super.init(frame: .zero)
+        cell = SidebarFilterCell()
         self.title = title; self.image = image
         alignment = .left; imagePosition = .imageLeading; imageScaling = .scaleProportionallyDown
         font = .systemFont(ofSize: 12); isBordered = false
@@ -112,7 +119,7 @@ private enum HistoryContentType: Equatable {
 }
 
 final class HistoryFilters: NSView, NSPopoverDelegate {
-    let sidebar: NSView = NSVisualEffectView()
+    let sidebar: NSView = HistorySidebarSurface()
     private let toolbarButton = NSButton(image: NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: L10n.text("Фильтры"))!, target: nil, action: nil)
     private let sidebarDateButton = SidebarFilterRow(title: L10n.text("Всё время"), image: NSImage(systemSymbolName: "calendar", accessibilityDescription: nil), value: nil)
     private let sourceRowsContainer = SidebarSourceList()
@@ -193,10 +200,6 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
     }
 
     private func buildSidebar() {
-        if let effect = sidebar as? NSVisualEffectView {
-            effect.material = .sidebar; effect.blendingMode = .withinWindow; effect.state = .active
-            effect.wantsLayer = true; effect.layer?.cornerRadius = 8; effect.layer?.masksToBounds = true
-        }
         let typeHeading = heading(L10n.text("Тип содержимого"))
         let types = NSStackView(); types.orientation = .vertical; types.alignment = .leading; types.spacing = 1
         let allTypes = sidebarRow(L10n.text("Все типы"), symbol: "square.grid.2x2", value: nil, action: #selector(sidebarKindClicked))
@@ -231,8 +234,8 @@ final class HistoryFilters: NSView, NSPopoverDelegate {
             document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
             document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            typeHeading.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 10),
-            typeHeading.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -10),
+            typeHeading.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 16),
+            typeHeading.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -16),
             typeHeading.topAnchor.constraint(equalTo: document.topAnchor, constant: 10),
             types.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 8),
             types.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -8),

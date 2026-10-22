@@ -8,9 +8,13 @@ const touchIdle = document.querySelector('#touch-label').textContent;
 const formatMessage = (message, values) => message.replace(/\{(\w+)\}/g, (_, key) => values[key]);
 const demo = document.querySelector('.demo-window');
 const search = document.querySelector('#demo-search');
+const semanticSearch = document.querySelector('#demo-semantic');
+const askButton = demo.querySelector('[data-command="ask"]');
 const list = document.querySelector('#demo-items');
 const count = document.querySelector('#demo-count');
 const detail = document.querySelector('#demo-detail');
+const detailNote = detail.querySelector('.detail-note');
+const previewNote = detailNote.textContent;
 const settings = document.querySelector('.demo-settings');
 const dateFilter = document.querySelector('#demo-date');
 const toast = document.querySelector('.demo-toast');
@@ -119,7 +123,9 @@ function renderDemo() {
   visible = samples.filter((item, index) => {
     if (nearbyID) return Math.abs(index - nearbyIndex) <= 1;
     const matchesKind = filter === 'all' || (filter === 'concealed' ? item.concealed : item.kind === filter);
-    const searchable = item.concealed ? item.source : `${item.text} ${item.source} ${item.keywords}`;
+    // Curated topics illustrate semantic matching; no model runs on the landing page.
+    const searchable = item.concealed ? item.source
+      : `${item.text} ${item.source} ${semanticSearch.checked ? item.keywords : ''}`;
     return matchesKind && (source === 'all' || item.source === source) && (scope !== 'favorite' || item.favorite)
       && dateFilter.value !== 'yesterday' && searchable.toLocaleLowerCase(locale).includes(query);
   });
@@ -167,12 +173,35 @@ function select(index) {
   [...list.querySelectorAll('.demo-item')].forEach((element, i) => element.classList.toggle('selected', i === index));
 }
 function openDetail(item, trigger) {
-  closeSettings(); toast.hidden = true; lastOpened = trigger;
   detail.querySelector('.detail-kind').textContent = `${kindLabels[item.kind]} · ${item.source}`;
   detail.querySelector('h3').textContent = item.concealed ? ui.hidden : item.title;
   const content = detail.querySelector('.detail-content'); content.replaceChildren();
   if (item.kind === 'image') content.append(screenshot());
   else content.textContent = item.concealed ? ui.hidden : item.text;
+  detailNote.textContent = previewNote;
+  showDetail(trigger);
+}
+function openAskDemo() {
+  detail.querySelector('.detail-kind').textContent = ui.askExample;
+  detail.querySelector('h3').textContent = askButton.getAttribute('aria-label');
+  const content = detail.querySelector('.detail-content'); content.replaceChildren();
+  const question = document.createElement('p'); question.className = 'demo-chat-question';
+  question.textContent = ui.askQuestion;
+  const answer = document.createElement('p'); answer.className = 'demo-chat-answer';
+  const entry = samples.find(item => item.id === 'image' && !item.concealed);
+  answer.textContent = entry
+    ? formatMessage(ui.askAnswer, { name: ui.imageName, address: ui.imageAddress }) : ui.hidden;
+  content.append(question, answer);
+  if (entry) {
+    const source = document.createElement('span'); source.className = 'demo-chat-source';
+    source.textContent = `${entry.title} · ${entry.source}`;
+    content.append(source);
+  }
+  detailNote.textContent = ui.askNote;
+  showDetail(askButton);
+}
+function showDetail(trigger) {
+  closeSettings(); toast.hidden = true; lastOpened = trigger;
   detail.hidden = false; demo.querySelector('.demo-controls').inert = true;
   detail.querySelector('button').focus({ preventScroll: true });
 }
@@ -193,6 +222,8 @@ function toggleSidebar() {
 if (matchMedia('(max-width: 600px)').matches) toggleSidebar();
 
 search.addEventListener('input', () => { nearbyID = null; renderDemo(); });
+semanticSearch.addEventListener('change', () => { nearbyID = null; renderDemo(); });
+askButton.addEventListener('click', openAskDemo);
 dateFilter.addEventListener('change', () => { nearbyID = null; renderDemo(); });
 demo.querySelectorAll('[data-scope]').forEach(button => button.addEventListener('click', () => { scope = button.dataset.scope; renderDemo(); }));
 demo.querySelector('.demo-nearby-back').addEventListener('click', () => { nearbyID = null; renderDemo(); });
@@ -232,7 +263,7 @@ demo.addEventListener('keydown', event => {
     return;
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); closeSettings(); search.focus({ preventScroll: true }); search.select(); return; }
-  if (!settings.hidden || event.target.closest('select,button')) return;
+  if (!settings.hidden || event.target.closest('select,button,input[type="checkbox"]')) return;
   const rows = [...list.querySelectorAll('.demo-item')];
   if (['ArrowDown', 'ArrowUp'].includes(event.key) && rows.length) {
     event.preventDefault(); select(document.activeElement === search ? 0 : (selection + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length);
