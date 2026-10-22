@@ -248,9 +248,19 @@ h3 {
 }
 
 .build-badge-stage {
+  position:relative;
   display:inline-block;
   border-radius:24px;
   vertical-align:top;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .build-badge-stage:before {
+    content:"";
+    position:absolute;
+    inset:-20px;
+    border-radius:44px;
+  }
 }
 
 .build-badge {
