@@ -144,12 +144,17 @@ _ = panel.window.onKeyDown?(enter)
 try check(confirmations.isEmpty, "Enter cannot copy to the general clipboard during drag preparation")
 card.onDragFinished?([], nil)
 try check(completions.isEmpty && refreshes == 1, "cancellation does not mark use and resumes deferred history refresh")
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible, "cancelled drag keeps the unfocused panel visible")
 panel.receive([fixture()], total: 1, offset: 0)
 let nextCard = cards.card(at: 0)!
 nextCard.requestDrag? { _ in }
+panel.clipboardDidCapture(id: 100)
 nextCard.onDragFinished?(.copy, nil)
 nextCard.onDragFinished?(.copy, nil)
 try check(completions == [1] && confirmations.isEmpty, "accepted copy marks use exactly once without clipboard confirmation")
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible && refreshes == 2, "accepted drop keeps the unfocused panel visible and resumes deferred history refresh")
 panel.window.orderOut(nil)
 
 let source = NSView()

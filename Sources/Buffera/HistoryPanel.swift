@@ -1205,13 +1205,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if operation.contains(.copy) {
             recentCaptureID = nil
             onDragCompleted?(id)
-            close(restoreFocus: false)
-        } else {
-            if needsRefresh { refresh(preservingSelection: true) }
-            if let error { failed(error) }
-            if searchIndexDirty { scheduleSearchIndexRefresh(after: 0.8) }
-            closeIfUnfocused()
         }
+        if needsRefresh { refresh(preservingSelection: true) }
+        if let error { failed(error) }
+        if searchIndexDirty { scheduleSearchIndexRefresh(after: 0.8) }
     }
 
     private func configure(_ card: ClipCardView, row: Int) {
