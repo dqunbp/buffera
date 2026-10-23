@@ -91,11 +91,11 @@
     "privacy_title_text": "Close to you.",
     "privacy_title_text_2": "Away from",
     "privacy_title_text_3": "the cloud.",
-    "privacy_copy_text": "Your data stays on your Mac — Buffera doesn’t send it anywhere. Search by meaning, text recognition and the smart assistant run locally, too.",
-    "privacy_copy_text_2": "Hide sensitive text from view and search.",
+    "privacy_copy_text": "Your history stays on your Mac. Search by meaning, text recognition and the built-in assistant run locally.",
+    "privacy_copy_text_2": "Secrets aren’t saved by default. Want to keep them handy? Turn on encrypted storage in history settings.",
     "privacy_copy_text_3": "History isn’t recorded while your Mac is locked or asleep.",
     "privacy_copy_text_4": "Pause recording. Delete what you don’t need. Set your limits.",
-    "fine_print_text": "Hiding an item masks it; it doesn’t encrypt it separately. External AI agents can access your history only with your permission and may send data to their services.",
+    "fine_print_text": "Buffera recognizes a secret when the app you copied from marks it as confidential. Without that mark, a password may enter your regular history. Regular items are stored without encryption.",
     "all_title_text": "And a little",
     "all_title_text_2": "more to like.",
     "all_heading_text": "Small details",
@@ -112,8 +112,6 @@
     "details_grid_text_10": "Open long text and images in a full preview. Save an image to a file or reveal it in Finder.",
     "details_grid_text_11": "From another device",
     "details_grid_text_12": "Find items received through Apple’s Universal Clipboard separately from things copied on your Mac.",
-    "details_grid_text_13": "Connect your AI agent",
-    "details_grid_text_14": "Codex, Claude Code and other AI agents can search your clipboard history. Connect yours through MCP and find what you need right in the conversation.",
     "details_grid_text_15": "Helps save battery",
     "details_grid_text_16": "By default, Buffera waits until your Mac is plugged in before preparing smart search in the background.",
     "details_grid_text_17": "Your history. Your limits.",
@@ -166,7 +164,11 @@
     "demo_ask": "Ask",
     "support_button": "Support Buffera",
     "support_hint": "Support development on Tribute — opens in a new tab",
-    "support_note": "Give your favorite clipboard a little love."
+    "support_note": "Give your favorite clipboard a little love.",
+    "privacy_hide_text": "Hide sensitive text yourself and it will be stored encrypted, too.",
+    "mcp_title": "MCP, too.",
+    "mcp_description": "Search your clipboard history right from a conversation with your AI agent.",
+    "mcp_connect": "How to connect"
   },
   "runtime": {
     "samples": [

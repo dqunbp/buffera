@@ -915,10 +915,10 @@ html[lang="en"] .hero-bottom>span {
   color:#6c755d;
 }
 
-.feature-trio {
+.feature-extras {
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:44px;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:32px;
   margin-top:64px;
 }
 
@@ -1072,6 +1072,55 @@ html[lang="en"] .hero-bottom>span {
   border-radius:50%;
   background:#8052aa;
   margin-right:9px;
+}
+
+.mcp-art {
+  height:140px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:18px;
+}
+
+.mcp-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:20px;
+  padding:14px 20px;
+  border-radius:16px;
+  background:#e2d3f0;
+  color:#593c79;
+  font-size:30px;
+  font-weight:600;
+  letter-spacing:-1px;
+  rotate:-4deg;
+}
+
+.mcp-badge>span {
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:var(--lime);
+  color:#59633c;
+  font-size:18px;
+}
+
+.mcp-apps {
+  font-size:12px;
+  color:var(--muted);
+}
+
+.mcp-apps>span { margin-left:14px; }
+
+.mcp-connect {
+  font-size:12px;
+  color:#6334a6;
+  gap:8px;
+  border-bottom-color:#c7b7dd;
+  padding-block:8px 3px;
 }
 
 .keyboard-section {
@@ -1584,8 +1633,9 @@ details p {
   .chat-art {
     padding-inline:25px;
   }
-  .feature-trio {
-    gap:30px;
+  .feature-extras {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:40px 30px;
   }
   .keyboard-layout {
     gap:30px;
@@ -1798,7 +1848,7 @@ details p {
     bottom:13px;
     right:20px;
   }
-  .feature-trio {
+  .feature-extras {
     grid-template-columns:1fr;
     gap:36px;
     margin-top:43px;
