@@ -168,7 +168,8 @@
     "privacy_hide_text": "Hide sensitive text yourself and it will be stored encrypted, too.",
     "mcp_title": "MCP, too.",
     "mcp_description": "Search your clipboard history right from a conversation with your AI agent.",
-    "mcp_connect": "How to connect"
+    "mcp_connect": "How to connect",
+    "docs_nav": "Documentation"
   },
   "runtime": {
     "samples": [

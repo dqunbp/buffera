@@ -1,0 +1,631 @@
+{
+  "ui": {
+    "title": "Documentation",
+    "home": "Back to site",
+    "search": "Search documentation",
+    "searchPlaceholder": "Find an answer…",
+    "searchHint": "Search requires JavaScript",
+    "noResults": "No results. Try “search”, “secrets” or “MCP”.",
+    "results": "Found: {count}",
+    "clear": "Clear search",
+    "menu": "Documentation sections",
+    "toc": "On this page",
+    "overview": "Overview",
+    "start": "Get started",
+    "read": "Read guide",
+    "previous": "Previous guide",
+    "next": "Next guide",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the text and copy it manually.",
+    "source": "Source code and technical details",
+    "footer": "Everything at hand. Answers, too.",
+    "download": "Download Buffera",
+    "groupBasics": "Every day",
+    "groupMore": "Features and settings",
+    "allGuides": "Make yourself at home",
+    "allGuidesText": "From your first copy to a workflow that feels like yours."
+  },
+  "overview": {
+    "title": "Meet your\nsecond memory.",
+    "description": "Small guides to help you find what you copied and spend less time doing things twice.",
+    "quickTitle": "Copy something.\nCome back to it.",
+    "quickText": "Install Buffera, copy something and open your history. It all starts with three keys.",
+    "keyCaption": "Your history, one shortcut away",
+    "keyNote": "The default · make it your own",
+    "metaTitle": "Buffera documentation — everything at hand",
+    "metaDescription": "Install Buffera, explore clipboard history and shortcuts, use local search, manage privacy and connect agents."
+  },
+  "articles": [
+    {
+      "id": "getting-started",
+      "icon": "start",
+      "title": "Getting started",
+      "description": "Installation, first launch and your first saved clip.",
+      "sections": [
+        {
+          "id": "install",
+          "title": "Install Buffera",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The release build runs on a Mac with Apple Silicon and macOS 14 or later. Local history does not need an account."
+            },
+            {
+              "type": "steps",
+              "items": [
+                "Download Buffera using the button at the top of this page.",
+                "Open the DMG and drag Buffera into Applications.",
+                "Launch Buffera. Its icon appears in the menu bar."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "The current build is not notarized by Apple. If macOS blocks it, try opening it once, then allow Buffera in System Settings → Privacy & Security."
+            }
+          ]
+        },
+        {
+          "id": "first-copy",
+          "title": "Copy. Find. Bring it back.",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Copy text or an image in any app. Buffera saves new copies while it is running.",
+                "Press ⌘⌥V. Select a clip with the mouse or arrow keys.",
+                "Press Enter to copy the selected clip and close the window.",
+                "Return to your app and paste with ⌘V."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "Buffera does not paste automatically. If macOS asks for clipboard access, allow it so Buffera can save your history."
+            }
+          ]
+        },
+        {
+          "id": "make-yours",
+          "title": "Make it yours",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Open settings with the gear button or ⌘,. In Appearance, choose a theme, language, column count and window position. Theme changes apply immediately; language changes require a restart."
+            },
+            {
+              "type": "paragraph",
+              "text": "To launch Buffera with your Mac, add it in System Settings → General → Login Items. You can download search and assistant models later; ordinary clipboard history works without them."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "icon": "history",
+      "title": "Your clipboard history",
+      "description": "Clips, favorites, filters and nearby copies.",
+      "sections": [
+        {
+          "id": "find",
+          "title": "Find the right clip",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Open history with ⌘⌥V and start typing. Search covers text, recognized words in images, file names and the source app. Narrow results by type, app and date using the sidebar or filter button."
+            },
+            {
+              "type": "paragraph",
+              "text": "⌘0 clears the query and filters. Space opens a preview when clips have focus; ⌘Y also works from the search field."
+            }
+          ]
+        },
+        {
+          "id": "keep",
+          "title": "Keep important clips close",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Click the star or press ⌘D to favorite a clip. Favorites survive restarts and are protected from automatic cleanup. Search and filters work in Favorites, too."
+            },
+            {
+              "type": "paragraph",
+              "text": "The anchor at the bottom of history pins the window above other apps. Escape or selecting a clip closes it. For side-by-side work, choose a left or right edge panel in Appearance settings."
+            }
+          ]
+        },
+        {
+          "id": "neighbors",
+          "title": "What came before and after",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Click the clock on a clip or press ⇧⌘N. Buffera shows the anchor clip and up to 10 copies on either side in time. This list uses all history, regardless of your current filters."
+            },
+            {
+              "type": "paragraph",
+              "text": "Back to history or Escape restores your search and list position. Copying identical content updates the existing clip; this is not a separate log of every repeated copy."
+            }
+          ]
+        },
+        {
+          "id": "move",
+          "title": "Drag or copy a different way",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Drag clips into editors, chats and Finder. Original files must still be available at their saved paths. Dragging does not change the system clipboard; format support depends on the receiving app."
+            },
+            {
+              "type": "paragraph",
+              "text": "Use Copy differently in the context menu to remove formatting, clean up line breaks, format JSON or strip tracking parameters from a link. Available actions depend on the content. The original clip stays intact."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "icon": "search",
+      "title": "Search by words and meaning",
+      "description": "Find an exact phrase, text in an image or a related idea.",
+      "sections": [
+        {
+          "id": "words",
+          "title": "Start with words",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Ordinary search works without downloading a model. Every query word must appear in the search index; letter case does not matter. Type, app and date filters narrow the results."
+            },
+            {
+              "type": "paragraph",
+              "text": "Text in saved PNG/TIFF images is recognized in the background by Apple Vision on your Mac. Once recognition finishes, those words become searchable. Selecting the image still copies the image."
+            }
+          ]
+        },
+        {
+          "id": "meaning",
+          "title": "Add semantic search",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Open Settings → Search & answers.",
+                "In Semantic search, choose Download model and enable. EmbeddingGemma 2 uses about 310 MB.",
+                "Wait for the relevant part of your history to be indexed. Settings show the progress.",
+                "Enable Also search by meaning in the history window."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Word matches appear first, followed by related clips. All filters still apply. If the model is unavailable, ordinary search remains available."
+            }
+          ]
+        },
+        {
+          "id": "power",
+          "title": "Models, battery and search limits",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Semantic search requires Apple Silicon. The model downloads separately and runs locally. Background indexing pauses on battery by default; Continue now resumes it. Search over already indexed clips stays available."
+            },
+            {
+              "type": "note",
+              "text": "Hidden content is not indexed. Files on disk are not opened; search uses their saved paths. Long clips may be partially indexed, as indicated in settings."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "assistant",
+      "icon": "ask",
+      "title": "Ask Buffera",
+      "description": "A local assistant with answers linked to your clips.",
+      "sections": [
+        {
+          "id": "enable",
+          "title": "Enable the assistant",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "In Settings → Search & answers, find Ask Buffera and choose Download model and enable. Gemma 4 E2B uses about 2.84 GB and runs on Apple Silicon."
+            },
+            {
+              "type": "paragraph",
+              "text": "The assistant and semantic search are enabled independently. Without the search model, the assistant searches by words. It does not need the permission for external MCP agents."
+            }
+          ]
+        },
+        {
+          "id": "ask",
+          "title": "Ask your history a question",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Click Ask in history. Try “What connection error did I copy yesterday?” The assistant finds and reads clips, then checks nearby copies when needed."
+            },
+            {
+              "type": "paragraph",
+              "text": "The answer appears as it is generated. Sources below it show the app and copy time. Open a source to check the original clip."
+            },
+            {
+              "type": "list",
+              "items": [
+                "Enter sends a question; Shift+Enter adds a new line.",
+                "Stop or Escape during an answer cancels generation.",
+                "New conversation clears the current conversation."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "limits",
+          "title": "What stays on your Mac",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The built-in model processes history locally. Conversations are kept in memory until Buffera quits and are not written to disk. Closing the window stops the current answer."
+            },
+            {
+              "type": "note",
+              "text": "Answers use a limited set of retrieved clips, not your entire history at once. Hidden content is excluded and files on disk are not read. Check important details against the sources."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "icon": "privacy",
+      "title": "History and privacy",
+      "description": "What stays on your Mac, how to hide clips and manage storage.",
+      "sections": [
+        {
+          "id": "local",
+          "title": "Your history on your Mac",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera stores history locally in ~/Library/Application Support/Buffera/. Ordinary clips are not encrypted by Buffera itself. Local search, image recognition and the built-in assistant do not require sending content to the cloud."
+            },
+            {
+              "type": "paragraph",
+              "text": "Capture pauses when your Mac locks, switches users or sleeps. Copies accumulated during that time are skipped when you return."
+            }
+          ]
+        },
+        {
+          "id": "secrets",
+          "title": "Secrets in history",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Settings → History → Secrets in history defaults to Do not save secrets. You can choose Save secrets encrypted. This applies to new copies; previously saved secrets remain encrypted."
+            },
+            {
+              "type": "note",
+              "text": "A secret is identified by a marker from the source app, not by inspecting its text. Without that marker, a password may be saved as an ordinary clip."
+            },
+            {
+              "type": "paragraph",
+              "text": "Hide encrypts a saved text clip or link using AES-256-GCM and removes its content from search indexes. The key stays in macOS Keychain. The date, app and other metadata remain unencrypted."
+            },
+            {
+              "type": "paragraph",
+              "text": "Hidden content is unavailable to search, OCR, the built-in assistant and MCP. You can temporarily reveal or copy it inside Buffera."
+            }
+          ]
+        },
+        {
+          "id": "retention",
+          "title": "Manage history storage",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Set limits in Settings → History. The defaults are 50,000 ordinary clips and 5 GB of their content. Cleanup runs after a new copy. Favorites do not count toward these limits and are not automatically removed."
+            },
+            {
+              "type": "note",
+              "text": "Models, OCR and the semantic index use additional space. Files are saved as references to the originals; Buffera cannot restore a file you deleted or moved."
+            }
+          ]
+        },
+        {
+          "id": "external",
+          "title": "If you connect an agent",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "MCP access is off by default. Once you grant permission, an agent can read ordinary clips and safe metadata for hidden clips. Read content enters the external agent’s context and may be sent to its service, depending on the client."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shortcuts",
+      "icon": "keys",
+      "title": "Keyboard shortcuts",
+      "description": "Fewer steps between copying and pasting.",
+      "sections": [
+        {
+          "id": "everyday",
+          "title": "Everyday shortcuts",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Keys",
+                "Action"
+              ],
+              "rows": [
+                [
+                  "⌘⌥V",
+                  "Open history / next clip"
+                ],
+                [
+                  "⌘⌥C",
+                  "Previous clip while history is open"
+                ],
+                [
+                  "↑ ↓",
+                  "Move between rows"
+                ],
+                [
+                  "Enter",
+                  "Copy the selected clip and close"
+                ],
+                [
+                  "⌘1–⌘9",
+                  "Select one of the first nine clips"
+                ],
+                [
+                  "Space / ⌘Y",
+                  "Open preview"
+                ],
+                [
+                  "⌘F",
+                  "Focus search"
+                ],
+                [
+                  "⌘0",
+                  "Clear search and filters"
+                ],
+                [
+                  "Esc",
+                  "Close preview, go back or close history"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "actions",
+          "title": "Clip actions",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Keys",
+                "Action"
+              ],
+              "rows": [
+                [
+                  "⌘D",
+                  "Toggle favorite"
+                ],
+                [
+                  "⇧⌘N",
+                  "Show nearby copies"
+                ],
+                [
+                  "⇧⌘H",
+                  "Hide / temporarily reveal"
+                ],
+                [
+                  "⇧⌘R",
+                  "Show image in Finder"
+                ],
+                [
+                  "⇧⌘S",
+                  "Save image as a file"
+                ],
+                [
+                  "⌘⌥S",
+                  "Toggle sidebar"
+                ],
+                [
+                  "⌘,",
+                  "Open settings"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "customize",
+          "title": "Make the shortcut yours",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "In Shortcuts, choose shared modifier keys and two different letters: one for opening / moving forward and one for moving backward. Click Apply; no restart is needed. Default restores ⌘⌥V / ⌘⌥C."
+            },
+            {
+              "type": "paragraph",
+              "text": "Shortcuts use physical Latin-layout keys, so they keep working when you switch input languages. If registration fails, the previous pair stays in place."
+            },
+            {
+              "type": "note",
+              "text": "Releasing the keys after opening leaves history open. To cycle quickly, keep holding ⌘⌥, press V or C again, then release the modifiers to copy the selected clip."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "icon": "agents",
+      "title": "Connect an agent",
+      "description": "Give Codex or Claude Code access to ordinary history through MCP.",
+      "sections": [
+        {
+          "id": "connect",
+          "title": "Connect from settings",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Launch the current Buffera version at least once to prepare history.",
+                "Open Settings → Agents and enable Allow agents to read history.",
+                "Choose Command for Claude Code or Command for Codex. Run the copied command in Terminal with the chosen agent’s CLI installed.",
+                "Reconnect MCP in your agent. Restart the connected MCP process after updating Buffera."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Buffera inserts its actual path. Copying a command does not itself enable access or change the agent’s settings. Search and assistant models are optional for this connection."
+            }
+          ]
+        },
+        {
+          "id": "manual",
+          "title": "Manual configuration",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Copy configuration gives you JSON with the current path. The example below assumes installation in /Applications. If your client uses another format, map command and args to its fields."
+            },
+            {
+              "type": "code",
+              "text": "{\n  \"mcpServers\": {\n    \"buffera\": {\n      \"command\": \"/Applications/Buffera.app/Contents/MacOS/BufferaMCP\",\n      \"args\": []\n    }\n  }\n}"
+            },
+            {
+              "type": "note",
+              "text": "Use an absolute path without ~. Update the configuration if you move Buffera. The agent starts the local process through stdio; no network address or port is needed."
+            }
+          ]
+        },
+        {
+          "id": "tools",
+          "title": "What the agent can do",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Tool",
+                "Purpose"
+              ],
+              "rows": [
+                [
+                  "search_history",
+                  "Search by words and meaning with filters"
+                ],
+                [
+                  "read_clip",
+                  "Read a retrieved clip in chunks"
+                ],
+                [
+                  "get_neighbors",
+                  "Look up nearby copies"
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "All tools are read-only. They do not change history or the system clipboard. Images expose cached OCR; files expose saved paths. Hidden content is never shared, only safe metadata."
+            }
+          ]
+        },
+        {
+          "id": "revoke",
+          "title": "Control access",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Turn off permission in Agents to block further reads. A running process checks it on every request. Previously read content may remain in the agent’s context."
+            },
+            {
+              "type": "note",
+              "text": "An external agent may send the clips it reads to its service. Buffera’s built-in assistant runs locally; that does not determine how a connected agent processes data."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "icon": "help",
+      "title": "Troubleshooting",
+      "description": "Practical next steps when something does not work as expected.",
+      "sections": [
+        {
+          "id": "open",
+          "title": "The app or history will not open",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Check that your Mac has Apple Silicon and macOS 14+. If macOS blocks launch, try opening it once, then allow Buffera under Privacy & Security in System Settings."
+            },
+            {
+              "type": "paragraph",
+              "text": "If ⌘⌥V does not work, open history from the menu bar icon. Close another app using that shortcut or choose a new one in Settings → Shortcuts."
+            }
+          ]
+        },
+        {
+          "id": "missing",
+          "title": "An expected clip is missing",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "Make sure Buffera is running and capture is not paused.",
+                "Allow clipboard access if macOS requests it.",
+                "Press ⌘0 to remove the query and filters.",
+                "Copy the content again. Copies made during lock or sleep are skipped.",
+                "Check secret settings: marked confidential clips are not saved by default."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "models",
+          "title": "Search or the assistant is not ready",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Open Search & answers. Check the model download and that the relevant feature is enabled. Semantic search also requires history indexing. On battery, choose Continue now or connect power."
+            },
+            {
+              "type": "paragraph",
+              "text": "If text in an image cannot be found, check OCR progress in the Buffera menu bar menu. Retry recognition restarts failed attempts. Hidden images are not recognized."
+            }
+          ]
+        },
+        {
+          "id": "agent",
+          "title": "The agent cannot access history",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Launch the current Buffera version, enable access in Agents and check the path in your client configuration. Restart MCP in the agent after an app update. Hidden clips always return without content."
+            }
+          ]
+        },
+        {
+          "id": "file",
+          "title": "A file in history is unavailable",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera stores a reference to the original file, not a backup. Check whether it was moved or deleted. To keep an image permanently, use Save as; Show in Finder creates a temporary export."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

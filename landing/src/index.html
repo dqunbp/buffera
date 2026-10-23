@@ -37,7 +37,7 @@
   <a class="skip-link" href="#main">{{page.skip_link_text}}</a>
   <header class="header wrap">
     <a class="brand" href="#" aria-label="{{page.brand_aria_label}}"><svg viewBox="0 0 40 32" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg><span>buffera</span></a>
-    <nav aria-label="{{page.header_aria_label}}"><a href="#try">{{page.header_text}}</a><a href="#features">{{page.header_text_2}}</a><a href="#privacy">{{page.header_text_3}}</a></nav>
+    <nav aria-label="{{page.header_aria_label}}"><a href="#try">{{page.header_text}}</a><a href="#features">{{page.header_text_2}}</a><a href="#privacy">{{page.header_text_3}}</a><a class="nav-docs" href="{{docsUrl}}">{{page.docs_nav}}</a></nav>
     <a class="button button-small button-outline" href="#install">{{page.button_text}} <span aria-hidden="true">↗</span></a>
   </header>
   <main id="main">
@@ -117,7 +117,7 @@
         <article class="mini-feature"><div class="ocr-art" aria-hidden="true"><span class="scan-corner top-left"></span><span class="scan-corner top-right"></span><span class="scan-corner bottom-left"></span><span class="scan-corner bottom-right"></span><span>{{page.ocr_art_text}}<br> {{page.ocr_art_text_2}}</span><i></i></div><h3>{{page.mini_feature_text}}<br> {{page.mini_feature_text_2}}</h3><p>{{page.mini_feature_text_3}}</p></article>
         <article class="mini-feature"><div class="clean-art" aria-hidden="true"><span>site.ru/article<span class="tracking">?utm_source=…</span></span><span class="clean-arrow">↓</span><span>site.ru/article <b>✦</b></span></div><h3>{{page.mini_feature_text_4}}<br> {{page.mini_feature_text_5}}</h3><p>{{page.mini_feature_text_6}}</p></article>
         <article class="mini-feature"><div class="nearby-art" aria-hidden="true"><span>{{page.nearby_art_text}}</span><span><i></i> {{page.nearby_art_text_2}}</span><span>{{page.nearby_art_text_3}}</span></div><h3>{{page.mini_feature_text_7}}<br> {{page.mini_feature_text_8}}</h3><p>{{page.mini_feature_text_9}}</p></article>
-        <article class="mini-feature" id="mcp"><div class="mcp-art" aria-hidden="true"><span class="mcp-badge">MCP <span>✓</span></span><span class="mcp-apps">Codex <span>Claude Code</span></span></div><h3>{{page.mcp_title}}</h3><p>{{page.mcp_description}}<br><a class="text-link mcp-connect" href="https://github.com/dqunbp/buffera#%D0%BF%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B0%D0%B3%D0%B5%D0%BD%D1%82%D0%B0-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-mcp">{{page.mcp_connect}} <span aria-hidden="true">↗</span></a></p></article>
+        <article class="mini-feature" id="mcp"><div class="mcp-art" aria-hidden="true"><span class="mcp-badge">MCP <span>✓</span></span><span class="mcp-apps">Codex <span>Claude Code</span></span></div><h3>{{page.mcp_title}}</h3><p>{{page.mcp_description}}<br><a class="text-link mcp-connect" href="{{mcpDocsUrl}}">{{page.mcp_connect}} <span aria-hidden="true">↗</span></a></p></article>
       </div>
     </section>
 
@@ -141,7 +141,7 @@
   <footer class="footer wrap">
     <a class="brand" href="#"><svg viewBox="0 0 40 32" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg><span>buffera</span></a>
     <span>{{page.footer_text}}</span>
-    <div class="footer-links"><a href="https://github.com/dqunbp/buffera">GitHub ↗</a><a href="#main">{{page.footer_links_text}}</a></div>
+    <div class="footer-links"><a href="{{docsUrl}}">{{page.docs_nav}}</a><a href="https://github.com/dqunbp/buffera">GitHub ↗</a><a href="#main">{{page.footer_links_text}}</a></div>
     <div class="maker-credit">
       <span>made by <a href="https://github.com/dqunbp">@dqunbp</a></span>
       <div class="maker-socials">

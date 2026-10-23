@@ -44,41 +44,45 @@ export async function loadLocales() {
   return locales;
 }
 
-const escapeHtml = value => value.replace(/[&<>"']/g, char => ({
+export const escapeHtml = value => value.replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[char]));
 
-// This function is embedded only in the root page; explicit locale URLs never redirect.
-function redirectToPreferredLanguage(supported) {
-  if (location.pathname !== '/') return;
+// Only language-neutral routes redirect; explicit locale URLs never redirect.
+function redirectToPreferredLanguage(supported, route = '') {
+  if (location.pathname !== `/${route}`) return;
   const preferences = Array.isArray(navigator.languages) && navigator.languages.length
     ? navigator.languages : [navigator.language];
   const language = preferences
     .map(value => typeof value === 'string' ? value.toLowerCase().split('-')[0] : '')
     .find(value => supported.includes(value)) || 'en';
-  location.replace(`/${language}/${location.search}${location.hash}`);
+  location.replace(`/${language}/${route}${location.search}${location.hash}`);
 }
 
-export function renderPage(template, locale, lang, assetVersion = 'local', { isRoot = false } = {}) {
+export function renderPage(template, locale, lang, assetVersion = 'local', { isRoot = false, route = '', fragments = {} } = {}) {
   if (!languages.includes(lang)) throw new Error(`Unsupported locale: ${lang}`);
   if (isRoot && lang !== 'en') throw new Error('The root page must use the English fallback');
   const values = {
     lang,
     assetVersion,
     supportUrl: 'https://web.tribute.tg/d/SHI',
-    assetPrefix: isRoot ? './' : '../',
-    canonical: `${siteOrigin}/${lang}/`,
-    defaultUrl: `${siteOrigin}/`,
-    ruUrl: `${siteOrigin}/ru/`,
-    enUrl: `${siteOrigin}/en/`,
+    assetPrefix: route ? '/' : isRoot ? './' : '../',
+    homeUrl: `/${lang}/`,
+    docsUrl: `/${lang}/docs/`,
+    mcpDocsUrl: `/${lang}/docs/agents/`,
+    canonical: `${siteOrigin}/${lang}/${route}`,
+    defaultUrl: `${siteOrigin}/${route}`,
+    ruUrl: `${siteOrigin}/ru/${route}`,
+    enUrl: `${siteOrigin}/en/${route}`,
     ogLocale: lang === 'ru' ? 'ru_RU' : 'en_US',
     ogAlternate: lang === 'ru' ? 'en_US' : 'ru_RU',
     ogImage: `${siteOrigin}/og/${lang}.png`,
   };
   return template.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
+    if (Object.hasOwn(fragments, key)) return fragments[key];
     if (key === 'languageRedirect') {
       return isRoot
-        ? `<script id="language-redirect">(${redirectToPreferredLanguage.toString()})(${JSON.stringify(languages)});</script>`
+        ? `<script id="language-redirect">(${redirectToPreferredLanguage.toString()})(${JSON.stringify(languages)},${JSON.stringify(route)});</script>`
         : '';
     }
     if (key === 'runtimeJson') {

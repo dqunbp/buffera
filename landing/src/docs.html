@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{languageRedirect}}
+  <meta name="theme-color" content="#f5f3f8">
+  <meta name="description" content="{{page.html_content}}">
+  <meta property="og:title" content="{{page.html_content_2}}">
+  <meta property="og:description" content="{{page.html_content_3}}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Buffera">
+  <meta property="og:url" content="{{canonical}}">
+  <meta property="og:locale" content="{{ogLocale}}">
+  <meta property="og:locale:alternate" content="{{ogAlternate}}">
+  <meta property="og:image" content="{{ogImage}}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{{page.og_image_alt}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{page.html_content_2}}">
+  <meta name="twitter:description" content="{{page.html_content_3}}">
+  <meta name="twitter:image" content="{{ogImage}}">
+  <meta name="twitter:image:alt" content="{{page.og_image_alt}}">
+  <link rel="canonical" href="{{canonical}}">
+  <link rel="alternate" hreflang="ru" href="{{ruUrl}}">
+  <link rel="alternate" hreflang="en" href="{{enUrl}}">
+  <link rel="alternate" hreflang="x-default" href="{{defaultUrl}}">
+  <title>{{page.html_content_2}}</title>
+  <link rel="icon" href="{{assetPrefix}}favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{assetPrefix}}styles.css?v={{assetVersion}}">
+  <link rel="stylesheet" href="{{assetPrefix}}docs.css?v={{assetVersion}}">
+  <script id="docs-data" type="application/json">{{docsJson}}</script>
+  <script src="{{assetPrefix}}docs.js?v={{assetVersion}}" defer></script>
+</head>
+<body class="docs-page">
+  <a class="skip-link" href="#main">{{page.skip_link_text}}</a>
+  <header class="docs-header">
+    <a class="brand" href="{{homeUrl}}" aria-label="{{page.brand_aria_label}}"><svg viewBox="0 0 40 32" aria-hidden="true"><path d="M7 6C1 26 15 34 20 17C25 34 39 26 33 6"/></svg><span>buffera</span></a>
+    <a class="docs-header-title" href="{{docsUrl}}">{{page.docs_title}}</a>
+    <div class="docs-header-actions"><a class="docs-back" href="{{homeUrl}}">{{page.docs_home}}</a><a class="button button-small button-dark docs-download" href="https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg">{{page.docs_download}} <span aria-hidden="true">↗</span></a></div>
+  </header>
+  <div class="docs-layout {{docsLayout}}">
+    <aside class="docs-sidebar">
+      <div class="docs-search" hidden><label for="docs-search" class="visually-hidden">{{page.docs_search}}</label><span aria-hidden="true">⌕</span><input id="docs-search" type="search" placeholder="{{page.docs_searchPlaceholder}}" autocomplete="off" aria-controls="docs-search-results"><kbd aria-hidden="true">/</kbd></div>
+      <noscript><p class="docs-search-fallback">{{page.docs_searchHint}}</p></noscript>
+      <details class="docs-menu" open><summary>{{page.docs_menu}}<span aria-hidden="true">⌄</span></summary>{{docsNavigation}}</details>
+      <a class="docs-sidebar-home" href="{{homeUrl}}">← {{page.docs_home}}</a>
+    </aside>
+    <main id="main" class="docs-main">
+      <section id="docs-search-results" class="docs-search-results" hidden aria-label="{{page.docs_search}}"><div class="docs-search-results-head"><p id="docs-search-status" role="status" aria-live="polite"></p><button type="button" id="docs-search-clear">{{page.docs_clear}}</button></div><div id="docs-search-matches"></div></section>
+      <div id="docs-page-content">{{docsContent}}</div>
+      <footer class="docs-footer"><span>{{page.docs_footer}}</span><a href="https://github.com/dqunbp/buffera">{{page.docs_source}} ↗</a></footer>
+    </main>
+    {{docsToc}}
+  </div>
+  <p id="docs-copy-status" class="visually-hidden" role="status" aria-live="polite"></p>
+</body>
+</html>
