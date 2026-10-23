@@ -1,5 +1,6 @@
 import AppKit
 import BufferaCore
+import BufferaLocalization
 import ImageIO
 
 func runSmokeTest() throws {
@@ -170,9 +171,9 @@ private func runPreviewSmokeChecks() throws {
         throw HistoryError.database("Preview changed Unicode text or line breaks")
     }
     let longText = String(repeating: "ж", count: 500_001)
+    let truncationNotice = L10n.text("\n\n— Показаны первые 500 000 символов. Копируется запись целиком. —")
     guard case .text(let truncated) = ClipPreviewContent.decode(payload(.string, Data(longText.utf8)), kind: .text),
-          truncated.hasPrefix(String(repeating: "ж", count: 500_000)),
-          truncated.contains("500 000"), truncated.count < 500_100 else {
+          truncated == String(repeating: "ж", count: 500_000) + truncationNotice else {
         throw HistoryError.database("Preview did not limit text with a truncation notice")
     }
     let path = "/tmp/проверка фото.png"

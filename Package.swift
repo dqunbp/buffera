@@ -38,7 +38,7 @@ let package = Package(
                           path: "Tests/BufferaEmbeddingRuntimeTests"),
         .executableTarget(name: "BufferaSearchChecks", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaLocalization"],
                           path: "Tests/BufferaSearchTests"),
-        .executableTarget(name: "BufferaChatChecks", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat"],
+        .executableTarget(name: "BufferaChatChecks", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat", "CSQLite"],
                           path: "Tests/BufferaChatTests"),
         .executableTarget(name: "BufferaChatRuntimeChecks", dependencies: ["BufferaModels"],
                           path: "Tests/BufferaChatRuntimeTests")

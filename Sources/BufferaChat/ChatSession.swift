@@ -273,7 +273,7 @@ public actor ChatSession {
                 })
                 break
             } catch {
-                if gate.isInvalid { throw ChatSessionError.historyChanged }
+                if let failure = gate.failure { throw failure }
                 if case ChatRuntimeError.contextTooLong = error, attempt < 4 {
                     budget /= 2
                     let perDocument = max(128, budget / max(1, evidence.count))
@@ -284,7 +284,7 @@ public actor ChatSession {
             }
         }
         try check(id)
-        guard gate.permits() else { throw ChatSessionError.historyChanged }
+        guard gate.permits() else { throw gate.failure ?? ChatSessionError.unavailable }
         guard let answer, !answer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ChatSessionError.emptyAnswer
         }

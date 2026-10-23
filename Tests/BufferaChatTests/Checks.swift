@@ -74,6 +74,7 @@ final class EventBuffer: @unchecked Sendable {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         try await runSharedEmbeddingChecks(root: root)
+        try await runHistoryAvailabilityChecks(root: root)
         let database = root.appendingPathComponent("history.sqlite")
         let store = try makeTestHistoryStore(url: database)
         func insert(_ text: String, source: String = "Fixture", date: Date = Date(),

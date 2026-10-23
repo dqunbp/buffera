@@ -128,13 +128,21 @@ struct ChatHistoryReader: Sendable {
     func validate(ids: Set<Int64>) throws {
         guard !ids.isEmpty else { return }
         let store = try HistoryStore(url: databaseURL, mode: .readOnly)
-        try store.withReadSnapshot {
-            for id in ids {
-                guard let current = try? store.summary(id: id), !current.isConcealed else {
-                    throw ChatSessionError.historyChanged
+        try Self.validate(ids: ids, in: store)
+    }
+
+    /// Missing/hidden evidence invalidates the conversation. An unreadable
+    /// database cannot establish that, and must retain its distinct error.
+    static func validate(ids: Set<Int64>, in store: HistoryStore) throws {
+        do {
+            try store.withReadSnapshot {
+                for id in ids {
+                    guard try !store.summary(id: id).isConcealed else {
+                        throw ChatSessionError.historyChanged
+                    }
                 }
             }
-        }
+        } catch HistoryError.missing { throw ChatSessionError.historyChanged }
     }
 }
 
@@ -144,7 +152,7 @@ final class ChatStreamGuard: @unchecked Sendable {
     private let lock = NSLock()
     private let reader: ChatHistoryReader
     private let ids: Set<Int64>
-    private var invalid = false
+    private var blockedBy: ChatSessionError?
     private var store: HistoryStore?
 
     init(reader: ChatHistoryReader, ids: Set<Int64>) { self.reader = reader; self.ids = ids }
@@ -152,23 +160,23 @@ final class ChatStreamGuard: @unchecked Sendable {
     func permits() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        guard !invalid else { return false }
+        guard blockedBy == nil else { return false }
         do {
             if store == nil { store = try HistoryStore(url: reader.databaseURL, mode: .readOnly) }
-            try store!.withReadSnapshot {
-                for id in ids {
-                    guard let current = try? store!.summary(id: id), !current.isConcealed else {
-                        throw ChatSessionError.historyChanged
-                    }
-                }
-            }
+            try ChatHistoryReader.validate(ids: ids, in: store!)
             return true
+        } catch ChatSessionError.historyChanged {
+            blockedBy = .historyChanged
+        } catch {
+            blockedBy = .unavailable
         }
-        catch { invalid = true; return false }
+        return false
     }
 
-    var isInvalid: Bool {
+    /// The first failed check blocks this entire response, even if storage
+    /// becomes readable before the worker finishes or delivers another token.
+    var failure: ChatSessionError? {
         lock.lock(); defer { lock.unlock() }
-        return invalid
+        return blockedBy
     }
 }

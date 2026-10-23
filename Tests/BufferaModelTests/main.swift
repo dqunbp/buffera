@@ -216,6 +216,105 @@ do {
 }
 
 do {
+    let directory = root("state-recovery")
+    let final = partial(directory).deletingPathExtension()
+    let assistantPartial = partial(directory, role: .assistant)
+    try FileManager.default.createDirectory(at: final.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: assistantPartial.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fullPayload.write(to: final)
+    let partialBytes = Data(fullPayload.prefix(65_536))
+    try partialBytes.write(to: assistantPartial)
+    let receiptURL = directory.appendingPathComponent("state.json")
+    let malformed = Data("{\"embedding\":".utf8)
+    let invalidSchema = try JSONSerialization.data(withJSONObject: [
+        "embedding": ["revision": revision, "sha256": expectedHash, "state": "unexpected", "enabled": true],
+        "assistant": ["revision": revision, "sha256": expectedHash, "state": "paused", "enabled": true]
+    ])
+    let before = requests().count
+    var originalReceipts: [Data] = []
+    for broken in [malformed, invalidSchema] {
+        try broken.write(to: receiptURL)
+        originalReceipts.append(broken)
+        let manager = try LocalModelManager(rootURL: directory,
+            descriptors: [descriptor(), descriptor(role: .assistant)])
+        let snapshots = manager.snapshots
+        check(snapshots.allSatisfy { !$0.isEnabled && !$0.isReadyForUse } &&
+              snapshots.first { $0.descriptor.role == .embedding }?.state == .downloaded &&
+              snapshots.first { $0.descriptor.role == .assistant }?.state == .paused,
+              "invalid model receipt reconstructs final and partial files with both features disabled")
+        check(manager.modelURL(for: .embedding) == nil && manager.modelURL(for: .assistant) == nil &&
+              (try? LocalModelReadAccess(rootURL: directory, descriptor: descriptor()).enabledEmbedding()) == nil &&
+              (try? LocalModelReadAccess(rootURL: directory, descriptor: descriptor(role: .assistant)).enabledAssistant()) == nil,
+              "recovered model files cannot be used before explicit activation and verification")
+        let archives = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("state.corrupt-") && $0.pathExtension == "json" }
+        let archivedBytes = try archives.map { try Data(contentsOf: $0) }
+        check(archives.count == originalReceipts.count && originalReceipts.allSatisfy(archivedBytes.contains),
+              "each invalid receipt is preserved byte-for-byte in a separate archive")
+        let recovered = try JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: [String: Any]]
+        check(recovered?["embedding"]?["enabled"] as? Bool == false &&
+              recovered?["assistant"]?["enabled"] as? Bool == false,
+              "recovery atomically replaces the receipt with disabled preferences")
+        check((try? Data(contentsOf: final)) == fullPayload &&
+              (try? Data(contentsOf: assistantPartial)) == partialBytes && requests().count == before,
+              "recovery preserves weights and partial downloads without starting network work")
+        manager.shutdown()
+    }
+    let restored = try LocalModelManager(rootURL: directory,
+        descriptors: [descriptor(), descriptor(role: .assistant)])
+    let archiveCount = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        .filter { $0.hasPrefix("state.corrupt-") }.count
+    check(archiveCount == 2 && restored.snapshots.allSatisfy { !$0.isEnabled && !$0.isReadyForUse },
+          "restart reads the repaired receipt without repeating recovery or enabling a feature")
+    restored.setEnabled(true, for: .embedding)
+    check(waitFor(restored) { $0.isReadyForUse } && restored.modelURL(for: .embedding) == final &&
+          (try? LocalModelReadAccess(rootURL: directory, descriptor: descriptor()).enabledEmbedding().fileURL) == final,
+          "explicit activation verifies and reuses a recovered installed model")
+    check(requests().count == before && (try? Data(contentsOf: assistantPartial)) == partialBytes,
+          "activating recovered weights does not download again or resume another feature")
+    restored.shutdown()
+}
+
+do {
+    for unsafe in ["directory", "symlink", "dangling-symlink", "unreadable", "unwritable-parent"] {
+        let directory = root("state-\(unsafe)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let receiptURL = directory.appendingPathComponent("state.json")
+        let target = directory.appendingPathComponent("target.json")
+        let bytes = Data("{broken".utf8)
+        switch unsafe {
+        case "directory":
+            try FileManager.default.createDirectory(at: receiptURL, withIntermediateDirectories: true)
+        case "symlink", "dangling-symlink":
+            if unsafe == "symlink" { try bytes.write(to: target) }
+            try FileManager.default.createSymbolicLink(at: receiptURL, withDestinationURL: target)
+        default:
+            try bytes.write(to: receiptURL)
+            try FileManager.default.setAttributes([.posixPermissions: unsafe == "unreadable" ? 0o000 : 0o500],
+                ofItemAtPath: unsafe == "unreadable" ? receiptURL.path : directory.path)
+        }
+        var rejected = false
+        do {
+            let manager = try LocalModelManager(rootURL: directory, descriptors: [descriptor()])
+            manager.shutdown()
+        } catch { rejected = true }
+        if unsafe == "unreadable" {
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: receiptURL.path)
+        } else if unsafe == "unwritable-parent" {
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        }
+        let archives = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("state.corrupt-") }
+        check(rejected && archives.isEmpty,
+              "receipt \(unsafe) errors remain explicit and never trigger recovery")
+        if unsafe == "unreadable" || unsafe == "unwritable-parent" {
+            check((try? Data(contentsOf: receiptURL)) == bytes,
+                  "failed receipt recovery preserves the original file after \(unsafe)")
+        }
+    }
+}
+
+do {
     let directory = root("disable-startup-verification")
     let file = partial(directory).deletingPathExtension()
     try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

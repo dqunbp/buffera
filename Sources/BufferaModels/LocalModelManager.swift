@@ -42,13 +42,8 @@ public final class LocalModelManager: @unchecked Sendable {
         self.entries = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.role, Entry($0)) })
         try ModelStorage.createDirectory(rootURL)
         let receiptURL = rootURL.appendingPathComponent("state.json")
-        let receipts: [String: ModelReceipt]
-        if FileManager.default.fileExists(atPath: receiptURL.path) {
-            _ = try ModelStorage.fileSize(receiptURL)
-            receipts = try JSONDecoder().decode([String: ModelReceipt].self, from: Data(contentsOf: receiptURL))
-        } else {
-            receipts = [:]
-        }
+        let loaded = try Self.loadReceipts(at: receiptURL)
+        let receipts = loaded.receipts
         for entry in entries.values {
             let descriptor = entry.descriptor
             let receipt = receipts[descriptor.role.rawValue]
@@ -87,6 +82,12 @@ public final class LocalModelManager: @unchecked Sendable {
                     }
                 }
             }
+        }
+        if let archive = loaded.archive {
+            // Reconstruct through the same file inspection as a missing receipt.
+            // Empty preferences keep every feature off until explicit activation.
+            try persist()
+            NSLog("Buffera: recovered model state; invalid receipt preserved as %@", archive.lastPathComponent)
         }
         queue.async { [weak self] in
             guard let self else { return }
@@ -370,6 +371,25 @@ public final class LocalModelManager: @unchecked Sendable {
 
     private func partialURL(_ entry: Entry) -> URL {
         fileURL(entry).appendingPathExtension("part")
+    }
+
+    private static func loadReceipts(at url: URL) throws -> (receipts: [String: ModelReceipt], archive: URL?) {
+        let data: Data
+        do {
+            // Validate even dangling symlinks instead of treating them as missing.
+            _ = try ModelStorage.fileSize(url)
+            data = try Data(contentsOf: url)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+            return ([:], nil)
+        }
+        do {
+            return (try JSONDecoder().decode([String: ModelReceipt].self, from: data), nil)
+        } catch is DecodingError {
+            let archive = url.deletingLastPathComponent()
+                .appendingPathComponent("state.corrupt-\(UUID().uuidString).json")
+            try FileManager.default.moveItem(at: url, to: archive)
+            return ([:], archive)
+        }
     }
 
     private func persist() throws {
