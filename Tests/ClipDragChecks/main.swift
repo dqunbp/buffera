@@ -116,7 +116,8 @@ for kind in ClipKind.allCases {
 
 // Exercise actual panel/card callbacks; use deferred preparation so no native
 // drag starts in this noninteractive suite.
-let panel = HistoryPanel()
+var fixtureFrontmostApp: NSRunningApplication?
+let panel = HistoryPanel(monitorsOutsideInteractions: false, currentFrontmostApplication: { fixtureFrontmostApp })
 panel.window.delegate = nil
 panel.window.alphaValue = 0
 panel.window.orderFront(nil)
@@ -132,6 +133,7 @@ panel.request = { _, _, _ in refreshes += 1 }
 panel.requestDragPayload = { _, _ in }
 let card = cards.card(at: 0)!
 card.requestDrag? { _ in }
+panel.dismissForOutsideInteraction()
 panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: panel.window))
 RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 try check(panel.window.isVisible && panel.isInteracting, "focus loss cannot close a drag source panel")
@@ -155,6 +157,75 @@ nextCard.onDragFinished?(.copy, nil)
 try check(completions == [1] && confirmations.isEmpty, "accepted copy marks use exactly once without clipboard confirmation")
 RunLoop.main.run(until: Date().addingTimeInterval(0.25))
 try check(panel.window.isVisible && refreshes == 2, "accepted drop keeps the unfocused panel visible and resumes deferred history refresh")
+panel.dismissForOutsideInteraction()
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(!panel.window.isVisible && confirmations.isEmpty, "outside click after drop closes an already unfocused panel without copying")
+
+// Exercise the workspace activation handler, even if the panel
+// has already lost key status during an earlier drop.
+panel.window.orderFront(nil)
+panel.receive([fixture()], total: 1, offset: 0)
+let switchCard = cards.card(at: 0)!
+switchCard.requestDrag? { _ in }
+guard let otherApp = NSWorkspace.shared.runningApplications.first(where: {
+    $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+}) else { fatalError("No other running application for activation fixture") }
+func switchApplication() {
+    fixtureFrontmostApp = otherApp
+    panel.applicationDidActivate(otherApp)
+}
+switchApplication()
+try check(panel.window.isVisible, "application activation during drag cannot close the source")
+switchCard.onDragFinished?(.copy, nil)
+switchApplication()
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(!panel.window.isVisible, "application switch after drop dismisses the unfocused panel")
+
+panel.window.orderFront(nil)
+panel.receive([fixture()], total: 1, offset: 0)
+fixtureFrontmostApp = .current
+panel.applicationDidActivate(otherApp)
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible, "a stale activation for an app that is no longer frontmost cannot dismiss")
+switchApplication()
+fixtureFrontmostApp = .current
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible, "activation dismissal rechecks the frontmost app after deferral")
+panel.showNearby(id: 1)
+let pin = descendants(panel.window.contentView!).compactMap { $0 as? NSButton }
+    .first { $0.identifier?.rawValue == "history.pin" }!
+pin.performClick(nil)
+panel.dismissForOutsideInteraction()
+switchApplication()
+try check(panel.window.isVisible && panel.isShowingNearby, "pin protects nearby from outside clicks and application switching")
+let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+    windowNumber: panel.window.windowNumber, context: nil, characters: "\u{1b}",
+    charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!
+_ = panel.window.onKeyDown?(escape)
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible && panel.isShowingNearby, "Escape preserves pinned nearby history")
+panel.close(restoreFocus: false)
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+panel.window.orderFront(nil)
+panel.receive([fixture()], total: 1, offset: 0)
+let preparingCard = cards.card(at: 0)!
+let startDrag = NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: 20, y: 20),
+    modifierFlags: [], timestamp: 0, windowNumber: panel.window.windowNumber, context: nil,
+    eventNumber: 1, clickCount: 1, pressure: 1)!
+let moveDrag = NSEvent.mouseEvent(with: .leftMouseDragged, location: NSPoint(x: 40, y: 20),
+    modifierFlags: [], timestamp: 0, windowNumber: panel.window.windowNumber, context: nil,
+    eventNumber: 2, clickCount: 1, pressure: 1)!
+preparingCard.mouseDown(with: startDrag)
+preparingCard.mouseDragged(with: moveDrag)
+try check(panel.window.onKeyDown?(escape) == true && panel.window.isVisible,
+          "Escape consumes cancellation of pending drag preparation without closing the panel")
+_ = panel.window.onKeyDown?(escape)
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(panel.window.isVisible, "Escape after drag cancellation still respects pinning")
+pin.performClick(nil)
+_ = panel.window.onKeyDown?(escape)
+RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+try check(!panel.window.isVisible, "unpinning allows dismissal after drag cancellation")
 panel.window.orderOut(nil)
 
 let source = NSView()

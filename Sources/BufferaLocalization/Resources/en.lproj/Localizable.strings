@@ -182,8 +182,8 @@
 "Избранное" = "Favorites";
 "Назад в историю" = "Back to History";
 "Загружаем соседние записи…" = "Loading nearby items…";
-"Показаны соседние копирования из всей истории. Esc — вернуться в историю." = "Showing nearby copies from all history. Esc returns to history.";
-"Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр" = "Esc history   ↑↓ select   ↩ copy   Space preview";
+"Показаны соседние копирования из всей истории. Esc — закрыть окно." = "Showing nearby copies from all history. Esc closes the window.";
+"Esc закрыть   ↑↓ выбор   ↩ в буфер   Пробел просмотр" = "Esc close   ↑↓ select   ↩ copy   Space preview";
 "↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное" = "↑↓ select   ↩ copy   Space preview   ⌘D favorite";
 "Все слова запроса должны встретиться в записи." = "All search words must occur in the item.";
 "По словам и по смыслу, когда «Поиск по смыслу» включён в настройках. Пустой запрос показывает историю." = "Search by words and meaning when Semantic Search is enabled in settings. An empty query shows history.";
@@ -203,7 +203,6 @@
 "Вся история · ⌘0" = "All history · ⌘0";
 "Настройки · ⌘," = "Settings · ⌘,";
 "Дополнять совпадения текста похожими по смыслу записями. Включите «Поиск по смыслу» в настройках." = "Include semantically similar items alongside text matches. Turn on Semantic Search in settings.";
-"Назад в историю · Esc" = "Back to history · Esc";
 "Спросить Buffera о том, что вы копировали" = "Ask Buffera about what you copied";
 "Открепить окно истории" = "Unpin history window";
 "Закрепить окно истории" = "Pin history window";

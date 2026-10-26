@@ -43,6 +43,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var bodyMinimumHeight: NSLayoutConstraint!
     private var presentationToken = 0
     private var focusToken = 0
+    private var outsideInteractionToken = 0
+    private let currentFrontmostApplication: () -> NSRunningApplication?
     private var changingFrame = false
     private var isClosing = false
     private let thumbnails = NSCache<NSNumber, NSImage>()
@@ -81,6 +83,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var cardMenuTracking = false
     private var dragSourceID: Int64?
     private var dragHistoryDirty = false
+    private var outsideClickMonitor: Any?
+    private var localClickMonitor: Any?
     private var cancelDragPreparation: (() -> Void)?
     private var pendingSelectionID: Int64?
     private var retainedSelectionID: Int64?
@@ -134,8 +138,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || nearbyIntroduction != nil || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing && nearbyIntroduction == nil }
 
-    init(introductionDefaults: UserDefaults = .standard) {
+    init(introductionDefaults: UserDefaults = .standard, monitorsOutsideInteractions: Bool = true,
+         currentFrontmostApplication: @escaping () -> NSRunningApplication? = { NSWorkspace.shared.frontmostApplication }) {
         self.introductionDefaults = introductionDefaults
+        self.currentFrontmostApplication = currentFrontmostApplication
         super.init()
         build()
         thumbnails.countLimit = 150
@@ -143,7 +149,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.delegate = self
         window.onKeyDown = { [weak self] event in
             if let self, self.dragSourceID != nil {
-                if event.keyCode == 53 { self.cancelDragPreparation?(); return false }
+                if event.keyCode == 53 {
+                    self.cancelDragPreparation?()
+                    // Active native drags handle Escape themselves. A cancelled
+                    // preparation consumes it so it cannot also close the panel.
+                    return self.dragSourceID == nil
+                }
                 return true
             }
             guard let self, self.window.isVisible, self.window.attachedSheet == nil,
@@ -177,16 +188,27 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] notification in
-            guard let self, self.isPinned, self.window.isVisible, !self.isClosing,
-                  let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
-            self.previousApp = app
+            guard let self, monitorsOutsideInteractions,
+                  let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            self.applicationDidActivate(app)
+        }
+        if monitorsOutsideInteractions {
+            let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: clicks) { [weak self] event in
+                self?.observeMouseDown(event, source: .globalMouse)
+            }
+            localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
+                self?.observeMouseDown(event, source: .localMouse)
+                return event
+            }
         }
         configureAppearance()
         if appearance.mode != .floating { positionDockedWindow() }
     }
 
     deinit {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        if let localClickMonitor { NSEvent.removeMonitor(localClickMonitor) }
         if let appActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver) }
     }
 
@@ -516,9 +538,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         scope.isHidden = isShowingNearby; nearbyBack.isHidden = !isShowingNearby
         nearbyBack.isEnabled = !confirming && !commitWhenLoaded
         resetSearch.isHidden = isShowingNearby || (search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0)
-        search.toolTip = isShowingNearby ? L10n.text("Показаны соседние копирования из всей истории. Esc — вернуться в историю.") : nil
+        search.toolTip = isShowingNearby ? L10n.text("Показаны соседние копирования из всей истории. Esc — закрыть окно.") : nil
         hint.stringValue = isShowingNearby
-            ? L10n.text("Esc в историю   ↑↓ выбор   ↩ в буфер   Пробел просмотр")
+            ? L10n.text("Esc закрыть   ↑↓ выбор   ↩ в буфер   Пробел просмотр")
             : L10n.text("↑↓ выбор   ↩ в буфер   Пробел просмотр   ⌘D избранное")
     }
 
@@ -648,6 +670,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
     }
     func windowDidBecomeKey(_ notification: Notification) {
+        outsideInteractionToken += 1
         commandHeld = NSEvent.modifierFlags.contains(.command); updateVisibleCards()
     }
     func windowDidResignKey(_ notification: Notification) {
@@ -679,6 +702,62 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         updateVisibleCards()
     }
 
+    enum OutsideInteractionSource: String {
+        case localMouse, globalMouse, applicationActivation
+    }
+
+    func observeMouseDown(_ event: NSEvent, source: OutsideInteractionSource) {
+        guard window.isVisible, !isClosing else { return }
+        let eventWindow = event.window
+        // AppKit can send unassociated mouse events in screen coordinates,
+        // including the non-content part of a window. nil is not "outside".
+        let belongsToPanel = eventWindow === window || event.windowNumber == window.windowNumber
+        let screenPoint = eventWindow.map { $0.convertPoint(toScreen: event.locationInWindow) }
+            ?? event.locationInWindow
+        let insideFrame = window.frame.contains(screenPoint)
+        // A foreign process can have a valid window number without an NSWindow
+        // object in this app. Do not mistake its overlapping window for ours.
+        let unassociated = eventWindow == nil && event.windowNumber <= 0
+        let inside = belongsToPanel || (unassociated && insideFrame)
+        logger.notice("Panel mouse: source=\(source.rawValue, privacy: .public), window=\(event.windowNumber), associated=\(eventWindow != nil), insideFrame=\(insideFrame), inside=\(inside), key=\(self.window.isKeyWindow)")
+        if inside {
+            outsideInteractionToken += 1
+            return
+        }
+        dismissForOutsideInteraction(source: source)
+    }
+
+    func applicationDidActivate(_ app: NSRunningApplication) {
+        guard window.isVisible, !isClosing,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              currentFrontmostApplication()?.processIdentifier == app.processIdentifier else { return }
+        if isPinned { previousApp = app }
+        else { dismissForOutsideInteraction(source: .applicationActivation, expectedApplicationPID: app.processIdentifier) }
+    }
+
+    // Mouse-down, not mouse-up: dropping a record leaves the panel available
+    // for another drag. This also works when it has already lost key status.
+    func dismissForOutsideInteraction(source: OutsideInteractionSource = .localMouse,
+                                      expectedApplicationPID: pid_t? = nil) {
+        guard window.isVisible, !isClosing, !isPinned, dragSourceID == nil,
+              nearbyIntroduction == nil, window.attachedSheet == nil,
+              !filters.isPresenting, !cardMenuTracking, !preview.isShown else { return }
+        let token = presentationToken
+        let interactionToken = outsideInteractionToken
+        // AppKit tracks buttons in a nested run loop. Wait for tracking to
+        // finish so the pin action can run before deciding whether to dismiss.
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            guard let self, token == self.presentationToken, interactionToken == self.outsideInteractionToken,
+                  self.window.isVisible, !self.isClosing, !self.isPinned, self.dragSourceID == nil,
+                  self.nearbyIntroduction == nil, self.window.attachedSheet == nil,
+                  !self.filters.isPresenting, !self.cardMenuTracking, !self.preview.isShown else { return }
+            if let expectedApplicationPID,
+               self.currentFrontmostApplication()?.processIdentifier != expectedApplicationPID { return }
+            self.logger.notice("Panel dismissal: source=\(source.rawValue, privacy: .public), key=\(self.window.isKeyWindow)")
+            self.close(restoreFocus: false)
+        }
+    }
+
     private func closeIfUnfocused() {
         guard dragSourceID == nil, nearbyIntroduction == nil else { return }
         // Filter menus, calendar popovers and save sheets can own keyboard input.
@@ -689,11 +768,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             if isPinned { remaskConcealedText() }
         }
         let token = presentationToken
-        DispatchQueue.main.async { [weak self] in
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
             guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
                   self.dragSourceID == nil, self.nearbyIntroduction == nil, !self.cardMenuTracking, !self.preview.isShown else { return }
             guard !self.isPinned else { return }
+            self.logger.notice("Panel dismissal: focus loss")
             self.close(restoreFocus: false)
         }
     }
@@ -739,8 +819,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if event.keyCode == 53 {
             if isConfirmingCopyTransform { cancelCopyTransform(); return nil }
             if preview.isShown { dismissPreview(); window.makeKey(); window.makeFirstResponder(cards) }
-            else if isShowingNearby { returnFromNearby() }
-            else { close() }
+            else if !isPinned { close() }
             return nil
         }
         if confirming || commitWhenLoaded { return nil }
@@ -1403,7 +1482,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyBack.bezelStyle = .rounded
         nearbyBack.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
         nearbyBack.imagePosition = .imageLeading
-        nearbyBack.toolTip = L10n.text("Назад в историю · Esc")
+        nearbyBack.toolTip = L10n.text("Назад в историю")
         nearbyBack.setAccessibilityLabel(L10n.text("Назад в историю"))
         nearbyBack.isHidden = true
         chatButton.target = self; chatButton.action = #selector(showChat)
@@ -1464,6 +1543,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     @objc private func togglePinned() {
+        logger.notice("Panel pin changed: pinned=\(self.isPinned), closing=\(self.isClosing), key=\(self.window.isKeyWindow)")
         cancelShortcutGesture()
         updatePinButton()
         if !isPinned { closeIfUnfocused() }

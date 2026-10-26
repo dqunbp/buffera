@@ -34,7 +34,7 @@ func fixture(_ id: Int) -> ClipSummary {
 final class PanelHarness {
     struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool; let filter: SearchFilter; let mode: HistorySearchMode }
     struct NearbyRequest { let anchorID: Int64; let token: Int }
-    let panel = HistoryPanel()
+    let panel = HistoryPanel(monitorsOutsideInteractions: false)
     let search: NSSearchField
     let cards: HistoryCardsView
     var requests: [Request] = []
@@ -90,6 +90,67 @@ final class PanelHarness {
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
+
+func mouseDismissalChecks() {
+    let value = PanelHarness(rows: [fixture(1)])
+    defer { value.finish() }
+    func mouse(_ point: NSPoint, windowNumber: Int = 0) -> NSEvent {
+        NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0,
+            windowNumber: windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1)!
+    }
+    func flush() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
+    let panel = value.panel
+    let titlebar = NSPoint(x: panel.window.frame.midX, y: panel.window.frame.maxY - 5)
+    let unassociated = mouse(titlebar)
+    check(unassociated.window == nil, "titlebar fixture is an unassociated screen-coordinate mouse event")
+    panel.observeMouseDown(unassociated, source: .localMouse)
+    flush()
+    check(panel.window.isVisible, "an unassociated click inside the titlebar must not dismiss history")
+    panel.observeMouseDown(unassociated, source: .globalMouse)
+    flush()
+    check(panel.window.isVisible, "unassociated in-frame clicks from the global monitor also preserve history")
+
+    let scope = descendants(of: panel.window.contentView!).compactMap { $0 as? NSSegmentedControl }.first!
+    let scopePoint = scope.convert(NSPoint(x: scope.bounds.midX, y: scope.bounds.midY), to: nil)
+    for segment in [1, 0] {
+        panel.observeMouseDown(mouse(scopePoint, windowNumber: panel.window.windowNumber), source: .localMouse)
+        scope.selectedSegment = segment
+        _ = NSApp.sendAction(scope.action!, to: scope.target, from: scope)
+        panel.receive([fixture(1)], total: 1, offset: 0)
+        flush()
+        check(panel.window.isVisible, "switching History/Favorites through a panel click keeps it open")
+    }
+    let outside = mouse(NSPoint(x: panel.window.frame.maxX + 30, y: panel.window.frame.midY))
+    panel.observeMouseDown(outside, source: .globalMouse)
+    panel.observeMouseDown(unassociated, source: .localMouse)
+    flush()
+    check(panel.window.isVisible, "a later inside click cancels queued outside dismissal")
+    panel.observeMouseDown(outside, source: .globalMouse)
+    panel.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification, object: panel.window))
+    flush()
+    check(panel.window.isVisible, "returning keyboard focus cancels queued outside dismissal")
+
+    let overlay = NSWindow(contentRect: panel.window.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    defer { overlay.orderOut(nil) }
+    overlay.alphaValue = 0; overlay.orderFront(nil)
+    let overlapClick = mouse(overlay.convertPoint(fromScreen: titlebar), windowNumber: overlay.windowNumber)
+    check(overlapClick.window === overlay, "overlap fixture retains its actual window identity")
+    panel.observeMouseDown(overlapClick, source: .localMouse)
+    flush()
+    check(!panel.window.isVisible, "a click in a different known window dismisses even when frames overlap")
+    panel.window.orderFront(nil)
+    let foreignWindow = mouse(titlebar, windowNumber: Int(Int32.max))
+    check(foreignWindow.window == nil && foreignWindow.windowNumber > 0,
+          "foreign-window fixture has a window number without a local NSWindow")
+    panel.observeMouseDown(foreignWindow, source: .globalMouse)
+    flush()
+    check(!panel.window.isVisible, "a foreign window overlapping the panel is still an outside click")
+    panel.window.orderFront(nil)
+    panel.observeMouseDown(outside, source: .globalMouse)
+    flush()
+    check(!panel.window.isVisible, "a genuine unassociated outside click still dismisses")
+}
+mouseDismissalChecks()
 
 func searchDeletionChecks() {
     let harness = PanelHarness(rows: [fixture(1)])
@@ -843,8 +904,8 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     results.append((pinned.panel.selected?.id == 3 && pinned.confirmations.isEmpty,
                     "arrow navigation still changes selection with the anchor enabled"))
     escape(pinned)
-    results.append((!pinned.panel.window.isVisible && pinned.confirmations.isEmpty && pinned.panel.isPinned,
-                    "Escape explicitly closes pinned history without copying and retains its session setting"))
+    results.append((pinned.panel.window.isVisible && pinned.confirmations.isEmpty && pinned.panel.isPinned,
+                    "Escape keeps pinned history open without copying"))
     pinned.panel.open()
     pinned.panel.receive(clips, total: clips.count, offset: 0)
     flushMainQueue()
@@ -861,6 +922,16 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     flushMainQueue()
     results.append((!pinned.panel.isPinned && !pinned.panel.window.isVisible,
                     "unpinning restores automatic dismissal on focus loss"))
+
+    let pinRace = harness()
+    let racePin = descendants(of: pinRace.panel.window.contentView!).compactMap { $0 as? NSButton }
+        .first { $0.identifier?.rawValue == "history.pin" }!
+    pinRace.panel.move(1)
+    pinRace.panel.dismissForOutsideInteraction()
+    racePin.performClick(nil)
+    flushMainQueue()
+    results.append((pinRace.panel.window.isVisible && pinRace.panel.isPinned && pinRace.confirmations.isEmpty,
+                    "pinning before a queued outside dismissal keeps the panel visible"))
 
     let secret = ClipSummary(id: 1, date: Date(), kind: .text, title: "Secret title",
                              text: "Secret body", source: "Panel Fixture App", byteCount: 11, isConcealed: true)
@@ -1140,9 +1211,15 @@ func nearbyChecks() -> [(Bool, String)] {
     results.append((interrupted.panel.isShowingNearby && interrupted.panel.selected?.id == 2
                     && interrupted.requests.count == beforeCapture && !interrupted.search.isEnabled,
                     "capture, OCR completion, and stale search responses cannot replace nearby or steal selection"))
+    let menuCard = interrupted.cards.card(at: interrupted.cards.selectedIndex)!
+    menuCard.onMenuTracking?(true)
+    let menuEscapeHandled = key(interrupted, code: 53, characters: "\u{1b}")
+    results.append((!menuEscapeHandled && interrupted.panel.window.isVisible && interrupted.panel.isShowingNearby,
+                    "Escape belongs to the active menu instead of closing nearby history"))
+    menuCard.onMenuTracking?(false)
     let escapeHandled = key(interrupted, code: 53, characters: "\u{1b}")
-    results.append((escapeHandled && !interrupted.panel.isShowingNearby && interrupted.panel.window.isVisible,
-                    "Escape leaves nearby without closing the history window"))
+    results.append((escapeHandled && !interrupted.panel.isShowingNearby && !interrupted.panel.window.isVisible,
+                    "Escape closes nearby directly without confirming a record"))
 
     let previewing = harness()
     previewing.panel.showNearby(id: 3)
@@ -1160,8 +1237,8 @@ func nearbyChecks() -> [(Bool, String)] {
                     && previewing.panel.selected?.id == 3 && previewing.panel.window.isVisible,
                     "the first Escape closes a nearby preview while retaining nearby selection"))
     _ = key(previewing, code: 53, characters: "\u{1b}")
-    results.append((!previewing.panel.isShowingNearby && previewing.panel.window.isVisible,
-                    "the second Escape returns from nearby after the preview has closed"))
+    results.append((!previewing.panel.isShowingNearby && !previewing.panel.window.isVisible,
+                    "the second Escape closes the panel after the nearby preview has closed"))
 
     let missing = harness()
     missing.panel.move(4)
