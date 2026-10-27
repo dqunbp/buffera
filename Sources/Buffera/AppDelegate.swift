@@ -47,7 +47,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastError: Error?
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
-    private var shortcutItem: NSMenuItem!
     private var openHistoryItem: NSMenuItem!
     private var imageTextItem: NSMenuItem!
     private var retryImageTextItem: NSMenuItem!
@@ -821,7 +820,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     private func updateShortcutMenu() {
         let title = hotKeys.preferences.nextTitle
-        shortcutItem.title = hotKeys.isRegistered ? L10n.text("\(title) подключено") : L10n.text("Подключить \(title) снова…")
         openHistoryItem.title = L10n.text("Открыть историю    \(title)")
     }
     @objc private func togglePause() {
@@ -833,11 +831,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func retryImageText() { imageTextIndexer?.retryFailed() }
     private func showImageTextProgress(_ progress: ImageTextProgress) {
         if progress.pending > 0 {
-            imageTextItem.title = L10n.text("Распознавание картинок: осталось \(progress.pending)")
+            imageTextItem.title = L10n.text("Текст в картинках: распознаётся… осталось \(progress.pending)")
         } else if progress.failed > 0 {
             imageTextItem.title = L10n.text("Не удалось распознать: \(progress.failed)")
         } else {
-            imageTextItem.title = L10n.text("Поиск по картинкам: готово")
+            imageTextItem.title = L10n.text("Текст в картинках: распознан")
         }
         retryImageTextItem.isHidden = progress.failed == 0
     }
@@ -896,11 +894,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chatMenuItems.append(statusChatItem)
         let settingsItem = add(L10n.text("Настройки…"), #selector(showSettings))
         settingsItem.keyEquivalent = ","
-        _ = add(L10n.text("Настроить Buffera…"), #selector(showSetup))
-        shortcutItem = add(L10n.text("Подключить \(hotKeys.preferences.nextTitle) снова…"), #selector(registerShortcuts))
         pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
         menu.addItem(.separator())
-        imageTextItem = NSMenuItem(title: L10n.text("Подготовка поиска по картинкам…"), action: nil, keyEquivalent: "")
+        imageTextItem = NSMenuItem(title: L10n.text("Текст в картинках: распознаётся…"), action: nil, keyEquivalent: "")
         menu.addItem(imageTextItem)
         retryImageTextItem = add(L10n.text("Повторить распознавание"), #selector(retryImageText))
         retryImageTextItem.isHidden = true
