@@ -10,7 +10,7 @@
 
 ## Скачать
 
-[Скачать Buffera для Apple Silicon](https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg) · [Все выпуски](https://github.com/dqunbp/buffera/releases) · [Сайт](https://buffera-soft-touch.dqunbp.chatgpt.site)
+[Скачать Buffera для Apple Silicon](https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg) · [Все выпуски](https://github.com/dqunbp/buffera/releases) · [Сайт](https://buffera.app)
 
 Поддержать разработку можно через кнопку внизу настроек. Она открывает [страницу Tribute](https://web.tribute.tg/d/SHI) в браузере. Донат добровольный и не открывает дополнительные функции.
 

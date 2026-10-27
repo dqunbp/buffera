@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://buffera-soft-touch.dqunbp.chatgpt.site/en/">
+  <a href="https://buffera.app/en/">
     <img src="landing/src/og/en.png" alt="Buffera — nice buffers. Great memory. Clipboard history for Mac." width="900">
   </a>
 </p>
@@ -16,9 +16,9 @@
 <p align="center">
   <a href="https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg"><strong>Download for Mac ↓</strong></a>
   &nbsp; · &nbsp;
-  <a href="https://buffera-soft-touch.dqunbp.chatgpt.site/en/">Website &amp; demo</a>
+  <a href="https://buffera.app/en/">Website &amp; demo</a>
   &nbsp; · &nbsp;
-  <a href="https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/">User guide</a>
+  <a href="https://buffera.app/en/docs/">User guide</a>
   &nbsp; · &nbsp;
   <a href="https://github.com/dqunbp/buffera/releases">What's new</a>
 </p>
@@ -46,17 +46,17 @@ Light, dark and system themes. List and grid layouts. Custom shortcuts and a his
 
 > The app is not yet notarized by Apple. If macOS blocks it, try opening it once, then go to **System Settings → Privacy & Security → Open Anyway**. [Installation details →](docs/INSTALL.txt)
 
-Semantic search and chat are optional: enable them in Settings to download the local models. Clipboard history works without them. [Search and model setup →](https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/search/)
+Semantic search and chat are optional: enable them in Settings to download the local models. Clipboard history works without them. [Search and model setup →](https://buffera.app/en/docs/search/)
 
 ## Your history stays on your Mac
 
 History, text recognition and the built-in models run locally. Access through MCP is off by default; once you connect an external agent, that agent determines how the data it reads is processed.
 
-Secrets marked by the source app are skipped by default. You can enable encrypted storage for them; concealed content is excluded from search, chat and MCP. A password without that marker may be saved as ordinary text. [How privacy works →](https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/privacy/)
+Secrets marked by the source app are skipped by default. You can enable encrypted storage for them; concealed content is excluded from search, chat and MCP. A password without that marker may be saved as ordinary text. [How privacy works →](https://buffera.app/en/docs/privacy/)
 
 ## Explore more
 
-[Shortcuts and tips](https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/shortcuts/) · [Connect an agent](https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/agents/) · [Ask Buffera](https://buffera-soft-touch.dqunbp.chatgpt.site/en/docs/assistant/) · [Releases](https://github.com/dqunbp/buffera/releases)
+[Shortcuts and tips](https://buffera.app/en/docs/shortcuts/) · [Connect an agent](https://buffera.app/en/docs/agents/) · [Ask Buffera](https://buffera.app/en/docs/assistant/) · [Releases](https://github.com/dqunbp/buffera/releases)
 
 <details>
 <summary><strong>Build from source</strong> — Swift + AppKit</summary>

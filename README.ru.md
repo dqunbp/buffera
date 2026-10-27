@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://buffera-soft-touch.dqunbp.chatgpt.site/ru/">
+  <a href="https://buffera.app/ru/">
     <img src="landing/src/og/ru.png" alt="Buffera — хорошие буфера. Всё помнят. История буфера обмена для Mac." width="900">
   </a>
 </p>
@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://github.com/dqunbp/buffera/releases/latest/download/Buffera-macOS-arm64.dmg"><strong>Скачать для Mac ↓</strong></a>
   &nbsp; · &nbsp;
-  <a href="https://buffera-soft-touch.dqunbp.chatgpt.site/ru/">Сайт и демо</a>
+  <a href="https://buffera.app/ru/">Сайт и демо</a>
   &nbsp; · &nbsp;
   <a href="docs/guide.md">Руководство</a>
   &nbsp; · &nbsp;

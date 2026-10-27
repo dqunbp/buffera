@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 export const languages = ['ru', 'en'];
-export const siteOrigin = 'https://buffera-soft-touch.dqunbp.chatgpt.site';
+export const siteOrigin = 'https://buffera.app';
 const src = new URL('../src/', import.meta.url);
 const placeholders = value => [...value.matchAll(/\{([a-zA-Z]\w*)\}/g)].map(match => match[1]).sort();
 
