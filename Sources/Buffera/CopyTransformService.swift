@@ -50,6 +50,7 @@ final class CopyTransformService {
                             let text = try Self.fullText(payload)
                             var lineActions: Set<TextTransformation>?
                             return candidates.filter { operation in
+                                if case .textFile = operation { return true }
                                 guard case .text(let transformation) = operation else { return false }
                                 if transformation == .plainText { return true }
                                 guard let output = try? transformation.apply(to: text),
@@ -96,6 +97,9 @@ final class CopyTransformService {
                                 guard let payload else { throw HistoryError.invalidPayload }
                                 let text = try Self.fullText(payload)
                                 return try transformation.apply(to: text)
+                            case .textFile:
+                                guard let payload else { throw HistoryError.invalidPayload }
+                                return try Self.fullText(payload)
                             case .imageText:
                                 let text: String
                                 if let cachedText { text = cachedText }
@@ -117,6 +121,23 @@ final class CopyTransformService {
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+    }
+
+    /// Prepare on the storage queue before touching the pasteboard. File URLs are
+    /// the sole representation so destinations receive an attachment, not text.
+    static func clipboardPayload(text: String, operation: CopyTransformOperation,
+                                 id: Int64, exports: TemporaryImageExports) throws -> ClipPayload {
+        guard !text.isEmpty else { throw CopyTransformError.noText }
+        let representation: Representation
+        if case .textFile(let format) = operation {
+            let url = try exports.file(data: Data(text.utf8), id: id, fileExtension: format.rawValue)
+            representation = Representation(type: NSPasteboard.PasteboardType.fileURL.rawValue,
+                                            data: Data(url.absoluteString.utf8))
+        } else {
+            representation = Representation(type: NSPasteboard.PasteboardType.string.rawValue,
+                                            data: Data(text.utf8))
+        }
+        return ClipPayload(items: [[representation]])
     }
 
     private func validate(id: Int64, operation: CopyTransformOperation) throws {

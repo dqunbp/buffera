@@ -1352,14 +1352,14 @@ func copyTransformChecks() {
     var cancellations = 0
     var navigations = 0
     var availability: [(Int64, (Result<[CopyTransformOperation], Error>) -> Void)] = []
-    let offered: [CopyTransformOperation] = [.text(.plainText), .text(.unwrapLines)]
+    let offered: [CopyTransformOperation] = [.text(.plainText), .text(.unwrapLines), .textFile(.txt), .textFile(.md)]
     value.panel.requestCopyTransformOperations = { id, completion in
         availability.append((id, completion))
     }
     value.panel.requestCopyTransform = { id, operation, completion in
         requests.append((id, operation)); pendingResult = completion
     }
-    value.panel.onCopyTransformed = { id, text, completion in
+    value.panel.onCopyTransformed = { id, _, text, completion in
         copied.append((id, text)); pendingCopy = completion
     }
     value.panel.onCancelCopyTransformed = { cancellations += 1 }
@@ -1470,19 +1470,21 @@ func copyTransformChecks() {
     success.panel.requestCopyTransformOperations = { _, completion in completion(.success(offered)) }
     var successfulSource: Int64?
     var successfulText: String?
+    var successfulOperation: CopyTransformOperation?
     var successfulCompletion: ((Error?) -> Void)?
     success.panel.requestCopyTransform = { id, operation, completion in
         successfulSource = id
         completion(.success("Direct menu result"))
     }
-    success.panel.onCopyTransformed = { id, text, completion in
+    success.panel.onCopyTransformed = { id, operation, text, completion in
+        successfulOperation = operation
         successfulText = text; successfulCompletion = completion
     }
     var closed = false
     success.panel.onClose = { closed = true }
-    choose(menu(success, at: 1), .text(.plainText))
+    choose(menu(success, at: 1), .textFile(.md))
     waitUntil("copy from another card") { successfulCompletion != nil }
-    check(successfulSource == 2 && success.panel.selected?.id == 2 && successfulText == "Direct menu result",
+    check(successfulSource == 2 && success.panel.selected?.id == 2 && successfulText == "Direct menu result" && successfulOperation == .textFile(.md),
           "a nonselected card's submenu copies that card instead of the previous selection")
     successfulCompletion?(nil)
     waitUntil("successful transformed copy closes history") { closed }
@@ -1496,7 +1498,7 @@ func copyTransformChecks() {
     var writeAfterClose: ((Error?) -> Void)?
     var closeCancellations = 0
     var closeCount = 0
-    closingWrite.panel.onCopyTransformed = { _, _, completion in writeAfterClose = completion }
+    closingWrite.panel.onCopyTransformed = { _, _, _, completion in writeAfterClose = completion }
     closingWrite.panel.onCancelCopyTransformed = { closeCancellations += 1 }
     closingWrite.panel.onClose = { closeCount += 1 }
     choose(menu(closingWrite), .text(.plainText))

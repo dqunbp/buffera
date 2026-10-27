@@ -121,7 +121,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onPreview: ((ClipSummary, Int) -> Void)?
     var requestCopyTransformOperations: ((Int64, @escaping (Result<[CopyTransformOperation], Error>) -> Void) -> Void)?
     var requestCopyTransform: ((Int64, CopyTransformOperation, @escaping (Result<String, Error>) -> Void) -> Void)?
-    var onCopyTransformed: ((Int64, String, @escaping (Error?) -> Void) -> Void)?
+    var onCopyTransformed: ((Int64, CopyTransformOperation, String, @escaping (Error?) -> Void) -> Void)?
     var onCancelCopyTransformed: (() -> Void)?
     var onClose: (() -> Void)?
     var onShortcutGestureEnd: (() -> Void)?
@@ -1007,7 +1007,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             switch result {
             case .failure(let error): self.copyTransformFailed(error)
             case .success(let text):
-                onCopyTransformed(id, text) { [weak self] error in
+                onCopyTransformed(id, operation, text) { [weak self] error in
                     guard let self, token == self.copyTransformToken, self.isConfirmingCopyTransform,
                           self.isAvailableForShortcut else { return }
                     if let error { self.copyTransformFailed(error) }

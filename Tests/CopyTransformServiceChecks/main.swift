@@ -2,10 +2,7 @@ import AppKit
 import BufferaCore
 
 // Uses a temporary SQLite database and a private named pasteboard, never user history or the general pasteboard.
-// mkdir -p .build/copy-transform-service-checks
-// swiftc -emit-library -emit-module -module-name BufferaCore -I Sources/CSQLite Sources/BufferaCore/*.swift -emit-module-path .build/copy-transform-service-checks/BufferaCore.swiftmodule -o .build/copy-transform-service-checks/libBufferaCore.dylib -module-cache-path .build/ModuleCache
-// swiftc -I Sources/CSQLite -I .build/copy-transform-service-checks -L .build/copy-transform-service-checks -lBufferaCore -Xlinker -rpath -Xlinker "$PWD/.build/copy-transform-service-checks" -module-cache-path .build/ModuleCache Sources/Buffera/CopyTransformOperation.swift Sources/Buffera/CopyTransformService.swift Sources/Buffera/ClipboardService.swift Sources/Buffera/ImageTextRecognizer.swift Tests/CopyTransformServiceChecks/main.swift -o .build/copy-transform-service-checks/checks
-// .build/copy-transform-service-checks/checks
+// Run with: zsh scripts/check-copy-transform.sh
 
 var checkCount = 0
 func check(_ condition: @autoclosure () throws -> Bool, _ message: String) {
@@ -19,7 +16,8 @@ func check(_ condition: @autoclosure () throws -> Bool, _ message: String) {
 let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Buffera-transform-checks-\(UUID().uuidString)", isDirectory: true)
 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: folder) }
-let store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite"))
+let store = try HistoryStore(url: folder.appendingPathComponent("history.sqlite"),
+                             secretCipher: SecretPayloadCipher { _, _ in Data(repeating: 0x42, count: 32) })
 let storage = DispatchQueue(label: "checks.history")
 var recognized = 0
 var recognition: (ClipPayload) throws -> String = { _ in "OCR fixture" }
@@ -108,40 +106,40 @@ check(fails(transform(emptyTextID)), "empty input has an explicit error")
 let badJSON = try insert(plain("{not json}"))
 check(fails(transform(badJSON, .text(.formatJSON))), "transformation errors reach the caller")
 let ordinaryID = try insert(plain("Обычный текст"))
-check(try operations(ordinaryID).get() == [.text(.plainText)], "ordinary text only offers plain copy")
-check(try operations(badJSON).get() == [.text(.plainText)], "invalid JSON is omitted from the menu")
+check(try operations(ordinaryID).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "ordinary text offers plain copy and both file formats")
+check(try operations(badJSON).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "invalid JSON is omitted from the menu")
 let compactJSON = try insert(plain("{\"value\":1}"))
-check(try operations(compactJSON).get() == [.text(.plainText), .text(.formatJSON)], "valid compact JSON offers formatting")
+check(try operations(compactJSON).get() == [.text(.plainText), .text(.formatJSON)] + [.textFile(.txt), .textFile(.md)], "valid compact JSON offers formatting")
 let formattedJSON = try insert(plain("{\n  \"value\": 1\n}"))
 check(!(try operations(formattedJSON).get()).contains(.text(.formatJSON)), "already formatted JSON does not offer an unchanged result")
 let linesID = try insert(plain("Первая строка\nВторая строка"))
-check(try operations(linesID).get() == [.text(.plainText), .text(.unwrapLines)], "different lines offer unwrapping without deduplication")
+check(try operations(linesID).get() == [.text(.plainText), .text(.unwrapLines)] + [.textFile(.txt), .textFile(.md)], "different lines offer unwrapping without deduplication")
 let crlfLines = try insert(plain("Первая строка\r\nВторая строка"))
-check(try operations(crlfLines).get() == [.text(.plainText), .text(.unwrapLines)], "CRLF normalization without duplicates does not offer deduplication")
+check(try operations(crlfLines).get() == [.text(.plainText), .text(.unwrapLines)] + [.textFile(.txt), .textFile(.md)], "CRLF normalization without duplicates does not offer deduplication")
 let paragraphs = try insert(plain("  Первый абзац \r\n\r\n Второй абзац  "))
-check(try operations(paragraphs).get() == [.text(.plainText)], "paragraphs without adjacent text lines do not offer unwrapping")
+check(try operations(paragraphs).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "paragraphs without adjacent text lines do not offer unwrapping")
 let paddedLine = try insert(plain("  Одна строка  "))
-check(try operations(paddedLine).get() == [.text(.plainText)], "trimming a single line does not offer unwrapping")
+check(try operations(paddedLine).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "trimming a single line does not offer unwrapping")
 let blankLines = try insert(plain(" \r\n \r\n\t\r\n\t"))
-check(try operations(blankLines).get() == [.text(.plainText)], "repeated blank lines do not offer deduplication or unwrapping")
+check(try operations(blankLines).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "repeated blank lines do not offer deduplication or unwrapping")
 let duplicatesID = try insert(plain("Повтор\nПовтор"))
-check(try operations(duplicatesID).get() == [.text(.plainText), .text(.unwrapLines), .text(.removeDuplicateLines)], "duplicate lines offer both applicable operations")
+check(try operations(duplicatesID).get() == [.text(.plainText), .text(.unwrapLines), .text(.removeDuplicateLines)] + [.textFile(.txt), .textFile(.md)], "duplicate lines offer both applicable operations")
 let unicodeID = try insert(plain("\u{00e9}\ne\u{0301}"))
 check(!(try operations(unicodeID).get()).contains(.text(.removeDuplicateLines)), "canonically equal but byte-distinct lines do not offer deduplication")
 let cleanURL = try insert(plain("https://example.com/?page=2"), kind: .link)
-check(try operations(cleanURL).get() == [.text(.plainText)], "clean URL omits tracking cleanup")
+check(try operations(cleanURL).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "clean URL omits tracking cleanup")
 let trackedURL = try insert(plain("https://example.com/?page=2&utm_source=checks"), kind: .link)
-check(try operations(trackedURL).get() == [.text(.plainText), .text(.removeTrackingParameters)], "URL with removable trackers offers cleanup")
+check(try operations(trackedURL).get() == [.text(.plainText), .text(.removeTrackingParameters)] + [.textFile(.txt), .textFile(.md)], "URL with removable trackers offers cleanup")
 let signedURL = try insert(plain("https://example.com/?utm_source=checks&sig=fixture"), kind: .link)
-check(try operations(signedURL).get() == [.text(.plainText)], "signed URL omits unsafe tracking cleanup")
+check(try operations(signedURL).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "signed URL omits unsafe tracking cleanup")
 let deepJSON = try insert(plain(String(repeating: "[", count: 129) + "0" + String(repeating: "]", count: 129)))
-check(try operations(deepJSON).get() == [.text(.plainText)], "JSON beyond supported depth omits formatting")
+check(try operations(deepJSON).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "JSON beyond supported depth omits formatting")
 let longDuplicate = try insert(plain(String(repeating: "x", count: 220_000) + "\ntail\ntail"))
 check((try operations(longDuplicate).get()).contains(.text(.removeDuplicateLines)), "applicability reads duplicate lines beyond the summary limit")
 let longJSON = try insert(plain("{\"text\":\"" + String(repeating: "x", count: 220_000) + "\"}"))
 check((try operations(longJSON).get()).contains(.text(.formatJSON)), "applicability parses full JSON beyond the summary limit")
 let hugeID = try insert(plain(String(repeating: "x", count: 2 * 1_024 * 1_024 + 1) + "\nrepeat\nrepeat"))
-check(try operations(hugeID).get() == [.text(.plainText)], "over-limit text keeps plain copy and omits bounded transformations")
+check(try operations(hugeID).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "over-limit text keeps plain copy and omits bounded transformations")
 check((try operations(rtfID).get()).contains(.text(.plainText)), "RTF-only applicability uses the shared full text decoder")
 check(fails(operations(partialID)), "unreadable item prevents offering a partial text copy")
 check(fails(operations(emptyTextID)), "empty source does not advertise plain copy")
@@ -150,7 +148,7 @@ check(fails(transform(hiddenID)), "fresh concealed source cannot be transformed"
 check(fails(transform(Int64.max)), "missing source completes with error")
 check(fails(operations(hiddenID)), "fresh concealed source has no applicable menu")
 check(fails(operations(Int64.max)), "missing source fails menu applicability")
-check(try operations(ordinaryID, mode: .eventTracking).get() == [.text(.plainText)], "menu availability arrives during native menu tracking")
+check(try operations(ordinaryID, mode: .eventTracking).get() == [.text(.plainText)] + [.textFile(.txt), .textFile(.md)], "menu availability arrives during native menu tracking")
 check(fails(operations(Int64.max, mode: .eventTracking)), "menu errors arrive during native menu tracking")
 let fileID = try insert(plain("fixture file"), kind: .file)
 check(try operations(fileID).get().isEmpty, "unsupported source has no transformations")
@@ -232,4 +230,30 @@ clipboard.poll()
 check(pasteboard.string(forType: .string) == exactOutput, "transformed output is written exactly")
 check(pasteboard.pasteboardItems?.first?.types == [.string], "transformed clipboard contains only plain text")
 check(captures == 0, "internal transformed restore is not captured as a new history entry")
+let exports = TemporaryImageExports(directory: folder.appendingPathComponent("exports"))
+let fileText = "# Заголовок 📝\r\n\r\n  **text**\t\n" + String(repeating: "tail", count: 60_000)
+let exportID = try insert(plain(fileText))
+for format in CopyTransformOperation.TextFileFormat.allCases {
+    let operation = CopyTransformOperation.textFile(format)
+    let text = try transform(exportID, operation).get()
+    let payload = try CopyTransformService.clipboardPayload(text: text, operation: operation, id: exportID, exports: exports)
+    try clipboard.restore(payload)
+    clipboard.poll()
+    let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+    check(urls?.count == 1, "file export is readable as a file URL by pasteboard consumers")
+    let url = urls!.first!
+    check(url.pathExtension == format.rawValue, "export has the requested extension")
+    check(try Data(contentsOf: url) == Data(fileText.utf8), "export preserves full UTF-8 bytes, whitespace and Markdown")
+    check(pasteboard.string(forType: .string) == nil, "file copy does not fall back to inline text")
+    check(captures == 0, "file copy is not recaptured")
+    check(fails(transform(hiddenID, operation)), "concealed text cannot be exported")
+    check(fails(transform(cachedID, operation)), "image cannot invoke text file export")
+    check(fails(transform(emptyTextID, operation)), "empty file export reports an error")
+}
+let blockedDirectory = folder.appendingPathComponent("not-a-directory")
+try Data([1]).write(to: blockedDirectory)
+let previousChange = pasteboard.changeCount
+let failedExport = Result { try CopyTransformService.clipboardPayload(text: "test", operation: .textFile(.txt),
+    id: exportID, exports: TemporaryImageExports(directory: blockedDirectory)) }
+check(fails(failedExport) && pasteboard.changeCount == previousChange, "file preparation failure leaves clipboard untouched")
 print("Passed \(checkCount) copy transform service checks")

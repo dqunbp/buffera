@@ -569,3 +569,6 @@
 "Режим применяется к новым копированиям. Уже сохранённые секреты остаются зашифрованными. Команда «Скрыть» также шифрует запись." = "This mode applies to new copies. Previously saved secrets remain encrypted. The Hide command also encrypts an entry.";
 "Применяем настройку…" = "Applying setting…";
 "История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится." = "History is stored locally. The secret encryption key is stored in macOS Keychain. Secrets cannot be recovered if the key is lost.";
+"Как файл .txt" = "As .txt file";
+"Как файл .md" = "As .md file";
+"Скопировать полный текст как файл UTF-8 без изменения содержимого." = "Copy the full text as a UTF-8 file without changing its contents.";

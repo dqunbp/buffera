@@ -338,15 +338,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             service.transform(id: id, operation: operation, completion: completion)
         }
         panel.onCancelCopyTransformed = { [weak self] in self?.confirmationToken += 1 }
-        panel.onCopyTransformed = { [weak self] id, text, completion in
+        panel.onCopyTransformed = { [weak self] id, operation, text, completion in
             guard let self else { completion(CopyTransformError.cancelled); return }
             self.confirmationToken += 1
             let token = self.confirmationToken
             self.work.async {
                 let validation = Result {
                     let clip = try self.store.summary(id: id)
-                    guard !CopyTransformOperation.available(for: clip).isEmpty else { throw CopyTransformError.unavailable }
-                    guard !text.isEmpty else { throw CopyTransformError.noText }
+                    guard CopyTransformOperation.available(for: clip).contains(operation) else { throw CopyTransformError.unavailable }
+                    return try CopyTransformService.clipboardPayload(text: text, operation: operation,
+                                                                     id: id, exports: self.temporaryImageExports)
                 }
                 DispatchQueue.main.async {
                     guard token == self.confirmationToken, self.panel.isAvailableForShortcut,
@@ -354,9 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         completion(CopyTransformError.cancelled); return
                     }
                     do {
-                        try validation.get()
-                        let payload = ClipPayload(items: [[Representation(type: NSPasteboard.PasteboardType.string.rawValue,
-                                                                          data: Data(text.utf8))]])
+                        let payload = try validation.get()
                         try self.restoreClipboard(payload, id: id)
                         completion(nil)
                     } catch { completion(error) }
