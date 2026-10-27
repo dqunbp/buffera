@@ -37,7 +37,7 @@ final class UpdateSettingsView: NSStackView {
         let actions = NSStackView(views: [openButton, skipButton])
         actions.spacing = 10; actions.alignment = .centerY
         let summary = SetupUI.card([installed, status, detail, actions], tinted: true)
-        let note = SetupUI.text(L10n.text("Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается точкой на значке Buffera в строке меню."), size: 12)
+        let note = SetupUI.text(L10n.text("Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается двумя красными точками на значке Buffera и пунктом в его меню."), size: 12)
         note.textColor = .secondaryLabelColor
         for child in [summary, automatic, note, checkButton] { addArrangedSubview(child) }
         summary.widthAnchor.constraint(equalTo: widthAnchor).isActive = true

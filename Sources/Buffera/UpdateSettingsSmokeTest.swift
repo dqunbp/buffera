@@ -23,12 +23,20 @@ import BufferaUpdates
                                 fetch: { if let failure { throw failure }; return release })
     let controller = AppUpdateController(checker: checker)
     defer { controller.stop() }
+    let statusButton = NSButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    statusButton.image = BrandIdentity.menuBarIcon()
+    statusButton.imagePosition = .imageOnly
+    let indicator = UpdateMenuIndicator(button: statusButton)
+    let menu = NSMenu()
+    menu.addItem(indicator.menuItem)
     var badge: ReleaseUpdate?
-    controller.onIndicatorChange = { badge = $0 }
+    controller.onIndicatorChange = { badge = $0; indicator.update(release: $0) }
     let settings = SettingsWindow(mcpAccess: MCPAccess(directory: directory), updateSettings: controller.settingsView,
                                   languageDefaults: defaults, limitsDefaults: defaults, themeDefaults: defaults,
                                   shortcutDefaults: defaults, frameAutosaveName: nil)
     let root = settings.window!.contentView!
+    var updatePageRequests = 0
+    indicator.onOpenSettings = { updatePageRequests += 1; settings.selectUpdates() }
     func descendants(_ view: NSView) -> [NSView] {
         var children = view.subviews
         if let stack = view as? NSStackView {
@@ -61,16 +69,36 @@ import BufferaUpdates
     let open = try control("open", NSButton.self)
     let skip = try control("skip", NSButton.self)
     let automatic = try control("automatic", NSButton.self)
-    try check(open.isHidden && skip.isHidden && badge == nil, "Unknown version must not offer an update")
+    try check(open.isHidden && skip.isHidden && badge == nil && indicator.menuItem.isHidden,
+              "Unknown version must not offer an update")
     try check(checkButton.title == (L10n.language == "en" ? "Check for Updates…" : "Проверить обновления…"),
               "Update controls must use the selected language")
     controller.start()
     try waitFor { badge == release && !checker.isChecking }
     try check(!open.isHidden && !skip.isHidden && status.stringValue.contains("99.0.0"),
               "New release must appear in settings and on the menu-bar icon")
+    try check(!indicator.menuItem.isHidden && indicator.menuItem.title ==
+              (L10n.language == "en" ? "Buffera 99.0.0 is available…" : "Доступна Buffera 99.0.0…"),
+              "Available release must show a localized menu entry")
+    for previousPage in [0, 4] {
+        tabs.selectedSegment = previousPage
+        _ = tabs.sendAction(tabs.action, to: tabs.target)
+        menu.performActionForItem(at: 0)
+        try check(tabs.selectedSegment == 5 && !status.isHiddenOrHasHiddenAncestor,
+                  "Menu action must switch directly to updates from any previous settings page")
+    }
+    try check(updatePageRequests == 2, "Update menu action must run once per click")
+    statusButton.layoutSubtreeIfNeeded()
+    let overlay = statusButton.subviews.first { $0.identifier?.rawValue == "updates.menuBarDots" } as! NSImageView
+    try check(!overlay.isHidden && overlay.image?.isTemplate == false && statusButton.image?.isTemplate == true,
+              "Colored dots must be independent of the native template mark")
+    try check(overlay.hitTest(NSPoint(x: 6, y: 8)) == nil && statusButton.hitTest(NSPoint(x: 12, y: 12)) === statusButton,
+              "Dots must not intercept menu-bar clicks")
     skip.performClick(nil)
-    try check(badge == nil && !open.isHidden && !skip.isEnabled,
-              "Skipping must clear the dot and keep the release accessible")
+    try check(badge == nil && !open.isHidden && !skip.isEnabled && overlay.isHidden && indicator.menuItem.isHidden,
+              "Skipping must clear the dots/menu entry and keep the release accessible")
+    menu.performActionForItem(at: 0)
+    try check(updatePageRequests == 2, "A stale hidden update menu action must be ignored")
     automatic.performClick(nil)
     try check(!checker.automaticEnabled, "Automatic preference did not reach the checker")
     failure = .unavailable
@@ -95,9 +123,23 @@ import BufferaUpdates
         try check(width + 8 <= tabs.width(forSegment: index), "Settings tab title is clipped")
     }
     let plain = BrandIdentity.menuBarIcon()
-    let badged = BrandIdentity.menuBarIcon(hasUpdate: true)
-    try check(plain.isTemplate && badged.isTemplate && plain.size == badged.size && plain.tiffRepresentation != badged.tiffRepresentation,
-              "Menu-bar dot must change the icon without resizing it or losing native contrast")
+    let dots = BrandIdentity.updateDotsImage()
+    try check(plain.isTemplate && !dots.isTemplate && plain.size == dots.size && indicator.menuItem.image?.isTemplate == false,
+              "Menu and menu-bar dots must retain color without resizing the template icon")
+    for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+        var left = 0, right = 0
+        NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
+            let bitmap = NSBitmapImageRep(data: BrandIdentity.updateDotsImage().tiffRepresentation!)!
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), color.alphaComponent > 0.5,
+                          color.redComponent > color.greenComponent + 0.25, color.redComponent > color.blueComponent + 0.25 else { continue }
+                    if x < bitmap.pixelsWide / 2 { left += 1 } else { right += 1 }
+                }
+            }
+        }
+        try check(left > 0 && right > 0, "Both update dots must be red in light and dark appearances")
+    }
     try check(!settings.window!.isVisible, "Update checks must not open a window")
     if let path = ProcessInfo.processInfo.environment["BUFFERA_UPDATE_PREVIEW_DIR"] {
         let bitmap = root.bitmapImageRepForCachingDisplay(in: root.bounds)!
@@ -112,7 +154,8 @@ import BufferaUpdates
         try NSBitmapImageRep(data: preview.tiffRepresentation!)!.representation(using: .png, properties: [:])!.write(to: target)
         let icon = NSImage(size: NSSize(width: 200, height: 180), flipped: false) { bounds in
             NSColor.white.setFill(); bounds.fill()
-            badged.draw(in: bounds)
+            plain.draw(in: bounds)
+            dots.draw(in: bounds)
             return true
         }
         let image = NSBitmapImageRep(data: icon.tiffRepresentation!)!

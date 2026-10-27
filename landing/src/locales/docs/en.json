@@ -71,11 +71,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Buffera checks GitHub Releases in the background at most once a day. When a newer stable version has a ready DMG for Apple Silicon, a small dot appears on Buffera’s menu bar icon. There are no update notices in the history panel, and background checks do not open windows."
+              "text": "Buffera checks GitHub Releases in the background at most once a day. When a newer stable version has a ready DMG for Apple Silicon, two small red dots appear on Buffera’s menu bar icon. A matching item in its menu opens the Updates settings tab directly. There are no update notices in the history panel, and background checks do not open windows."
             },
             {
               "type": "paragraph",
-              "text": "Open Settings → Updates to view the installed and available versions, open the GitHub release or skip it. Skipping removes the dot while keeping the release accessible in settings. Check for Updates… and Check for Updates Automatically are also available here."
+              "text": "Open Settings → Updates to view the installed and available versions, open the GitHub release or skip it. Skipping removes the dots and menu item while keeping the release accessible in settings. Check for Updates… and Check for Updates Automatically are also available here."
             },
             {
               "type": "paragraph",

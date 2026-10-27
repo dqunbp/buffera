@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
     @MainActor private lazy var updates = AppUpdateController()
+    @MainActor private var updateMenuIndicator: UpdateMenuIndicator?
     private var setup: SetupWindow?
     private var settings: SettingsWindow?
     private var modelManager: LocalModelManager?
@@ -156,12 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel = HistoryPanel()
         connectPanel()
         updates.onIndicatorChange = { [weak self] release in
-            guard let button = self?.statusItem.button else { return }
-            button.image = BrandIdentity.menuBarIcon(hasUpdate: release != nil)
-            let description = release.map { L10n.text("Доступна Buffera \($0.version.description). Настройки → Обновления.") }
-                ?? L10n.text("\(BrandIdentity.name) — история буфера обмена")
-            button.toolTip = description
-            button.setAccessibilityLabel(description)
+            self?.updateMenuIndicator?.update(release: release)
         }
         updates.start()
         imageTextIndexer = ImageTextIndexer(store: store, storageQueue: work,
@@ -761,6 +757,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor @objc private func showSettings() {
+        openSettings(showUpdates: false)
+    }
+
+    @MainActor private func openSettings(showUpdates: Bool) {
         if setup?.window?.isVisible == true { setup?.show(); return }
         // A save sheet must finish before its parent can be hidden.
         if let window = panel?.window, window.attachedSheet != nil {
@@ -852,6 +852,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showEmbeddingProgress(embeddingStatus)
         }
         if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
+        if showUpdates { settings?.selectUpdates() }
         settings?.show()
     }
     private func cleanupExports() {
@@ -942,6 +943,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chatMenuItems.append(statusChatItem)
         let settingsItem = add(L10n.text("Настройки…"), #selector(showSettings))
         settingsItem.keyEquivalent = ","
+        if let button = statusItem.button {
+            let indicator = UpdateMenuIndicator(button: button)
+            indicator.onOpenSettings = { [weak self] in self?.openSettings(showUpdates: true) }
+            updateMenuIndicator = indicator
+            menu.addItem(indicator.menuItem)
+        }
         pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
         menu.addItem(.separator())
         imageTextItem = NSMenuItem(title: L10n.text("Текст в картинках: распознаётся…"), action: nil, keyEquivalent: "")

@@ -106,6 +106,8 @@ final class SettingsWindow: NSWindowController {
         settings.showFeatures()
     }
 
+    func selectUpdates() { settings.selectUpdates() }
+
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
@@ -227,6 +229,11 @@ private final class SettingsContentController: NSViewController {
         _ = view
         tabs.selectedSegment = 4
         presentPage(4)
+    }
+    func selectUpdates() {
+        _ = view
+        tabs.selectedSegment = 5
+        presentPage(5)
     }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { models.update(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {

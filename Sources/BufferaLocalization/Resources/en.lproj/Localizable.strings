@@ -610,4 +610,6 @@
 "Установлена Buffera %1$@ (сборка %2$@)." = "Buffera %1$@ (build %2$@) is installed.";
 "Доступна Buffera %1$@. Настройки → Обновления." = "Buffera %1$@ is available. Settings → Updates.";
 "Откройте релиз на GitHub, чтобы прочитать об изменениях и скачать DMG. Установка выполняется вручную." = "Open the release on GitHub to read what’s new and download the DMG. Installation is manual.";
-"Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается точкой на значке Buffera в строке меню." = "Background checks run at most once a day. Clipboard history is not sent. A dot on Buffera’s menu bar icon indicates a new version.";
+"Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается двумя красными точками на значке Buffera и пунктом в его меню." = "Background checks run at most once a day. Clipboard history is not sent. Two red dots on Buffera’s icon and an item in its menu indicate a new version.";
+
+"Доступна Buffera %1$@…" = "Buffera %1$@ is available…";
