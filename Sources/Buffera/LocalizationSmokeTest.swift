@@ -125,6 +125,36 @@ func runLocalizationSmokeTest() throws {
     }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
+    guard let resetEnabled = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.enabled" }) as? NSButton,
+          let resetMinutes = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.minutes" }) as? NSTextField,
+          let resetStepper = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.stepper" }) as? NSStepper else {
+        throw HistoryError.database("History reset controls missing")
+    }
+    try check(resetEnabled.state == .on && resetMinutes.integerValue == 1 && resetMinutes.isEnabled,
+              "History reset defaults must be visible in settings")
+    resetStepper.integerValue = 7
+    _ = resetStepper.sendAction(resetStepper.action, to: resetStepper.target)
+    try check(HistoryResetPreferences.load(from: defaults).minutes == 7 && resetMinutes.integerValue == 7,
+              "Reset stepper must save its duration immediately")
+    resetMinutes.integerValue = 12
+    resetMinutes.delegate?.controlTextDidEndEditing?(Notification(name: NSControl.textDidEndEditingNotification, object: resetMinutes))
+    try check(HistoryResetPreferences.load(from: defaults).minutes == 12 && resetStepper.integerValue == 12,
+              "Typed reset duration must save and synchronize its stepper")
+    resetEnabled.performClick(nil)
+    try check(!HistoryResetPreferences.load(from: defaults).isEnabled && !resetMinutes.isEnabled && !resetStepper.isEnabled,
+              "Disabling reset must persist and disable the duration controls")
+    let resetReopened = makeSettings()
+    let resetRoot = resetReopened.window!.contentView!
+    let resetTabs = descendants(resetRoot).compactMap { $0 as? NSSegmentedControl }.first!
+    resetTabs.selectedSegment = 1
+    _ = resetTabs.sendAction(resetTabs.action, to: resetTabs.target)
+    let restoredReset = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.enabled" } as? NSButton
+    let restoredMinutes = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.minutes" } as? NSTextField
+    try check(restoredReset?.state == .off && restoredMinutes?.integerValue == 12 && restoredMinutes?.isEnabled == false,
+              "Reopened settings must retain both reset preferences")
+    resetEnabled.performClick(nil)
+    try check(resetMinutes.isEnabled && HistoryResetPreferences.load(from: defaults).minutes == 12,
+              "Re-enabling reset must preserve the custom duration")
     guard let naming = descendants(content).first(where: { $0.identifier?.rawValue == "settings.textFileNaming" }) as? NSPopUpButton else {
         throw HistoryError.database("Text file naming selector missing")
     }

@@ -89,6 +89,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var pendingSelectionID: Int64?
     private var retainedSelectionID: Int64?
     private var retainedRowCount = 150
+    private let resetDefaults: UserDefaults
+    private let currentDate: () -> Date
+    private var closedAt: Date?
     private var recentCaptureID: Int64?
     private var pendingFavorites: Set<Int64> = []
     private var revealed: (id: Int64, text: String)?
@@ -139,8 +142,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var isAvailableForShortcut: Bool { window.isVisible && !isClosing && nearbyIntroduction == nil }
 
     init(introductionDefaults: UserDefaults = .standard, monitorsOutsideInteractions: Bool = true,
+         resetDefaults: UserDefaults = .standard, currentDate: @escaping () -> Date = Date.init,
          currentFrontmostApplication: @escaping () -> NSRunningApplication? = { NSWorkspace.shared.frontmostApplication }) {
         self.introductionDefaults = introductionDefaults
+        self.resetDefaults = resetDefaults
+        self.currentDate = currentDate
         self.currentFrontmostApplication = currentFrontmostApplication
         super.init()
         build()
@@ -212,8 +218,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if let appActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver) }
     }
 
-    func open(fromShortcut: Bool = false) {
-        if let nearbyIntroduction { nearbyIntroduction.show(); return }
+    /// Returns whether the previous navigation state expired while closed.
+    @discardableResult
+    func open(fromShortcut: Bool = false) -> Bool {
+        if let nearbyIntroduction { nearbyIntroduction.show(); return false }
         cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
         rememberPreviousApp()
@@ -221,24 +229,19 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.permitsOffscreenFrame = false
         let token = presentationToken
         commitWhenLoaded = false; pendingMoveDelta = 0; confirming = false
+        let reset = HistoryResetPreferences.load(from: resetDefaults).shouldReset(closedAt: closedAt, now: currentDate())
+        closedAt = nil
+        if reset { resetNavigationState() }
         invalidateReveal()
         updateNavigationControls()
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
         else { positionDockedWindow() }
-        let targetFrame = window.frame
-        let animate = appearance.mode != .floating && !window.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        if animate { window.permitsOffscreenFrame = true; window.setFrame(hiddenFrame(for: targetFrame), display: false) }
         focusHistoryWindow(token: token)
-        if animate {
-            animateFrame(to: targetFrame, duration: 0.18, token: token) { [weak self] in
-                guard let self, token == self.presentationToken else { return }
-                self.window.permitsOffscreenFrame = false
-            }
-        }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
-        refresh(preservingSelection: true)
+        refresh(preservingSelection: !reset)
         if fromShortcut { recordShortcutPress() }
+        return reset
     }
 
     private func rememberPreviousApp() {
@@ -435,10 +438,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     /// navigates; clipboard confirmation remains an explicit separate action.
     func openSource(_ clip: ClipSummary) {
         guard !clip.isConcealed, window.attachedSheet == nil else { return }
-        let returnPoint = NearbyHistoryState.ReturnPoint(rows: [], total: total,
+        var returnPoint = NearbyHistoryState.ReturnPoint(rows: [], total: total,
             selectedID: selected?.id ?? pendingSelectionID ?? retainedSelectionID,
             viewport: cards.scrollView.contentView.bounds.origin)
-        open()
+        if open() {
+            returnPoint = NearbyHistoryState.ReturnPoint(rows: [], total: 0, selectedID: nil, viewport: .zero)
+        }
         // Source navigation starts in Buffera's chat, not the older external
         // application remembered by a previous global-hotkey presentation.
         previousApp = .current
@@ -633,6 +638,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         cancelShortcutGesture()
         guard !isClosing else { return }
+        if window.isVisible { closedAt = currentDate() }
         cancelCopyTransform(refreshHistory: false)
         copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
         restoreSearchFromNearby(reloadIfNeeded: false, render: false)
@@ -915,9 +921,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     @objc private func searchModeChanged() { refresh(preservingSelection: true) }
     @objc private func resetEverything() {
         guard !confirming, !commitWhenLoaded else { return }
-        restoreSearchFromNearby(reloadIfNeeded: false)
-        search.stringValue = ""; filters.reset(); scope.selectedSegment = 0
+        resetNavigationState()
         window.makeFirstResponder(cards); refresh()
+    }
+
+    private func resetNavigationState() {
+        restoreSearchFromNearby(reloadIfNeeded: false, render: false)
+        search.stringValue = ""; filters.reset(); scope.selectedSegment = 0
+        retainedSelectionID = nil; pendingSelectionID = nil; recentCaptureID = nil
+        retainedRowCount = 150; pendingViewport = nil
     }
 
     private func select(id: Int64, scrollIntoView: Bool = true) {

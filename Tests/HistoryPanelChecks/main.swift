@@ -34,14 +34,15 @@ func fixture(_ id: Int) -> ClipSummary {
 final class PanelHarness {
     struct Request { let query: String; let offset: Int; let limit: Int; let silent: Bool; let filter: SearchFilter; let mode: HistorySearchMode }
     struct NearbyRequest { let anchorID: Int64; let token: Int }
-    let panel = HistoryPanel(monitorsOutsideInteractions: false)
+    let panel: HistoryPanel
     let search: NSSearchField
     let cards: HistoryCardsView
     var requests: [Request] = []
     var nearbyRequests: [NearbyRequest] = []
     var confirmations: [Int64] = []
 
-    init(rows: [ClipSummary] = []) {
+    init(rows: [ClipSummary] = [], resetDefaults: UserDefaults = .standard, currentDate: @escaping () -> Date = Date.init) {
+        panel = HistoryPanel(monitorsOutsideInteractions: false, resetDefaults: resetDefaults, currentDate: currentDate)
         // Existing interaction fixtures exercise both ready features.
         panel.updateFeatureAvailability(semanticSearch: true, chat: true)
         let views = descendants(of: panel.window.contentView!)
@@ -90,6 +91,7 @@ final class PanelHarness {
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
+historyResetChecks()
 
 func photoThumbnailChecks() {
     let value = PanelHarness()
@@ -459,6 +461,27 @@ func settingsChecks() -> [(Bool, String)] {
                     "changing hidden history layout neither shows it nor takes keyboard focus"))
     results.append((changed.last == floating && HistoryAppearance.load() == floating,
                     "external appearance changes are saved and published to settings"))
+
+    for mode in [HistoryAppearance.Mode.left, .right] {
+        harness.panel.applyAppearance(HistoryAppearance(mode: mode, columns: 2, visibleRows: 5, sidebarVisible: false))
+        let targetFrame = harness.panel.window.frame
+        harness.panel.open(fromShortcut: true)
+        results.append((harness.panel.window.isVisible && harness.panel.window.frame == targetFrame
+                        && !harness.panel.window.permitsOffscreenFrame,
+                        "\(mode) history opens immediately at its final frame"))
+        harness.panel.close(restoreFocus: false)
+        harness.panel.open(fromShortcut: true)
+        results.append((harness.panel.window.isVisible && harness.panel.window.frame == targetFrame
+                        && !harness.panel.window.permitsOffscreenFrame,
+                        "\(mode) history reopens immediately during close"))
+        let animationDeadline = Date(timeIntervalSinceNow: 0.25)
+        while Date() < animationDeadline {
+            _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
+        results.append((harness.panel.window.isVisible && harness.panel.window.frame == targetFrame,
+                        "\(mode) reopened history ignores stale close animation steps"))
+        harness.panel.window.orderOut(nil)
+    }
 
     harness.panel.applyAppearance(docked)
     harness.panel.window.orderFront(nil)

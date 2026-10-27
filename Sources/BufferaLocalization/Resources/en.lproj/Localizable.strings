@@ -51,7 +51,7 @@
 "Карточки" = "Cards";
 "Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места." = "One column makes a list; multiple columns make a grid. The row count sets card height. In a side panel, this is the maximum height: shorter items take up less space.";
 "У каждого вида — своё место" = "A place for every view";
-"Обычное окно можно перемещать и менять в размере. Боковая панель выезжает у выбранного края экрана." = "The floating window can be moved and resized. A side panel slides out from the selected edge of the screen.";
+"Обычное окно можно перемещать и менять в размере. Боковая панель появляется сразу у выбранного края экрана." = "The floating window can be moved and resized. A side panel appears immediately at the selected edge of the screen.";
 "Лимит записей" = "Item limit";
 "Лимит объёма истории" = "History size limit";
 "Количество записей" = "Number of items";
@@ -578,3 +578,13 @@
 "Заметка" = "Note";
 "Имя текстового файла" = "Text file name";
 "Для «Как файл .txt» и «Как файл .md». Если первая строка не подходит для имени, используется время копирования." = "For “As .txt file” and “As .md file”. If the first line cannot form a filename, the copy time is used.";
+
+"Сбрасывать состояние окна после закрытия" = "Reset window state after closing";
+
+"Время до сброса, минут" = "Reset delay in minutes";
+
+"Через" = "After";
+
+"мин. после закрытия" = "min. after closing";
+
+"При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается." = "On next open: clear the search, show all items without filters, and select the first item. An open window is never reset.";

@@ -23,6 +23,7 @@ Verify these contracts in `Sources/Buffera/HistoryPanel.swift`, `Sources/Buffera
 - Escape cancels drag preparation or dismisses transient UI without also closing the panel; otherwise it closes unpinned history. Pinning prevents Escape/focus-loss dismissal, but explicit copy confirmation still closes pinned history.
 - Internal clicks must not count as external. Preserve window-identity checks and deferred-dismissal tokens: AppKit button tracking and stale activation events can otherwise close a newly pinned/reopened panel.
 - One shortcut tap leaves history open; cycling while holding modifiers confirms on release. Repeated taps with separate modifier holds are not that gesture.
+- Reopening before the configured reset interval retains search, filters, scope, and selection. After the interval with the panel closed, opening resets to unfiltered history and its first item; an open panel never expires. `HistoryResetPreferences` defaults to enabled after one minute and is configurable in Settings; keep the manual and timed reset paths shared. See `Sources/Buffera/HistoryResetPreferences.swift` and `Tests/HistoryPanelChecks/HistoryResetChecks.swift`.
 
 ## Secrets & MCP
 - Capture recognizes source markers (`org.nspasteboard.ConcealedType`, `com.agilebits.onepassword`); deduplication can also preserve an existing record's concealment. Neither is password-content detection. A Keychain prompt can arise during protected deduplication and does not prove detection (`Sources/Buffera/ClipboardService.swift`, `Sources/BufferaCore/HistoryStore+Secrets.swift`).

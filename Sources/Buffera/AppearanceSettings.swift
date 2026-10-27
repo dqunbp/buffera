@@ -94,6 +94,7 @@ final class SettingsWindow: NSWindowController {
         settings.refreshMCPAccess()
         settings.refreshSecrets()
         settings.refreshTextFileNaming()
+        settings.refreshHistoryReset()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
@@ -152,6 +153,7 @@ private final class SettingsContentController: NSViewController {
     private let shortcutSettings: ShortcutSettingsView
     private let mcp: MCPSettingsView
     private let secrets: SecretHistorySettingsView
+    private let historyReset: HistoryResetSettingsView
     private let models: ModelSettingsView
     private var appearance = HistoryAppearance.load()
     private var limits: HistoryLimits
@@ -183,6 +185,7 @@ private final class SettingsContentController: NSViewController {
         shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
         self.limitsDefaults = limitsDefaults
         secrets = SecretHistorySettingsView(defaults: limitsDefaults)
+        historyReset = HistoryResetSettingsView(defaults: limitsDefaults)
         self.limits = HistoryLimits.load(from: limitsDefaults)
         self.launchLanguage = launchLanguage
         self.languageDefaults = languageDefaults
@@ -346,7 +349,7 @@ private final class SettingsContentController: NSViewController {
         ])
         let note = paragraph(L10n.text("Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места."))
         let tip = info(symbol: "sidebar.left", title: L10n.text("У каждого вида — своё место"),
-                       text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель выезжает у выбранного края экрана."))
+                       text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель появляется сразу у выбранного края экрана."))
         let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» следует предпочитаемым языкам macOS; если русский и английский отсутствуют, используется английский."))
         let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
         restart.bezelStyle = .rounded
@@ -364,6 +367,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     func refreshSecrets() { secrets.refresh() }
+    func refreshHistoryReset() { historyReset.refresh() }
 
     func refreshTextFileNaming() {
         textFileNaming.selectItem(at: TextFileNaming.allCases.firstIndex(of: .load(from: limitsDefaults)) ?? 0)
@@ -411,8 +415,8 @@ private final class SettingsContentController: NSViewController {
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         folder.imagePosition = .imageLeading
         let storage = paragraph(L10n.text("История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится."))
-        let page = vertical([naming, secrets, grid, note, ocr, folder, storage], spacing: 14)
-        for child in [naming, secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let page = vertical([historyReset, naming, secrets, grid, note, ocr, folder, storage], spacing: 14)
+        for child in [historyReset, naming, secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 
