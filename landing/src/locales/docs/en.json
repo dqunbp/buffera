@@ -83,7 +83,7 @@
             },
             {
               "type": "note",
-              "text": "Installation remains manual: download the DMG, quit Buffera and replace the app in its installation folder. Restart any connected MCP process after updating. Version 0.2.0 has no update checker; download 0.3.0 or newer manually to enable this feature."
+              "text": "Installation remains manual: download the DMG, quit Buffera and replace the app in its installation folder. Restart any connected MCP process after updating. Version 0.2.0 has no update checker; download 0.3.1 or newer manually to enable this feature."
             }
           ]
         },

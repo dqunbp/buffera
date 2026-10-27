@@ -72,7 +72,7 @@ cat > scripts/build-app.sh <<'SH'
 set -euo pipefail
 [[ ! -e local-only.txt ]]
 [[ -z "${BUFFERA_BUILD_PATH:-}" ]]
-[[ "$1" == --disable-sandbox ]]
+[[ "$1" == --build-system && "$2" == native && "$3" == --disable-sandbox ]]
 mkdir -p dist
 print 'fixture DMG' > dist/Buffera-macOS-arm64.dmg
 SH

@@ -59,7 +59,10 @@ tar -xf "$RELEASE_WORKSPACE/source.tar" -C "$RELEASE_SOURCE"
   cd "$RELEASE_SOURCE"
   # Isolate the build from local files and any caller-provided scratch path.
   unset BUFFERA_BUILD_PATH
-  zsh scripts/build-app.sh "$@"
+  # Use the same SwiftPM build system as UI verification. The Xcode backend
+  # in CLT-only installations can stamp the deployment target as the SDK version,
+  # changing AppKit compatibility/layout behavior in the shipped executable.
+  zsh scripts/build-app.sh --build-system native "$@"
   zsh scripts/package-release.sh
 )
 mkdir -p "$OUTPUT"
