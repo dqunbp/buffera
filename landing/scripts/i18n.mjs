@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { renderAnalytics } from './analytics.mjs';
 
 export const languages = ['ru', 'en'];
 export const siteOrigin = 'https://buffera.app';
@@ -79,6 +80,7 @@ export function renderPage(template, locale, lang, assetVersion = 'local', { isR
     ogImage: `${siteOrigin}/og/${lang}.png`,
   };
   return template.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
+    if (key === 'analytics') return renderAnalytics({ isRoot });
     if (Object.hasOwn(fragments, key)) return fragments[key];
     if (key === 'languageRedirect') {
       return isRoot
