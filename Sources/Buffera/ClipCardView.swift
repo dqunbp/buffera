@@ -202,7 +202,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
                                 width: CGFloat, maximumHeight: CGFloat) -> CGFloat {
         let width = width.isFinite ? max(1, width) : 1
         let maximumHeight = maximumHeight.isFinite ? max(74, maximumHeight) : 74
-        if clip.kind == .image && !clip.isConcealed {
+        if ClipboardService.canPreviewImage(clip) {
             return maximumHeight
         }
         let text = makeContentText()
@@ -257,9 +257,10 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     func setThumbnail(_ image: NSImage) {
-        guard clip.kind == .image, !clip.isConcealed else { return }
+        guard ClipboardService.canPreviewImage(clip) else { return }
         thumbnailView.image = image
         thumbnailView.contentTintColor = nil
+        contentText.isHidden = true
     }
 
     func setQuickShortcut(_ number: Int?) {
@@ -369,10 +370,11 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         content.translatesAutoresizingMaskIntoConstraints = false
         addSubview(content)
 
-        let isImage = clip.kind == .image && !clip.isConcealed
+        let isImage = ClipboardService.canPreviewImage(clip)
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.image = NSImage(systemSymbolName: clip.isConcealed ? "lock.fill" : clip.kind.symbol,
                                       accessibilityDescription: clip.isConcealed ? L10n.text("Скрытая запись") : clip.kind.label)
+        if isImage && clip.kind == .file { thumbnailView.image = nil }
         thumbnailView.imageScaling = isImage ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
         if isImage {
             for axis in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
@@ -393,7 +395,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         if clip.isConcealed && !isRevealed { text.setAccessibilityLabel(L10n.text("Скрытая запись")) }
         // Full content is opened by an explicit preview, never an incidental hover.
         text.toolTip = nil
-        if !isImage { content.addSubview(text) }
+        if !isImage || clip.kind == .file { content.addSubview(text) }
 
         quickShortcut.translatesAutoresizingMaskIntoConstraints = false
         quickShortcut.isEditable = false
@@ -445,6 +447,16 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
             footer.heightAnchor.constraint(equalToConstant: 26)
         ])
         if isImage {
+            if clip.kind == .file {
+                // Keep the filename readable while loading, or if the source is unavailable.
+                NSLayoutConstraint.activate([
+                    text.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 36),
+                    text.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -36),
+                    text.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+                    text.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor),
+                    text.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor)
+                ])
+            }
             // Keep a type symbol over the thumbnail without shrinking the preview or action row.
             let typeBadge = NSBox()
             typeBadge.boxType = .custom
@@ -501,7 +513,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     private func updateContentSizing(for size: NSSize) {
-        guard clip.kind != .image || clip.isConcealed else { return }
+        guard !ClipboardService.canPreviewImage(clip) || clip.kind == .file else { return }
         // The action footer remains fixed while extra height goes to the preview.
         let contentHeight = max(24, size.height - 50)
         let lineHeight = Self.lineHeight(for: contentText.font)

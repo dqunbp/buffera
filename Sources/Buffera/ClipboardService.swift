@@ -2,6 +2,7 @@ import AppKit
 import BufferaLocalization
 import BufferaCore
 import ImageIO
+import UniformTypeIdentifiers
 
 struct CapturedClip {
     let payload: ClipPayload
@@ -184,17 +185,55 @@ final class ClipboardService {
     }
 
     static func thumbnail(_ payload: ClipPayload) -> NSImage? {
-        for representation in payload.items.joined() where
-            [NSPasteboard.PasteboardType.png.rawValue, NSPasteboard.PasteboardType.tiff.rawValue].contains(representation.type) {
-            guard let source = CGImageSourceCreateWithData(representation.data as CFData, nil),
-                  let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 320
-                  ] as CFDictionary) else { continue }
-            return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        previewImage(payload, maximumPixelSize: 320)
+    }
+
+    /// Presentation only: image files keep their original kind and pasteboard formats.
+    /// This also works for file records captured by older versions of Buffera.
+    static func canPreviewImage(_ clip: ClipSummary) -> Bool {
+        guard !clip.isConcealed else { return false }
+        if clip.kind == .image { return true }
+        guard clip.kind == .file, clip.text.hasPrefix("/"), !clip.text.contains("\n") else { return false }
+        return isImageFile(URL(fileURLWithPath: clip.text))
+    }
+
+    /// Call off the main queue, after excluding concealed records.
+    static func previewImage(_ payload: ClipPayload, maximumPixelSize: Int) -> NSImage? {
+        let files = payload.items.joined().filter { $0.type == NSPasteboard.PasteboardType.fileURL.rawValue }
+        // A preview of one image must not hide the rest of a file selection.
+        guard files.isEmpty || (payload.items.count == 1 && files.count == 1) else { return nil }
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        for representation in payload.items.joined() where UTType(representation.type)?.conforms(to: .image) == true {
+            guard let source = CGImageSourceCreateWithData(representation.data as CFData, options),
+                  let image = previewImage(source, maximumPixelSize: maximumPixelSize) else { continue }
+            return image
         }
-        return nil
+        // Photos supplies embedded JPEG bytes; Finder may supply only a file URL.
+        // Prefer stored bytes so previews survive removal of Photos' temporary file.
+        guard let file = files.first,
+              let value = String(data: file.data, encoding: .utf8),
+              let url = URL(string: value), url.isFileURL,
+              url.host == nil || url.host == "" || url.host == "localhost",
+              isImageFile(url),
+              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true, let size = values.fileSize, size <= 64 * 1024 * 1024,
+              let source = CGImageSourceCreateWithURL(url as CFURL, options) else { return nil }
+        return previewImage(source, maximumPixelSize: maximumPixelSize)
+    }
+
+    private static func isImageFile(_ url: URL) -> Bool {
+        UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+    }
+
+    private static func previewImage(_ source: CGImageSource, maximumPixelSize: Int) -> NSImage? {
+        guard maximumPixelSize > 0,
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
+                kCGImageSourceShouldCacheImmediately: true
+              ] as CFDictionary) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
     }
 
     static func imageData(_ payload: ClipPayload) -> (Data, String)? {

@@ -214,6 +214,36 @@ check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
 }, "all image actions remain inside the card")
 
 let shortClip = ClipSummary(id: 300, date: Date(), kind: .text, title: "OK", text: "OK", source: "Checks", byteCount: 2)
+let photoFile = ClipSummary(id: 400, date: Date(), kind: .file, title: "Photo.jpeg", text: "/tmp/Photo.jpeg",
+                            source: "Photos", byteCount: 100)
+let photoFileCard = ClipCardView(clip: photoFile, revealedText: nil, thumbnail: nil) { _ in }
+photoFileCard.frame = NSRect(x: 0, y: 0, width: 444, height: 208)
+photoFileCard.layoutSubtreeIfNeeded()
+let filename = descendants(of: photoFileCard).compactMap { $0 as? NSTextField }
+    .first { $0.stringValue == photoFile.title }!
+check(!filename.isHidden, "an image file retains its filename until a thumbnail is available")
+let photoThumbnail = NSImage(size: NSSize(width: 300, height: 200))
+photoFileCard.setThumbnail(photoThumbnail)
+let photoView = descendants(of: photoFileCard).compactMap { $0 as? NSImageView }
+    .first { $0.image === photoThumbnail }!
+check(filename.isHidden && photoView.frame.width == 440 && photoView.frame.height == 166,
+      "a Photos file displays its thumbnail across the full card preview area")
+check(ClipCardView.preferredHeight(for: photoFile, revealedText: nil, width: 444, maximumHeight: 208) == 208,
+      "image files receive the same preview height as image records")
+check(!ClipCardAction.save.isAvailable(for: photoFile) && !ClipCardAction.finder.isAvailable(for: photoFile),
+      "an image preview preserves file actions and does not reclassify the record")
+for (path, concealed, expected) in [("/tmp/Photo.HEIC", false, true), ("/tmp/Notes.txt", false, false),
+                                   ("/tmp/a.jpeg\n/tmp/b.jpeg", false, false), ("/tmp/Photo.jpeg", true, false)] {
+    let candidate = ClipSummary(id: 401, date: Date(), kind: .file, title: "Fixture", text: path,
+                                source: "Photos", byteCount: 100, isConcealed: concealed)
+    check(ClipboardService.canPreviewImage(candidate) == expected,
+          "preview eligibility respects image formats, file selections and concealed records: \(path), concealed=\(concealed)")
+    if concealed {
+        let card = ClipCardView(clip: candidate, revealedText: nil, thumbnail: photoThumbnail) { _ in }
+        check(!descendants(of: card).compactMap { $0 as? NSImageView }.contains { $0.image === photoThumbnail },
+              "a concealed image file never displays a supplied thumbnail")
+    }
+}
 let wrappingText = "A medium length clipboard entry should use the available width and wrap only when the column needs additional lines."
 let wrappingClip = ClipSummary(id: 301, date: Date(), kind: .text, title: "Wrapping", text: wrappingText, source: "Checks", byteCount: wrappingText.utf8.count)
 let concealedClip = ClipSummary(id: 302, date: Date(), kind: .text, title: longText, text: longText,

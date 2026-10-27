@@ -86,6 +86,68 @@ func runSmokeTest() throws {
     }
     try runCaptureOriginAndSessionChecks()
     try runPreviewSmokeChecks()
+    try runPhotoFilePreviewChecks()
+}
+
+private func runPhotoFilePreviewChecks() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("Фото с пробелами.jpeg")
+    guard let context = CGContext(data: nil, width: 1_200, height: 800, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+          let image = context.makeImage() else { throw ClipboardFailure.noImage }
+    let data = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else {
+        throw ClipboardFailure.noImage
+    }
+    CGImageDestinationAddImage(destination, image, [kCGImagePropertyOrientation: 6] as CFDictionary)
+    guard CGImageDestinationFinalize(destination) else { throw ClipboardFailure.noImage }
+    try (data as Data).write(to: url)
+    let file = Representation(type: NSPasteboard.PasteboardType.fileURL.rawValue, data: Data(url.absoluteString.utf8))
+    let jpeg = Representation(type: "public.jpeg", data: data as Data)
+    let photos = ClipPayload(items: [[
+        Representation(type: "com.apple.photos.object-reference.asset", data: Data([1, 2, 3])), jpeg, file
+    ]])
+    let pasteboard = NSPasteboard.withUniqueName()
+    defer { pasteboard.releaseGlobally() }
+    let service = ClipboardService(pasteboard: pasteboard, frontmostApplicationName: { "Photos" })
+    try service.restore(photos)
+    guard let captured = try service.capture(), captured.kind == .file,
+          captured.payload == photos, captured.title == url.lastPathComponent,
+          captured.text == url.path, captured.source == "Photos",
+          let thumbnail = ClipboardService.thumbnail(captured.payload),
+          thumbnail.size.height == 320, thumbnail.size.width < thumbnail.size.height,
+          case .image(let preview) = ClipPreviewContent.decode(captured.payload, kind: captured.kind),
+          preview.size.height == 1_200, preview.size.width == 800 else {
+        throw HistoryError.database("Photos JPEG/file capture lost its formats, orientation or image previews")
+    }
+    let fileOnly = ClipPayload(items: [[file]])
+    guard ClipboardService.thumbnail(fileOnly) != nil,
+          case .image = ClipPreviewContent.decode(fileOnly, kind: .file) else {
+        throw HistoryError.database("A local image file without embedded pixels has no preview")
+    }
+    let group = ClipPayload(items: [photos.items[0], [file]])
+    guard ClipboardService.thumbnail(group) == nil,
+          case .text(let paths) = ClipPreviewContent.decode(group, kind: .file),
+          paths == [url.path, url.path].joined(separator: "\n\n") else {
+        throw HistoryError.database("An image preview hid other files in a selection")
+    }
+    try FileManager.default.removeItem(at: url)
+    guard ClipboardService.thumbnail(photos) != nil,
+          case .image = ClipPreviewContent.decode(photos, kind: .file),
+          ClipboardService.thumbnail(fileOnly) == nil,
+          case .text(let path) = ClipPreviewContent.decode(fileOnly, kind: .file), path == url.path else {
+        throw HistoryError.database("Removed image files did not use embedded bytes or fall back to their paths")
+    }
+    let corrupt = Representation(type: "public.jpeg", data: Data([0, 1, 2]))
+    guard ClipboardService.thumbnail(ClipPayload(items: [[corrupt, file]])) == nil,
+          ClipboardService.thumbnail(ClipPayload(items: [[corrupt, jpeg, file]])) != nil,
+          ClipboardService.thumbnail(ClipPayload(items: [[Representation(type: "public.file-url",
+              data: Data("https://example.invalid/photo.jpeg".utf8))]])) == nil else {
+        throw HistoryError.database("Image preview mishandled corrupt alternatives or nonlocal file URLs")
+    }
+    print("Photos JPEG/file preview checks passed")
 }
 
 private func runCaptureOriginAndSessionChecks() throws {

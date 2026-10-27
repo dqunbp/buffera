@@ -1,7 +1,6 @@
 import BufferaLocalization
 import AppKit
 import BufferaCore
-import ImageIO
 
 enum ClipPreviewContent {
     case text(String)
@@ -17,19 +16,14 @@ enum ClipPreviewContent {
             }
             return .text(limited(text))
         case .image:
-            for representation in payload.items.joined() where
-                [NSPasteboard.PasteboardType.png.rawValue, NSPasteboard.PasteboardType.tiff.rawValue].contains(representation.type) {
-                guard let source = CGImageSourceCreateWithData(representation.data as CFData, nil),
-                      let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                        kCGImageSourceCreateThumbnailFromImageAlways: true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                        kCGImageSourceThumbnailMaxPixelSize: 1_600,
-                        kCGImageSourceShouldCacheImmediately: true
-                      ] as CFDictionary) else { continue }
-                return .image(NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)))
+            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600) {
+                return .image(image)
             }
             return .unavailable(L10n.text("Не удалось показать картинку. Исходные данные сохранены в истории."))
         case .file:
+            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600) {
+                return .image(image)
+            }
             let paths = payload.items.compactMap { representations -> String? in
                 guard let representation = representations.first(where: { $0.type == NSPasteboard.PasteboardType.fileURL.rawValue }),
                       let value = String(data: representation.data, encoding: .utf8),

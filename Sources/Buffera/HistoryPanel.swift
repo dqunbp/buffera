@@ -1262,7 +1262,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             self?.dragFinished(id: clip.id, operation: operation, error: error)
         }
         configure(card, row: row)
-        if clip.kind == .image && !clip.isConcealed && thumbnails.object(forKey: NSNumber(value: clip.id)) == nil {
+        if ClipboardService.canPreviewImage(clip) && thumbnails.object(forKey: NSNumber(value: clip.id)) == nil {
             requestThumbnail?(clip.id) { [weak self, weak card] image in
                 guard let image else { return }
                 self?.thumbnails.setObject(image, forKey: NSNumber(value: clip.id))

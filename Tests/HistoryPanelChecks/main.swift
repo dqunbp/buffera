@@ -91,6 +91,29 @@ _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
 
+func photoThumbnailChecks() {
+    let value = PanelHarness()
+    defer { value.finish() }
+    let photo = ClipSummary(id: 400, date: Date(), kind: .file, title: "Photo.jpeg", text: "/tmp/Photo.jpeg",
+                            source: "Photos", byteCount: 100)
+    let concealed = ClipSummary(id: 401, date: Date(), kind: .file, title: "Private.jpeg", text: "/tmp/Private.jpeg",
+                                source: "Photos", byteCount: 100, isConcealed: true)
+    var thumbnailRequests: [Int64] = []
+    let thumbnail = NSImage(size: NSSize(width: 300, height: 200))
+    value.panel.requestThumbnail = { id, completion in
+        thumbnailRequests.append(id)
+        completion(thumbnail)
+    }
+    value.panel.receive([photo, concealed, fixture(402)], total: 3, offset: 0)
+    value.cards.layoutSubtreeIfNeeded()
+    waitUntil("photo file thumbnail") { value.cards.card(at: 0) != nil }
+    check(thumbnailRequests == [photo.id], "panel requests a thumbnail for a stored Photos file, excluding concealed and text records")
+    let card = value.cards.card(at: 0)!
+    check(descendants(of: card).compactMap { $0 as? NSImageView }.contains { $0.image === thumbnail },
+          "panel delivers the file thumbnail to the visible history card")
+}
+photoThumbnailChecks()
+
 func mouseDismissalChecks() {
     let value = PanelHarness(rows: [fixture(1)])
     defer { value.finish() }
