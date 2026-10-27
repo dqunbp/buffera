@@ -47,9 +47,14 @@ if print -r -- "$EXISTING_TAGS" | /usr/bin/grep -Fxq "$BUFFERA_TAG"; then
   exit 1
 fi
 
-RELEASE_SOURCE=$(mktemp -d "${TMPDIR:-/tmp}/buffera-release-source.XXXXXX")
-trap 'rm -rf "$RELEASE_SOURCE"' EXIT
-git archive "$COMMIT" | tar -xf - -C "$RELEASE_SOURCE"
+RELEASE_WORKSPACE=$(mktemp -d "${TMPDIR:-/tmp}/buffera-release-source.XXXXXX")
+trap 'rm -rf "$RELEASE_WORKSPACE"' EXIT
+RELEASE_SOURCE="$RELEASE_WORKSPACE/source"
+mkdir "$RELEASE_SOURCE"
+# macOS tar can stop at the end marker before Git finishes writing padding.
+# A completed archive avoids SIGPIPE under pipefail without ignoring Git errors.
+git archive --format=tar --output="$RELEASE_WORKSPACE/source.tar" "$COMMIT"
+tar -xf "$RELEASE_WORKSPACE/source.tar" -C "$RELEASE_SOURCE"
 (
   cd "$RELEASE_SOURCE"
   # Isolate the build from local files and any caller-provided scratch path.

@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 CHECK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/buffera-release-check.XXXXXX")
 trap 'rm -rf "$CHECK_ROOT"' EXIT
 REAL_GIT=$(command -v git)
-export REAL_GIT
+REAL_TAR=$(command -v tar)
+export REAL_GIT REAL_TAR
 mkdir -p "$CHECK_ROOT/repo/scripts" "$CHECK_ROOT/repo/Sources/BufferaCore" "$CHECK_ROOT/bin"
 cp scripts/{version,create-release}.sh "$CHECK_ROOT/repo/scripts/"
 cp Sources/BufferaCore/AppVersion.swift "$CHECK_ROOT/repo/Sources/BufferaCore/"
@@ -18,9 +19,30 @@ if [[ "$1" == ls-remote ]]; then
     print "ignored refs/tags/$RELEASE_CHECK_TAG"
     print "$RELEASE_CHECK_COMMIT refs/tags/$RELEASE_CHECK_TAG^{}"
   fi
+elif [[ "$1" == archive ]]; then
+  if [[ "${RELEASE_CHECK_MODE:-}" == archive-error ]]; then
+    print -u2 'Fixture archive failure'
+    exit 9
+  fi
+  "$REAL_GIT" "$@" || exit $?
+  for argument in "$@"; do
+    case "$argument" in --output=*|--output|-o) exit 0 ;; esac
+  done
+  # Valid tar padding delivered after the reader has seen the end marker.
+  # The old streaming pipeline must fail even if Git's own writes win the race.
+  sleep 0.05
+  dd if=/dev/zero bs=65536 count=1 2>/dev/null
 else
   exec "$REAL_GIT" "$@"
 fi
+SH
+cat > "$CHECK_ROOT/bin/tar" <<'SH'
+#!/bin/zsh
+if [[ "${RELEASE_CHECK_MODE:-}" == extract-error ]]; then
+  print -u2 'Fixture extraction failure'
+  exit 8
+fi
+exec "$REAL_TAR" "$@"
 SH
 cat > "$CHECK_ROOT/bin/gh" <<'SH'
 #!/bin/zsh
@@ -75,7 +97,7 @@ expect_failure() {
   [[ ! -e "$RELEASE_CHECK_CALL" ]]
   print "PASS: $label prevents upload"
 }
-for RELEASE_CHECK_MODE in wrong-remote api-error exists; do
+for RELEASE_CHECK_MODE in wrong-remote api-error exists archive-error extract-error; do
   export RELEASE_CHECK_MODE
   expect_failure "$RELEASE_CHECK_MODE"
 done
@@ -106,4 +128,4 @@ zsh scripts/create-release.sh --disable-sandbox
 /usr/bin/grep -Fxq -- --verify-tag "$RELEASE_CHECK_CALL"
 /usr/bin/grep -Fxq -- "$BUFFERA_TAG" "$RELEASE_CHECK_CALL"
 (cd "dist/releases/$BUFFERA_TAG" && shasum -a 256 -c SHA256SUMS.txt)
-print 'PASS: exact tagged sources, isolated build, artifacts and draft-only GitHub call'
+print 'PASS: archive padding regression, exact tagged sources, isolated build, artifacts and draft-only GitHub call'
