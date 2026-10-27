@@ -16,9 +16,18 @@ enum BrandIdentity {
         }
     }
 
-    static func menuBarIcon() -> NSImage {
+    static func menuBarIcon(hasUpdate: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
             drawMark(in: NSRect(x: 0, y: 0, width: 20, height: 18), color: .black)
+            if hasUpdate {
+                // A small separated dot; the template keeps native menu-bar contrast.
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current?.compositingOperation = .clear
+                NSBezierPath(ovalIn: NSRect(x: 15.5, y: 12.5, width: 5, height: 5)).fill()
+                NSGraphicsContext.restoreGraphicsState()
+                NSColor.black.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 16.5, y: 13.5, width: 3, height: 3)).fill()
+            }
             return true
         }
         image.isTemplate = true

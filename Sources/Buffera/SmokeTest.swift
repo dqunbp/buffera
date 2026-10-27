@@ -123,7 +123,7 @@ private func runPhotoFilePreviewChecks() throws {
         throw HistoryError.database("Photos JPEG/file capture lost its formats, orientation or image previews")
     }
     let fileOnly = ClipPayload(items: [[file]])
-    guard ClipboardService.thumbnail(fileOnly) != nil,
+    guard ClipboardService.thumbnail(fileOnly) == nil,
           case .image = ClipPreviewContent.decode(fileOnly, kind: .file) else {
         throw HistoryError.database("A local image file without embedded pixels has no preview")
     }

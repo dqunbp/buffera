@@ -43,9 +43,30 @@ public enum L10n {
     private static let english = localizedBundle("en")
     private static let russian = localizedBundle("ru")
 
+    private static let resources: Bundle = {
+        // SwiftPM's generated Bundle.module searches the .app root, then an
+        // absolute build path. Our packaged resources live in Contents/Resources.
+        // Resolve those first, so installed apps never probe the source checkout.
+        let name = "Buffera_BufferaLocalization.bundle"
+        if let url = Bundle.main.resourceURL?.appendingPathComponent(name),
+           let bundle = Bundle(url: url) { return bundle }
+        // Also support the bundled MCP executable launched directly from a shell.
+        if let executable = Bundle.main.executableURL,
+           executable.deletingLastPathComponent().lastPathComponent == "MacOS" {
+            let url = executable.deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Resources").appendingPathComponent(name)
+            guard let bundle = Bundle(url: url) else {
+                fatalError("Missing packaged Buffera localization resources")
+            }
+            return bundle
+        }
+        // SwiftPM executables and fixture harnesses still use their adjacent bundle.
+        return Bundle.module
+    }()
+
     private static func localizedBundle(_ language: String) -> Bundle {
-        guard let url = Bundle.module.url(forResource: language, withExtension: "lproj"),
-              let bundle = Bundle(url: url) else { return Bundle.module }
+        guard let url = resources.url(forResource: language, withExtension: "lproj"),
+              let bundle = Bundle(url: url) else { return resources }
         return bundle
     }
 

@@ -12,6 +12,12 @@ if CommandLine.arguments.contains("--secret-keychain-smoke-test") {
 } else if CommandLine.arguments.contains("--localization-ui-smoke-test") {
     do { try runLocalizationSmokeTest() }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--updates-ui-smoke-test") {
+    do {
+        try MainActor.assumeIsolated { try runUpdateSettingsSmokeTest() }
+        print("PASS: update settings, menu-bar dot, skip and offline state")
+    }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else if CommandLine.arguments.contains("--features-ui-smoke-test") {
     do { try runFeatureSettingsSmokeTest(); print("PASS: feature settings, preparation controls and layout") }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }

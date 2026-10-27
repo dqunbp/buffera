@@ -11,6 +11,7 @@ swift build --build-system native --disable-sandbox --scratch-path "$BUILD_PATH"
 BIN_DIR=$(swift build --build-system native --disable-sandbox --scratch-path "$BUILD_PATH" --cache-path "$PWD/.build/cache" --show-bin-path)
 CHECK_DIR="$BUILD_PATH/localized-panel-checks"
 mkdir -p "$CHECK_DIR"
+rm -rf "$CHECK_DIR/Buffera_BufferaLocalization.bundle"
 cp -R "$BIN_DIR/Buffera_BufferaLocalization.bundle" "$CHECK_DIR/"
 # Share a single localization module between the fixture library and executable.
 swiftc -emit-library "$BIN_DIR"/BufferaLocalization.build/*.swift.o -o "$CHECK_DIR/libBufferaLocalization.dylib"
@@ -32,7 +33,7 @@ swiftc -I "$CHECK_DIR" -I "$BIN_DIR/Modules" -L "$CHECK_DIR" -lBufferaCore -lBuf
   Sources/Buffera/ClipDragPayload.swift Sources/Buffera/TemporaryImageExports.swift Sources/Buffera/HistoryFilters.swift \
   Sources/Buffera/HistoryAppearance.swift Sources/Buffera/HistoryResetPreferences.swift Sources/Buffera/HistorySurface.swift Sources/Buffera/InterfaceTheme.swift Sources/Buffera/BrandIdentity.swift \
   Sources/Buffera/LegacyMigration.swift Sources/Buffera/ClipPreview.swift \
-  Sources/Buffera/ClipboardService.swift Sources/Buffera/ClipboardSessionMonitor.swift "Tests/$test/"*.swift \
+  Sources/Buffera/ClipboardService.swift Sources/Buffera/ThumbnailCache.swift Sources/Buffera/ClipboardSessionMonitor.swift "Tests/$test/"*.swift \
   -o "$CHECK_DIR/$test"
 "$CHECK_DIR/$test" -interfaceLanguage ru -AppleLanguages "(ru)" -nearby.hideIntroduction YES
 # Cards are locale-independent; the legacy filter fixture uses Russian labels.

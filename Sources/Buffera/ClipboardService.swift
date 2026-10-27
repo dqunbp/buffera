@@ -188,6 +188,11 @@ final class ClipboardService {
         previewImage(payload, maximumPixelSize: 320)
     }
 
+    static func thumbnail(_ image: NSImage) -> NSImage? {
+        guard let data = image.tiffRepresentation else { return nil }
+        return thumbnail(ClipPayload(items: [[Representation(type: "public.tiff", data: data)]]))
+    }
+
     /// Presentation only: image files keep their original kind and pasteboard formats.
     /// This also works for file records captured by older versions of Buffera.
     static func canPreviewImage(_ clip: ClipSummary) -> Bool {
@@ -198,7 +203,7 @@ final class ClipboardService {
     }
 
     /// Call off the main queue, after excluding concealed records.
-    static func previewImage(_ payload: ClipPayload, maximumPixelSize: Int) -> NSImage? {
+    static func previewImage(_ payload: ClipPayload, maximumPixelSize: Int, allowFileAccess: Bool = false) -> NSImage? {
         let files = payload.items.joined().filter { $0.type == NSPasteboard.PasteboardType.fileURL.rawValue }
         // A preview of one image must not hide the rest of a file selection.
         guard files.isEmpty || (payload.items.count == 1 && files.count == 1) else { return nil }
@@ -210,7 +215,9 @@ final class ClipboardService {
         }
         // Photos supplies embedded JPEG bytes; Finder may supply only a file URL.
         // Prefer stored bytes so previews survive removal of Photos' temporary file.
-        guard let file = files.first,
+        // Automatic thumbnails must never touch original files (including metadata).
+        // Only a user-requested preview may trigger a protected-folder prompt.
+        guard allowFileAccess, let file = files.first,
               let value = String(data: file.data, encoding: .utf8),
               let url = URL(string: value), url.isFileURL,
               url.host == nil || url.host == "" || url.host == "localhost",

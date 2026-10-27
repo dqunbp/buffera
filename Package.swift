@@ -20,9 +20,10 @@ let package = Package(
                 cSettings: [.define("SQLITE_CORE"), .define("SQLITE_VEC_STATIC")]),
         .target(name: "BufferaCore", dependencies: ["CSQLite", "CSQLiteVec", "BufferaLocalization"]),
         .target(name: "BufferaModels", dependencies: ["BufferaLocalization"]),
+        .target(name: "BufferaUpdates"),
         .target(name: "BufferaSearch", dependencies: ["BufferaCore", "BufferaModels", "BufferaLocalization"]),
         .target(name: "BufferaChat", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaLocalization"]),
-        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat", "BufferaLocalization"],
+        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat", "BufferaLocalization", "BufferaUpdates"],
                           linkerSettings: [.linkedFramework("Carbon")]),
         .target(name: "BufferaMCPKit", dependencies: [
             "BufferaCore", "BufferaSearch", .product(name: "MCP", package: "swift-sdk")
@@ -33,6 +34,7 @@ let package = Package(
         .executableTarget(name: "BufferaMCPChecks", dependencies: ["BufferaMCPKit", "BufferaCore", "BufferaSearch", "CSQLite"],
                     path: "Tests/BufferaMCPTests"),
         .executableTarget(name: "BufferaChecks", dependencies: ["BufferaCore"], path: "Tests/BufferaCoreTests"),
+        .executableTarget(name: "BufferaUpdateChecks", dependencies: ["BufferaUpdates"], path: "Tests/BufferaUpdateTests"),
         .executableTarget(name: "BufferaModelChecks", dependencies: ["BufferaModels"], path: "Tests/BufferaModelTests"),
         .executableTarget(name: "BufferaEmbeddingRuntimeChecks", dependencies: ["BufferaModels"],
                           path: "Tests/BufferaEmbeddingRuntimeTests"),

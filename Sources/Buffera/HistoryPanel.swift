@@ -610,6 +610,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     func refresh(preservingSelection: Bool = false) {
         guard !isClosing, !confirming, !commitWhenLoaded else { return }
+        thumbnails.removeAllObjects()
         if let context = nearbyState {
             nearbyState?.needsReload = true
             loadNearby(anchorID: context.anchorID, date: context.anchorDate, preservingSelection: preservingSelection)
@@ -1114,6 +1115,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
               !confirming, !commitWhenLoaded,
               let row = rows.firstIndex(where: { $0.id == id }),
               let card = cards.card(at: row) else { return }
+        if case .image(let image) = content, selected?.isConcealed == false,
+           let thumbnail = ClipboardService.thumbnail(image) {
+            thumbnails.setObject(thumbnail, forKey: NSNumber(value: id))
+            card.setThumbnail(thumbnail)
+        }
         preview.show(content, title: selected?.isConcealed == true ? L10n.text("Скрытая запись") : (selected?.kind.label ?? L10n.text("Просмотр")),
                      isConcealed: selected?.isConcealed == true, relativeTo: card)
     }
@@ -1276,8 +1282,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         configure(card, row: row)
         if ClipboardService.canPreviewImage(clip) && thumbnails.object(forKey: NSNumber(value: clip.id)) == nil {
             requestThumbnail?(clip.id) { [weak self, weak card] image in
-                guard let image else { return }
-                self?.thumbnails.setObject(image, forKey: NSNumber(value: clip.id))
+                guard let self, let image,
+                      self.rows.contains(where: { $0.id == clip.id && !$0.isConcealed }) else { return }
+                self.thumbnails.setObject(image, forKey: NSNumber(value: clip.id))
                 card?.setThumbnail(image)
             }
         }

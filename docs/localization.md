@@ -6,6 +6,8 @@
 В `Package.swift` объявлены `defaultLocalization` и обработка ресурсов SwiftPM.
 `scripts/build-app.sh` переносит ресурсный bundle в `Contents/Resources`,
 объявляет оба языка в Info.plist и подписывает готовое приложение.
+Перед копированием ресурсный bundle заменяется целиком: смешение плоской структуры SwiftPM и старой `Contents/Resources` может заставить Foundation загружать устаревшие переводы.
+`L10n.resources` явно загружает этот bundle из пакета приложения, включая прямой запуск вложенного MCP-бинарника. В установленном `.app` нельзя полагаться на сгенерированный `Bundle.module`: он ищет bundle в корне `.app`, а затем по абсолютному пути сборки, что может вызвать запрос доступа к «Документам». Для обычных SwiftPM-бинарников остаётся `Bundle.module`.
 
 ## Выбор языка
 
@@ -64,6 +66,8 @@ swift run --disable-sandbox --cache-path "$PWD/.build/cache" BufferaLocalization
 swift build --disable-sandbox --product Buffera
 .build/debug/Buffera --localization-ui-smoke-test -interfaceLanguage ru -AppleLanguages '(ru)'
 .build/debug/Buffera --localization-ui-smoke-test -interfaceLanguage en -AppleLanguages '(en)'
+.build/debug/Buffera --updates-ui-smoke-test -interfaceLanguage ru -AppleLanguages '(ru)'
+.build/debug/Buffera --updates-ui-smoke-test -interfaceLanguage en -AppleLanguages '(en)'
 zsh scripts/check-history-panel.sh
 ```
 
@@ -74,12 +78,15 @@ zsh scripts/check-history-panel.sh
 папкой; пользовательская история и буфер не затрагиваются. Отдельный скрипт
 проверяет существующие взаимодействия панели на обоих языках.
 
+Проверка обновлений использует подставной релиз и изолированные настройки: проверяет точку на значке, пропуск версии, ошибки сети и размещение раздела «Обновления». Сеть и браузер не открываются. Логику GitHub-клиента проверяет `swift run BufferaUpdateChecks`; флаг `--live` дополнительно выполняет реальный публичный запрос.
+
 Для других самостоятельных `swiftc`-проверок, компилирующих исходники приложения,
 теперь также требуется модуль `BufferaLocalization`, его библиотека и ресурсный
 bundle рядом с исполняемым файлом. Пример сборки — `scripts/check-history-panel.sh`.
 
 Финальный `.app` проверяется после переноса за пределы checkout: основной
 бинарник и `BufferaMCP --help` должны находить переводы внутри пакета.
+`zsh scripts/check-packaged-localization.sh` проверяет RU/EN в отдельном пакете из `/private/tmp` с запретом чтения исходного checkout и каталога сборки через macOS Sandbox.
 
 Если файловый провайдер повторно добавляет FinderInfo и мешает подписи
 ресурсного bundle уже внутри SwiftPM, задайте каталог сборки вне синхронизации:

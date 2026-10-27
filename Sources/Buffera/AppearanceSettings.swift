@@ -24,13 +24,13 @@ final class SettingsWindow: NSWindowController {
     private let limitsDefaults: UserDefaults
 
     init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
-         mcpAccess: MCPAccess = MCPAccess(), bundleURL: URL = Bundle.main.bundleURL,
+         mcpAccess: MCPAccess = MCPAccess(), updateSettings: NSView = UpdateSettingsView(), bundleURL: URL = Bundle.main.bundleURL,
          languageDefaults: UserDefaults = .standard, limitsDefaults: UserDefaults = .standard,
          themeDefaults: UserDefaults = .standard, shortcutDefaults: UserDefaults = .standard,
          launchLanguage: LanguagePreference = L10n.preference, frameAutosaveName: String? = "BufferaSettingsWindow") {
         self.limitsDefaults = limitsDefaults
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
-                                             mcpAccess: mcpAccess, bundleURL: bundleURL, languageDefaults: languageDefaults,
+                                             mcpAccess: mcpAccess, updateSettings: updateSettings, bundleURL: bundleURL, languageDefaults: languageDefaults,
                                              limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, shortcutDefaults: shortcutDefaults, launchLanguage: launchLanguage)
         let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 620),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -155,6 +155,7 @@ private final class SettingsContentController: NSViewController {
     private let secrets: SecretHistorySettingsView
     private let historyReset: HistoryResetSettingsView
     private let models: ModelSettingsView
+    private let updateSettings: NSView
     private var appearance = HistoryAppearance.load()
     private var limits: HistoryLimits
     private let limitsDefaults: UserDefaults
@@ -173,15 +174,16 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSSlider()
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
-    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), "MCP", L10n.text("Поиск и ответы")], trackingMode: .selectOne,
+    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), "MCP", L10n.text("Поиск и ответы"), L10n.text("Обновления")], trackingMode: .selectOne,
                                           target: nil, action: nil)
     private let saveNotice = NSTextField(labelWithString: "")
     private let body = NSView()
     private var pages: [NSView] = []
 
-    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, bundleURL: URL,
+    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, updateSettings: NSView, bundleURL: URL,
          languageDefaults: UserDefaults, limitsDefaults: UserDefaults, themeDefaults: UserDefaults, shortcutDefaults: UserDefaults, launchLanguage: LanguagePreference) {
         self.shortcutDefaults = shortcutDefaults
+        self.updateSettings = updateSettings
         shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
         self.limitsDefaults = limitsDefaults
         secrets = SecretHistorySettingsView(defaults: limitsDefaults)
@@ -258,7 +260,11 @@ private final class SettingsContentController: NSViewController {
         tabs.controlSize = .regular
         tabs.target = self; tabs.action = #selector(changeTab)
         tabs.setAccessibilityLabel(L10n.text("Раздел настроек"))
-        for index in 0..<tabs.segmentCount { tabs.setWidth(index == 4 ? 130 : 92, forSegment: index) }
+        for index in 0..<tabs.segmentCount {
+            let title = (tabs.label(forSegment: index) ?? "") as NSString
+            let width = title.size(withAttributes: [.font: tabs.font ?? NSFont.systemFont(ofSize: 13)]).width
+            tabs.setWidth(ceil(width) + 24, forSegment: index)
+        }
         tabs.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(tabs)
         body.translatesAutoresizingMaskIntoConstraints = false
@@ -286,7 +292,7 @@ private final class SettingsContentController: NSViewController {
             footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), SetupUI.scroll(historyPage()), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models]
+        pages = [appearancePage(), SetupUI.scroll(historyPage()), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models, SetupUI.scroll(updateSettings)]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)

@@ -11,10 +11,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: HistoryStore!
     private let secretKeys = KeychainSecretKeyProvider()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
+    private let thumbnailCache = ThumbnailCache()
     private let clipboard = ClipboardService()
     private let clipboardSession = ClipboardSessionMonitor()
     private let hotKeys = HotKeys()
     private var panel: HistoryPanel!
+    @MainActor private lazy var updates = AppUpdateController()
     private var setup: SetupWindow?
     private var settings: SettingsWindow?
     private var modelManager: LocalModelManager?
@@ -93,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 try self.store.protectLegacySecrets()
                 self.store.performSecretMaintenance()
+                self.pruneThumbnails()
             }
             catch { DispatchQueue.main.async { self.showError(error, alert: true) } }
         }
@@ -100,7 +103,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // retries at most once per 30 seconds, independently of further captures.
         let maintenance = DispatchSource.makeTimerSource(queue: work)
         maintenance.schedule(deadline: .now() + 30, repeating: 30, leeway: .seconds(5))
-        maintenance.setEventHandler { [weak self] in self?.store.performSecretMaintenance() }
+        maintenance.setEventHandler { [weak self] in
+            self?.store.performSecretMaintenance()
+            self?.pruneThumbnails()
+        }
         secretMaintenanceTimer = maintenance
         maintenance.resume()
         let modelRoot = folder.appendingPathComponent("Models", isDirectory: true)
@@ -149,6 +155,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         copyTransformService = CopyTransformService(store: store, storageQueue: work)
         panel = HistoryPanel()
         connectPanel()
+        updates.onIndicatorChange = { [weak self] release in
+            guard let button = self?.statusItem.button else { return }
+            button.image = BrandIdentity.menuBarIcon(hasUpdate: release != nil)
+            let description = release.map { L10n.text("Доступна Buffera \($0.version.description). Настройки → Обновления.") }
+                ?? L10n.text("\(BrandIdentity.name) — история буфера обмена")
+            button.toolTip = description
+            button.setAccessibilityLabel(description)
+        }
+        updates.start()
         imageTextIndexer = ImageTextIndexer(store: store, storageQueue: work,
             onProgress: { [weak self] in self?.showImageTextProgress($0) },
             onIndexed: { [weak self] in
@@ -168,6 +183,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let id = try self.store.insert(payload: clip.payload, kind: clip.kind, title: clip.title, text: clip.text,
                                           source: clip.source, isConcealed: clip.isConcealed, isRemote: clip.isRemote,
                                           date: date, maxCount: count, maxBytes: bytes)
+                    // Deduplication can preserve concealment even for an unmarked capture.
+                    // The count/size limit may already have pruned this record.
+                    if let saved = try? self.store.summary(id: id), !saved.isConcealed {
+                        if ClipboardService.canPreviewImage(saved) {
+                            _ = self.thumbnailCache.thumbnail(id: id, payload: clip.payload, isConcealed: false)
+                        }
+                    } else {
+                        self.thumbnailCache.remove(id: id)
+                    }
                     DispatchQueue.main.async {
                         guard selectionToken == self.captureSelectionToken else { return }
                         self.panel.clipboardDidCapture(id: id)
@@ -206,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updates.stop()
         clipboard.paused = true
         secretMaintenanceTimer?.cancel()
         clipboardSession.stop()
@@ -221,7 +246,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         embeddingRuntime?.shutdown()
     }
 
-    private func connectPanel() {
+    @MainActor private func connectPanel() {
         panel.onNavigate = { [weak self] in
             self?.searchGeneration += 1
             self?.searchTask?.cancel()
@@ -366,7 +391,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             let current = self.generation
             self.work.async {
-                let result = Result { ClipboardService.thumbnail(try self.store.payload(id: id)) }
+                let result = Result { () throws -> NSImage? in
+                    guard try !self.store.summary(id: id).isConcealed else {
+                        self.thumbnailCache.remove(id: id)
+                        return nil
+                    }
+                    return self.thumbnailCache.thumbnail(id: id, payload: try self.store.payload(id: id), isConcealed: false)
+                }
                 DispatchQueue.main.async {
                     guard current == self.generation else { return }
                     switch result {
@@ -385,6 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.secretKeys.retryAccess()
                 do {
                     try self.store.conceal(id: id)
+                    self.thumbnailCache.remove(id: id)
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
                     DispatchQueue.main.async {
                         self.historyChat?.historyChanged(id: id)
@@ -410,7 +442,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let current = self.generation
             self.work.async {
                 let content: ClipPreviewContent
-                do { content = ClipPreviewContent.decode(try self.store.payload(id: clip.id), kind: clip.kind) }
+                do {
+                    let currentClip = try self.store.summary(id: clip.id)
+                    guard !currentClip.isConcealed else { return }
+                    let payload = try self.store.payload(id: clip.id)
+                    content = ClipPreviewContent.decode(payload, kind: currentClip.kind)
+                    if case .image(let image) = content {
+                        self.thumbnailCache.save(image, id: clip.id, payload: payload, isConcealed: false)
+                    }
+                }
                 catch { content = .unavailable(error.localizedDescription) }
                 DispatchQueue.main.async {
                     guard current == self.generation else { return }
@@ -426,6 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.work.async {
                 do {
                     try self.store.delete(id: id)
+                    self.thumbnailCache.remove(id: id)
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
                     DispatchQueue.main.async {
                         self.historyChat?.historyChanged(id: id)
@@ -443,6 +484,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.confirmationToken += 1
             self?.hotKeys.resetPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
+        }
+    }
+
+    private func pruneThumbnails() {
+        thumbnailCache.prune { id in
+            guard let clip = try? store.summary(id: id) else { return false }
+            return !clip.isConcealed
         }
     }
 
@@ -712,7 +760,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             type: NSPasteboard.PasteboardType.string.rawValue, data: Data(configuration.utf8))]]))
     }
 
-    @objc private func showSettings() {
+    @MainActor @objc private func showSettings() {
         if setup?.window?.isVisible == true { setup?.show(); return }
         // A save sheet must finish before its parent can be hidden.
         if let window = panel?.window, window.attachedSheet != nil {
@@ -721,7 +769,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if settings == nil {
             let controller = SettingsWindow(modelManager: modelManager, modelError: modelStorageError,
-                                            mcpAccess: MCPAccess(directory: folder))
+                                            mcpAccess: MCPAccess(directory: folder), updateSettings: updates.settingsView)
             controller.onCheckModel = { [weak self] role in
                 guard let self, let manager = self.modelManager else { return }
                 let token = UUID()
@@ -877,7 +925,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if alert { let dialog = NSAlert(error: error); NSApp.activate(ignoringOtherApps: true); dialog.runModal() }
     }
 
-    private func buildMenu() {
+    @MainActor private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "BufferaClipboard"
         statusItem.isVisible = true

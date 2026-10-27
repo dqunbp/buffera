@@ -66,6 +66,28 @@
           ]
         },
         {
+          "id": "updates",
+          "title": "Updates",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera checks GitHub Releases in the background at most once a day. When a newer stable version has a ready DMG for Apple Silicon, a small dot appears on Buffera’s menu bar icon. There are no update notices in the history panel, and background checks do not open windows."
+            },
+            {
+              "type": "paragraph",
+              "text": "Open Settings → Updates to view the installed and available versions, open the GitHub release or skip it. Skipping removes the dot while keeping the release accessible in settings. Check for Updates… and Check for Updates Automatically are also available here."
+            },
+            {
+              "type": "paragraph",
+              "text": "The check requests only public release metadata; clipboard history is not sent. Network errors appear in settings and retain an update already found. GitHub rate limits also apply to manual checks."
+            },
+            {
+              "type": "note",
+              "text": "Installation remains manual: download the DMG, quit Buffera and replace the app in its installation folder. Restart any connected MCP process after updating. Version 0.2.0 has no update checker; download 0.3.0 or newer manually to enable this feature."
+            }
+          ]
+        },
+        {
           "id": "first-copy",
           "title": "Copy. Find. Bring it back.",
           "blocks": [
@@ -117,6 +139,10 @@
             {
               "type": "paragraph",
               "text": "⌘0 clears the query and filters. Space opens a preview when clips have focus; ⌘Y also works from the search field."
+            },
+            {
+              "type": "paragraph",
+              "text": "Thumbnails are stored in ~/Library/Caches/Buffera/Thumbnails (up to 64 MB and 512 files). Opening history uses the cache or saved image bytes and does not read original files. A file without a cached thumbnail shows an icon. An explicit preview with Space or ⌘Y may read the original and request folder access, then cache its thumbnail. Concealed clips are not cached; hiding or deleting a clip removes its thumbnail."
             }
           ]
         },

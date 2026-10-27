@@ -19,6 +19,9 @@ mkdir -p "$APP/Contents/Resources/SQLiteVec"
 cp Sources/CSQLiteVec/LICENSE-* Sources/CSQLiteVec/README.md "$APP/Contents/Resources/SQLiteVec/"
 cp "$BIN_DIR/Buffera" "$APP/Contents/MacOS/Buffera"
 cp "$BIN_DIR/BufferaMCP" "$APP/Contents/MacOS/BufferaMCP"
+# SwiftPM build systems use different bundle layouts. Merging would retain an
+# old Contents/Resources tree, which Foundation prefers over fresh flat resources.
+rm -rf "$APP/Contents/Resources/Buffera_BufferaLocalization.bundle"
 cp -R "$BIN_DIR/Buffera_BufferaLocalization.bundle" "$APP/Contents/Resources/"
 if [[ "$(uname -m)" == arm64 ]]; then
   zsh scripts/prepare-model-runtime.sh "$APP"

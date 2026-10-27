@@ -588,3 +588,26 @@
 "мин. после закрытия" = "min. after closing";
 
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается." = "On next open: clear the search, show all items without filters, and select the first item. An open window is never reset.";
+
+/* GitHub release checks. */
+"Проверить обновления…" = "Check for Updates…";
+"Проверять обновления автоматически" = "Check for Updates Automatically";
+"Проверка обновлений…" = "Checking for Updates…";
+"Доступна Buffera %1$@" = "Buffera %1$@ is available";
+"У вас актуальная версия" = "You’re up to date";
+"Подходящий релиз не найден" = "No compatible release found";
+"На GitHub пока нет готового стабильного релиза для этого Mac." = "There is no ready stable release for this Mac on GitHub yet.";
+"Проверка временно недоступна" = "Update checks are temporarily unavailable";
+"GitHub ограничил частоту запросов. Повторите проверку позже." = "GitHub has limited the request rate. Please check again later.";
+"Не удалось проверить обновления" = "Could not check for updates";
+"Проверьте подключение к интернету и повторите попытку позже. Приложение продолжает работать." = "Check your internet connection and try again later. You can keep using the app.";
+"Открыть релиз" = "Open Release";
+"Пропустить эту версию" = "Skip This Version";
+"Обновления" = "Updates";
+"Обновления Buffera" = "Buffera Updates";
+"Версия пропущена" = "Version Skipped";
+"Проверьте, доступна ли новая версия Buffera." = "Check whether a newer version of Buffera is available.";
+"Установлена Buffera %1$@ (сборка %2$@)." = "Buffera %1$@ (build %2$@) is installed.";
+"Доступна Buffera %1$@. Настройки → Обновления." = "Buffera %1$@ is available. Settings → Updates.";
+"Откройте релиз на GitHub, чтобы прочитать об изменениях и скачать DMG. Установка выполняется вручную." = "Open the release on GitHub to read what’s new and download the DMG. Installation is manual.";
+"Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается точкой на значке Buffera в строке меню." = "Background checks run at most once a day. Clipboard history is not sent. A dot on Buffera’s menu bar icon indicates a new version.";

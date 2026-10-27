@@ -17,6 +17,9 @@ Buffera is a Swift/AppKit clipboard manager for macOS 14+. `Sources/Buffera/` ow
 - OCR and embeddings are derived data. Model failures must leave capture and literal search usable (`Sources/BufferaSearch/HybridSearchService.swift`). `Sources/Buffera/BackgroundPreparationPolicy.swift` governs background semantic indexing: battery restrictions are configurable, while Low Power Mode and thermal pauses remain enforced.
 
 ## Panel Interaction Contracts
+
+- Automatic image thumbnails read only stored pixels or `~/Library/Caches/Buffera/Thumbnails`, never original file URLs or their metadata. File-only cache misses show a file icon; explicit preview may read the original and populate the cache. Cache entries are bounded, fingerprinted, excluded for concealed records and removed on hide/delete or maintenance. See `Sources/Buffera/ThumbnailCache.swift`, `Sources/Buffera/ClipboardService.swift`, and `Tests/ThumbnailCacheChecks/`.
+
 Verify these contracts in `Sources/Buffera/HistoryPanel.swift`, `Sources/Buffera/HistoryShortcutGesture.swift`, and `Tests/HistoryPanelChecks/main.swift`:
 
 - Successful and cancelled drags leave history open; only a completed copy drop counts as drag use. Subsequent outside clicks/application switches dismiss an unpinned panel unless a drag, menu, preview, sheet, filter, or introduction currently blocks dismissal.
@@ -49,10 +52,13 @@ Select checks for the affected modules and callers; this is a routing table, not
 | Chat orchestration | `swift run BufferaChatChecks` |
 | Chat worker/runtime | `swift run BufferaChatRuntimeChecks` |
 | History panel, cards, drag-and-drop | `zsh scripts/check-history-panel.sh` |
+| Thumbnail cache and original-file access | `zsh scripts/check-history-panel.sh ThumbnailCacheChecks` |
+| Packaged localization resource lookup | `zsh scripts/check-packaged-localization.sh` (denies access to the source checkout) |
 | Clipboard session eligibility | `zsh scripts/check-history-panel.sh ClipboardSessionChecks`; capture smoke check in [docs/guide.md](docs/guide.md#проверка) |
 | Copy transformations/integration | `zsh scripts/check-copy-transform.sh` |
 | Website | In `landing/`: `npm run check`, then `npm run build` |
 | Release scripts/packaging | [docs/releases.md](docs/releases.md) |
+| Update checks, menu-bar dot and settings | `swift run BufferaUpdateChecks`; `Buffera --updates-ui-smoke-test` in RU/EN; localization checks |
 
 Model, runtime, search, and chat suites above use fixtures by default. Real-model checks are separate: `BufferaModelChecks --download-live` downloads weights; runtime/search/chat suites support `--live` and require the paths/options documented by their `Live*.swift` entry points under `Tests/`. Choose them when validating real download/inference behavior; fixture success alone does not establish it.
 
@@ -66,3 +72,5 @@ Use focused imperative commits. PRs should explain behavior, validation, limitat
 Change version/build metadata only in `Sources/BufferaCore/AppVersion.swift`: PATCH for fixes, MINOR for features, MAJOR for incompatible changes; reset lower components when increasing MINOR/MAJOR and increase `build` every release without resetting it. Preserve the string-constant layout parsed by `scripts/version.sh`.
 
 Follow [docs/releases.md](docs/releases.md) for metadata format, preparation, checks, tags, draft publication, signing, and release-script constraints. Never replace published tags/assets; issue a new version/build.
+
+`Sources/BufferaUpdates/` reads public GitHub release metadata without history or credentials. Keep numeric stable-version comparison, ready arm64 asset validation, persisted daily throttling/rate-limit backoff, skip-version behavior and cancellation of late results. `Sources/Buffera/AppUpdateController.swift` owns scheduling; background checks must not interrupt work. Show a quiet menu-bar dot (`BrandIdentity.menuBarIcon`) and details/actions in `UpdateSettingsView`, never an update indicator in history. Skipping hides the dot while keeping the release accessible in settings. Checks: `Tests/BufferaUpdateTests/`, `Sources/Buffera/UpdateSettingsSmokeTest.swift`. Installation remains manual.

@@ -16,12 +16,12 @@ enum ClipPreviewContent {
             }
             return .text(limited(text))
         case .image:
-            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600) {
+            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600, allowFileAccess: true) {
                 return .image(image)
             }
             return .unavailable(L10n.text("Не удалось показать картинку. Исходные данные сохранены в истории."))
         case .file:
-            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600) {
+            if let image = ClipboardService.previewImage(payload, maximumPixelSize: 1_600, allowFileAccess: true) {
                 return .image(image)
             }
             let paths = payload.items.compactMap { representations -> String? in
