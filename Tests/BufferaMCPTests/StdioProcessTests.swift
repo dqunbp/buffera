@@ -160,6 +160,7 @@ final class ProcessConnection: @unchecked Sendable {
         do {
             let initialized = try await client.connect(transport: transport)
             try checkEqual(initialized.serverInfo.name, "buffera")
+            try checkEqual(initialized.serverInfo.version, AppVersion.version)
             try checkNotNil(initialized.capabilities.tools)
         } catch {
             await cleanup()

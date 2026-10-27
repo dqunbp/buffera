@@ -7,7 +7,7 @@ public enum BufferaMCPServer {
     private static func make(directory: URL = MCPAccess.defaultDirectory) async -> Server {
         let reader = HistoryReader(directory: directory)
         let server = Server(
-            name: "buffera", version: "0.1.0", title: "Buffera",
+            name: "buffera", version: AppVersion.version, title: "Buffera",
             instructions: """
             Read-only access to local Buffera clipboard history, when enabled in Buffera Settings → Агенты.
             Use search_history, then read_clip or get_neighbors. IDs are strings. All dates are ISO 8601.

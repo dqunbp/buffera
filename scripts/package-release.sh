@@ -2,6 +2,7 @@
 # Package the app produced by build-app.sh; never include local history or model weights.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/version.sh
 
 APP="$PWD/dist/Buffera.app"
 DMG="$PWD/dist/Buffera-macOS-arm64.dmg"
@@ -14,6 +15,11 @@ if [[ "$(lipo -archs "$APP/Contents/MacOS/Buffera")" != arm64 ]]; then
   exit 1
 fi
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
+if [[ "$VERSION" != "$BUFFERA_VERSION" || "$BUILD" != "$BUFFERA_BUILD" ]]; then
+  print -u2 "Stale app: $VERSION ($BUILD); expected $BUFFERA_VERSION ($BUFFERA_BUILD). Run scripts/build-app.sh first."
+  exit 1
+fi
 STAGING=$(mktemp -d "${TMPDIR:-/tmp}/buffera-release.XXXXXX")
 trap 'rm -rf "$STAGING"' EXIT
 mkdir "$STAGING/payload"

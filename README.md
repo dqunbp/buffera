@@ -31,6 +31,8 @@ open dist/Buffera.app
 zsh scripts/package-release.sh
 ```
 
+Версия приложения, номер сборки и версия MCP задаются в `Sources/BufferaCore/AppVersion.swift`. Тег релиза имеет вид `vX.Y.Z`. Команда `zsh scripts/create-release.sh` собирает код из тега и создаёт черновик GitHub Release с DMG и SHA-256. Подготовка тега, публикация и восстановление после ошибок описаны в [docs/releases.md](docs/releases.md).
+
 В среде, где запрещён вложенный `sandbox-exec`, передайте `--disable-sandbox` скрипту сборки. Это отключает только песочницу манифеста SwiftPM, а не защиту macOS приложения.
 
 Получается локально подписанный ad-hoc пакет `dist/Buffera.app` с основным приложением и отдельным исполняемым файлом `Contents/MacOS/BufferaMCP`. На Apple Silicon сборка также скачивает закреплённый выпуск llama.cpp, проверяет SHA-256 и включает движок с `BufferaModelProbe` для проверки моделей, `BufferaEmbeddingWorker` для поиска и `BufferaChatWorker` для чата. sqlite-vec 0.1.9 собирается статически из закреплённого исходника. Веса в пакет не входят. Для распространения без предупреждения о неизвестном разработчике нужны Developer ID и notarization. Можно скопировать пакет в Applications. Для автозапуска добавьте его в «Системные настройки → Основные → Объекты входа».
