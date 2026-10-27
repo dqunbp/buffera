@@ -907,7 +907,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         _ = add(L10n.text("Папка данных…"), #selector(revealData))
         _ = add(L10n.text("Клавиши и справка…"), #selector(help))
-        menu.addItem(SupportBuffera.menuItem())
         errorItem = add(L10n.text("Последняя ошибка…"), #selector(showLastError)); errorItem.isHidden = true
         menu.addItem(.separator()); _ = add(L10n.text("Завершить \(BrandIdentity.name)"), #selector(quit))
         statusItem.menu = menu
