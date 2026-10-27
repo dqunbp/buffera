@@ -277,11 +277,8 @@ private final class SettingsContentController: NSViewController {
         body.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(body)
 
-        let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
-        setupButton.bezelStyle = .inline
         saveNotice.font = .systemFont(ofSize: 11); saveNotice.textColor = .tertiaryLabelColor
-        let footerNotes = vertical([saveNotice, setupButton], spacing: 3)
-        let footer = NSStackView(views: [footerNotes, NSView(), SupportBufferaButton()])
+        let footer = NSStackView(views: [saveNotice, NSView(), SupportBufferaButton()])
         footer.spacing = 18
         footer.alignment = .centerY
         footer.translatesAutoresizingMaskIntoConstraints = false
@@ -374,8 +371,15 @@ private final class SettingsContentController: NSViewController {
         restartNotice.addArrangedSubview(paragraph(L10n.text("Язык изменится после перезапуска")))
         restartNotice.addArrangedSubview(restart)
         refreshLanguage()
-        let page = vertical([grid, languageNote, restartNotice, sidebar, note, tip], spacing: 12)
-        for child in [grid, languageNote, note, tip] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
+        setupButton.bezelStyle = .inline
+        setupButton.identifier = NSUserInterfaceItemIdentifier("settings.showSetup")
+        let setupNote = paragraph(L10n.text("Откроет пошаговый мастер настройки Buffera с текущими параметрами."))
+        setupNote.identifier = NSUserInterfaceItemIdentifier("settings.setupNote")
+        let setup = vertical([setupButton, setupNote], spacing: 4)
+        setupNote.widthAnchor.constraint(equalTo: setup.widthAnchor).isActive = true
+        let page = vertical([grid, languageNote, restartNotice, sidebar, note, tip, setup], spacing: 12)
+        for child in [grid, languageNote, note, tip, setup] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 

@@ -9,9 +9,9 @@ public final class HistoryStore {
 
     var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private static let schemaVersion = 9
+    private static let schemaVersion = 10
     let secretCipher: SecretPayloadCipher?
-    static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote"
+    static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote,label"
     // Storage/search sentinel: presentation translates it through ClipSummary.displayTitle.
     public static let concealedTitle = "Скрытая запись"
     private static func concealedSearch(source: String) -> String {
@@ -149,6 +149,12 @@ public final class HistoryStore {
                 INSERT INTO secret_maintenance VALUES(1,\(version > 0 ? 1 : 0),\(version > 0 ? 1 : 0));
                 UPDATE secret_storage SET needs_cleanup=0;
                 PRAGMA user_version=9;
+                """)
+            }
+            if version < 10 {
+                try execute("""
+                ALTER TABLE clips ADD COLUMN label TEXT NOT NULL DEFAULT '';
+                PRAGMA user_version=10;
                 """)
             }
             try execute("COMMIT")
@@ -297,14 +303,15 @@ public final class HistoryStore {
             if status == SQLITE_DONE { throw HistoryError.missing }
             guard status == SQLITE_ROW else { throw failure() }
             let clip = summary(statement)
+            let payloadColumn = Int32(Self.summaryColumns.split(separator: ",").count)
             var data: Data?
             if [.text, .link, .file].contains(clip.kind) {
-                guard let bytes = sqlite3_column_blob(statement, 10) else { throw HistoryError.invalidPayload }
-                data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 10)))
+                guard let bytes = sqlite3_column_blob(statement, payloadColumn) else { throw HistoryError.invalidPayload }
+                data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, payloadColumn)))
             }
-            let imageText = clip.kind == .image && string(statement, 11) == "complete" ? string(statement, 12) : nil
-            let encoding = sqlite3_column_int(statement, 13)
-            let fingerprint = string(statement, 14)
+            let imageText = clip.kind == .image && string(statement, payloadColumn + 1) == "complete" ? string(statement, payloadColumn + 2) : nil
+            let encoding = sqlite3_column_int(statement, payloadColumn + 3)
+            let fingerprint = string(statement, payloadColumn + 4)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
             return (clip, data, imageText, encoding, fingerprint)
         }
@@ -334,7 +341,7 @@ public final class HistoryStore {
             text: string(statement, 4), source: string(statement, 5), byteCount: Int(sqlite3_column_int64(statement, 6)),
             isConcealed: sqlite3_column_int(statement, 7) != 0,
             isFavorite: sqlite3_column_int(statement, 8) != 0,
-            isRemote: sqlite3_column_int(statement, 9) != 0)
+            isRemote: sqlite3_column_int(statement, 9) != 0, label: string(statement, 10))
     }
 
     public func count(_ filter: SearchFilter = SearchFilter()) throws -> Int {

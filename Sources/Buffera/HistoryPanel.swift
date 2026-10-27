@@ -121,6 +121,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onExport: ((Int64, Bool) -> Void)?
     var onDelete: ((Int64) -> Void)?
     var onFavorite: ((Int64, Bool) -> Void)?
+    var onLabel: ((Int64, String, @escaping (Error?) -> Void) -> Void)?
     var onPreview: ((ClipSummary, Int) -> Void)?
     var requestCopyTransformOperations: ((Int64, @escaping (Result<[CopyTransformOperation], Error>) -> Void) -> Void)?
     var requestCopyTransform: ((Int64, CopyTransformOperation, @escaping (Result<String, Error>) -> Void) -> Void)?
@@ -953,6 +954,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         switch action {
         case .copy: confirm()
         case .preview: previewSelected()
+        case .label: editLabel(clip)
         case .favorite:
             guard !pendingFavorites.contains(id) else { return }
             nearbyState?.needsReload = true
@@ -966,6 +968,33 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         case .delete: onDelete?(id)
         case .nearby: requestShowNearby(id: id)
         case .copyDifferently: showCopyTransform(clip)
+        }
+    }
+
+    private func editLabel(_ clip: ClipSummary) {
+        guard clip.isFavorite, pendingFavorites.isEmpty, let onLabel else { return }
+        cancelShortcutGesture(); invalidateReveal()
+        let alert = NSAlert()
+        alert.messageText = L10n.text("Подпись к записи")
+        alert.informativeText = L10n.text("Например, «Пароль от Wi-Fi». Подпись видна даже у скрытой записи и хранится без шифрования. Не вводите в неё сам пароль. Пустое поле удалит подпись.")
+        alert.addButton(withTitle: L10n.text("Сохранить"))
+        alert.addButton(withTitle: L10n.text("Отмена"))
+        let field = NSTextField(string: clip.label)
+        field.frame = NSRect(x: 0, y: 0, width: 340, height: 24)
+        field.placeholderString = L10n.text("Подпись (до 120 символов)")
+        field.setAccessibilityLabel(L10n.text("Подпись"))
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self else { return }
+            self.window.makeKey()
+            guard response == .alertFirstButtonReturn else { return }
+            onLabel(clip.id, field.stringValue) { [weak self] error in
+                guard let self else { return }
+                if let error { self.status.stringValue = error.localizedDescription; return }
+                self.nearbyState?.needsReload = true
+                if self.window.isVisible { self.refresh(preservingSelection: true) }
+            }
         }
     }
 
@@ -1063,7 +1092,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             let clip = rows[row]
             let updated = ClipSummary(id: clip.id, date: clip.date, kind: clip.kind, title: clip.title,
                                       text: clip.text, source: clip.source, byteCount: clip.byteCount,
-                                      isConcealed: clip.isConcealed, isFavorite: isFavorite, isRemote: clip.isRemote)
+                                      isConcealed: clip.isConcealed, isFavorite: isFavorite, isRemote: clip.isRemote, label: clip.label)
             rows[row] = updated
             cards.card(at: row)?.updateFavorite(updated)
             updateVisibleCards()
@@ -1233,6 +1262,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 && current.title == updated.title && current.text == updated.text && current.source == updated.source
                 && current.byteCount == updated.byteCount && current.isConcealed == updated.isConcealed
                 && current.isFavorite == updated.isFavorite && current.isRemote == updated.isRemote
+                && current.label == updated.label
         }
     }
 

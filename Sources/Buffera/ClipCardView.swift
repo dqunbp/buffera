@@ -3,10 +3,11 @@ import AppKit
 import BufferaCore
 
 enum ClipCardAction: Int, CaseIterable {
-    case copy, preview, favorite, reveal, finder, save, delete, nearby, copyDifferently
+    case copy, preview, favorite, reveal, finder, save, delete, nearby, copyDifferently, label
 
     var title: String {
         switch self {
+        case .label: return L10n.text("Подпись…")
         case .copy: return L10n.text("В буфер")
         case .preview: return L10n.text("Просмотр")
         case .favorite: return L10n.text("В избранное")
@@ -21,6 +22,7 @@ enum ClipCardAction: Int, CaseIterable {
 
     var symbol: String {
         switch self {
+        case .label: return "tag"
         case .copy: return "doc.on.clipboard"
         case .preview: return "arrow.up.left.and.arrow.down.right"
         case .favorite: return "star"
@@ -35,6 +37,7 @@ enum ClipCardAction: Int, CaseIterable {
 
     var shortcut: String {
         switch self {
+        case .label: return ""
         case .copy: return "↩"
         case .preview: return L10n.text("Пробел / ⌘Y")
         case .favorite: return "⌘D"
@@ -49,7 +52,7 @@ enum ClipCardAction: Int, CaseIterable {
 
     var keyEquivalent: String {
         switch self {
-        case .copy: return ""
+        case .copy, .label: return ""
         case .preview: return "y"
         case .favorite: return "d"
         case .reveal: return "h"
@@ -63,7 +66,7 @@ enum ClipCardAction: Int, CaseIterable {
 
     var keyEquivalentModifierMask: NSEvent.ModifierFlags {
         switch self {
-        case .copy: return []
+        case .copy, .label: return []
         case .reveal, .finder, .save, .nearby, .copyDifferently: return [.command, .shift]
         case .preview, .favorite, .delete: return .command
         }
@@ -71,6 +74,7 @@ enum ClipCardAction: Int, CaseIterable {
 
     func isAvailable(for clip: ClipSummary) -> Bool {
         switch self {
+        case .label: return clip.isFavorite
         case .reveal: return clip.isConcealed || clip.kind == .text || clip.kind == .link
         case .finder, .save: return clip.kind == .image && !clip.isConcealed
         case .copyDifferently: return !clip.isConcealed && [.text, .link, .image].contains(clip.kind)
@@ -213,7 +217,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         let measured = text.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth,
                                                            height: .greatestFiniteMagnitude)).height ?? 24
         let visibleTextHeight = min(ceil(measured), CGFloat(maximumPreviewLines) * lineHeight(for: text.font))
-        return min(maximumHeight, 50 + max(24, visibleTextHeight))
+        return min(maximumHeight, 50 + (clip.label.isEmpty ? 0 : 22) + max(24, visibleTextHeight))
     }
 
     init(clip: ClipSummary, revealedText: String?, thumbnail: NSImage?,
@@ -370,6 +374,22 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         content.translatesAutoresizingMaskIntoConstraints = false
         addSubview(content)
 
+        let labelHeight: CGFloat = clip.label.isEmpty ? 0 : 22
+        if !clip.label.isEmpty {
+            let label = NSTextField(labelWithString: clip.label)
+            label.font = .systemFont(ofSize: 12, weight: .semibold)
+            label.lineBreakMode = .byTruncatingTail
+            label.toolTip = clip.label
+            label.setAccessibilityLabel(L10n.text("Подпись") + ": " + clip.label)
+            label.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+                label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+                label.topAnchor.constraint(equalTo: topAnchor, constant: 5),
+                label.heightAnchor.constraint(equalToConstant: 17)
+            ])
+        }
         let isImage = ClipboardService.canPreviewImage(clip)
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.image = NSImage(systemSymbolName: clip.isConcealed ? "lock.fill" : clip.kind.symbol,
@@ -438,7 +458,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         NSLayoutConstraint.activate([
             content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: contentInset),
             content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -contentInset),
-            content.topAnchor.constraint(equalTo: topAnchor, constant: isImage ? 2 : 10),
+            content.topAnchor.constraint(equalTo: topAnchor, constant: labelHeight + (isImage ? 2 : 10)),
             content.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -6),
             content.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
@@ -515,7 +535,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     private func updateContentSizing(for size: NSSize) {
         guard !ClipboardService.canPreviewImage(clip) || clip.kind == .file else { return }
         // The action footer remains fixed while extra height goes to the preview.
-        let contentHeight = max(24, size.height - 50)
+        let contentHeight = max(24, size.height - 50 - (clip.label.isEmpty ? 0 : 22))
         let lineHeight = Self.lineHeight(for: contentText.font)
         let lines = max(1, min(Self.maximumPreviewLines, Int(floor(contentHeight / lineHeight))))
         if contentText.maximumNumberOfLines != lines { contentText.maximumNumberOfLines = lines }

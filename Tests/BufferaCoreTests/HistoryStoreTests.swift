@@ -88,7 +88,7 @@ final class HistoryStoreTests {
             _ = try store.imageText(id: empty)
             throw CheckFailure(description: "Expected missing image text record")
         } catch HistoryError.missing { }
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 9)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 10)
     }
 
     func testDuplicateMovesToTopWithoutNewRecord() throws {
@@ -416,11 +416,11 @@ final class HistoryStoreTests {
         try checkEqual(records.map(\.title), (1...8).reversed().map { "legacy \($0)" })
         try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite && !$0.isRemote })
         for index in 1...8 { try checkEqual(try store.payload(id: Int64(index)), payload("legacy \(index)")) }
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         store = nil; store = try makeTestHistoryStore(url: url)
         try checkEqual(try store.count(), 8)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
     }
 
     func testVersionTwoMigrationPreservesConcealmentAndPayloads() throws {
@@ -452,7 +452,7 @@ final class HistoryStoreTests {
         try checkEqual(record.source, "Old App"); try checkEqual(record.byteCount, encoded.count + 28)
         try check(record.isConcealed && !record.isFavorite && !record.isRemote)
         try checkEqual(try store.payload(id: 42), original)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         try store.setFavorite(id: 42, isFavorite: true)
         store = nil; store = try makeTestHistoryStore(url: url)
@@ -463,7 +463,7 @@ final class HistoryStoreTests {
     func testFavoriteSurvivesRepeatSetReopenDeduplicationAndConcealment() throws {
         let id = try insert("favorite-fixture", time: 100)
         try check(!store.search(SearchFilter())[0].isFavorite)
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 9)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 10)
         try store.setFavorite(id: id, isFavorite: true)
         try store.setFavorite(id: id, isFavorite: true)
         try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 100))
@@ -631,7 +631,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         try checkEqual(try store.count(), 4)
         let records = try store.search(SearchFilter())
         for entry in entries {
@@ -717,7 +717,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         let records = try store.search(SearchFilter())
         try checkEqual(records.count, entries.count)
         for entry in entries {
@@ -737,7 +737,7 @@ final class HistoryStoreTests {
         filter.query = ""
         try checkEqual(try store.count(filter), 0)
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
         try withRawDatabase(at: url) { db in
             try checkEqual(sqlite3_exec(db, "UPDATE clips SET is_remote=2 WHERE id=21", nil, nil, nil), SQLITE_CONSTRAINT)
@@ -787,7 +787,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 9)
+        try checkEqual(try rawSchemaVersion(at: url), 10)
         let records = try store.search(SearchFilter())
         try checkEqual(records.map(\.id), [34, 33, 31, 32])
         for entry in entries {
@@ -1108,7 +1108,7 @@ final class HistoryStoreTests {
 
         let url = directory.appendingPathComponent("history.sqlite")
         let id = try insert("read-only version fixture")
-        for version in [0, 5, 6, 7, 8, 10] {
+        for version in [0, 5, 6, 7, 8, 9, 11] {
             try withRawDatabase(at: url) { db in
                 try checkEqual(sqlite3_exec(db, "PRAGMA user_version=\(version)", nil, nil, nil), SQLITE_OK)
             }
@@ -1117,7 +1117,7 @@ final class HistoryStoreTests {
             try checkEqual(try store.payload(id: id), payload("read-only version fixture"))
         }
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=9", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=10", nil, nil, nil), SQLITE_OK)
         }
         let reader = try makeTestHistoryStore(url: url, mode: .readOnly)
         try checkEqual(try reader.summary(id: id).text, "read-only version fixture")
@@ -1264,6 +1264,60 @@ final class HistoryStoreTests {
         var query = SearchFilter()
         query.query = "original concealed payload"
         try checkEqual(try store.count(query), 0)
+    }
+
+    func testLabelsPreservePayloadAndSurviveLifecycle() throws {
+        let id = try insert("synthetic secret", time: 10)
+        let newer = try insert("newer", time: 20)
+        try checkThrows(try store.setLabel(id: id, label: "Wi-Fi"))
+        try store.setFavorite(id: id, isFavorite: true)
+        try store.setLabel(id: id, label: "  Домашний\n Wi-Fi  ")
+        try checkEqual(try store.summary(id: id).label, "Домашний Wi-Fi")
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [newer, id])
+        try checkEqual(try store.summary(id: id).date, Date(timeIntervalSince1970: 10))
+        try checkEqual(try store.visibleContent(id: id).payload, payload("synthetic secret"))
+        try checkThrows(try store.setLabel(id: id, label: String(repeating: "a", count: 121)))
+        try checkThrows(try store.setLabel(id: id, label: "bad\0label"))
+        try checkEqual(try store.summary(id: id).label, "Домашний Wi-Fi")
+        try store.conceal(id: id)
+        try checkEqual(try insert("synthetic secret", time: 30), id)
+        try checkEqual(try store.revealedContent(id: id).payload, payload("synthetic secret"))
+        try checkEqual(try store.summary(id: id).label, "Домашний Wi-Fi")
+        try store.setFavorite(id: id, isFavorite: false)
+        try checkEqual(try store.summary(id: id).label, "Домашний Wi-Fi")
+        try store.setFavorite(id: id, isFavorite: true)
+        store = nil; store = try makeTestHistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        try checkEqual(try store.nearby(anchorID: id).first?.label, "Домашний Wi-Fi")
+        let reader = try makeTestHistoryStore(url: directory.appendingPathComponent("history.sqlite"), mode: .readOnly)
+        try checkEqual(try reader.summary(id: id).label, "Домашний Wi-Fi")
+        try checkThrows(try reader.setLabel(id: id, label: "readonly"))
+        var filter = SearchFilter(); filter.query = "Домашний"
+        try checkEqual(try store.count(filter), 0) // Not indexed as clipboard content.
+        try store.setLabel(id: id, label: "   ")
+        try checkEqual(try store.summary(id: id).label, "")
+        try store.delete(id: id)
+        try checkThrows(try store.setLabel(id: id, label: "deleted"))
+    }
+
+    func testVersionNineMigrationAddsEmptyLabels() throws {
+        let id = try insert("migration payload", time: 10)
+        try store.setFavorite(id: id, isFavorite: true)
+        let url = directory.appendingPathComponent("history.sqlite")
+        store = nil
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, "ALTER TABLE clips DROP COLUMN label; PRAGMA user_version=9", nil, nil, nil), SQLITE_OK)
+        }
+        try checkThrows(try makeTestHistoryStore(url: url, mode: .readOnly))
+        store = try makeTestHistoryStore(url: url)
+        let clip = try store.summary(id: id)
+        try checkEqual(clip.label, "")
+        try check(clip.isFavorite)
+        try checkEqual(clip.date, Date(timeIntervalSince1970: 10))
+        try checkEqual(try store.payload(id: id), payload("migration payload"))
+        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try store.setLabel(id: id, label: "Migrated")
+        store = nil; store = try makeTestHistoryStore(url: url)
+        try checkEqual(try store.summary(id: id).label, "Migrated")
     }
 
     private func withRawDatabase(at url: URL, _ body: (OpaquePointer) throws -> Void) throws {

@@ -519,6 +519,7 @@
 "Применить новый язык?" = "Apply the new language?";
 "Пробел" = "Space";
 "Пройти настройку заново…" = "Run setup again…";
+"Откроет пошаговый мастер настройки Buffera с текущими параметрами." = "Opens Buffera’s step-by-step setup wizard with your current settings.";
 "Пропустить шаг" = "Skip this step";
 "Размер истории: от 1 до 20 ГБ" = "History size: 1–20 GB";
 "Скопировать" = "Copy";
@@ -613,3 +614,13 @@
 "Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается двумя красными точками на значке Buffera и пунктом в его меню." = "Background checks run at most once a day. Clipboard history is not sent. Two red dots on Buffera’s icon and an item in its menu indicate a new version.";
 
 "Доступна Buffera %1$@…" = "Buffera %1$@ is available…";
+
+// Favorite item labels
+"Подпись…" = "Label…";
+"Подпись" = "Label";
+"Подпись к записи" = "Item label";
+"Например, «Пароль от Wi-Fi». Подпись видна даже у скрытой записи и хранится без шифрования. Не вводите в неё сам пароль. Пустое поле удалит подпись." = "For example, “Wi-Fi password”. The label stays visible on concealed items and is stored unencrypted. Do not enter the password itself. Leave empty to remove the label.";
+"Подпись (до 120 символов)" = "Label (up to 120 characters)";
+"Подпись должна содержать не более 120 символов без управляющих знаков." = "Labels must contain no more than 120 characters and no control characters.";
+"Подпись можно изменить только у записи в избранном." = "Only favorite items can have their labels edited.";
+"Сохранить" = "Save";

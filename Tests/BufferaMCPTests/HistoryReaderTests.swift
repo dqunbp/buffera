@@ -97,7 +97,7 @@ final class HistoryReaderTests {
         try checkNil(item.snippetTruncated)
         try checkNil(item.byteCount)
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(item)) as? [String: Any]
-        for key in ["snippet", "snippetTruncated", "byteCount"] {
+        for key in ["snippet", "snippetTruncated", "byteCount", "label"] {
             try checkNil(json?[key], "Masked metadata must omit \(key), including null values")
         }
     }
@@ -437,6 +437,7 @@ final class HistoryReaderTests {
         let text = "private-secret-needle" + String(repeating: "Я", count: 60_000)
         let id = try insert(text, time: 1, hidden: true)
         try store.setFavorite(id: id, isFavorite: true)
+        try store.setLabel(id: id, label: "Router label private metadata")
         let originalPayload = try store.payload(id: id)
         let originalSummary = try store.summary(id: id)
         let order = try store.search(SearchFilter()).map(\.id)
@@ -448,6 +449,8 @@ final class HistoryReaderTests {
             try checkNil(result.totalCharacters)
             try checkNil(result.nextOffset)
             try checkMaskedItem(result.item)
+            let encoded = String(decoding: try JSONEncoder().encode(result), as: UTF8.self)
+            try checkFalse(encoded.contains("Router label private metadata"))
         }
         var query = SearchFilter()
         query.query = "private-secret-needle"

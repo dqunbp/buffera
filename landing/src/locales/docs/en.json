@@ -156,6 +156,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Right-click a favorite and choose “Label…” to add a description, such as “Home Wi-Fi password”. Labels of up to 120 characters appear above the content, including on concealed items; the password stays masked. Leave the field empty to remove the label. Labels survive restarts, repeated copies, and removing the favorite star. They are unencrypted metadata: do not put the secret itself in a label. Labels are not included in content search, MCP responses, or chat."
+            },
+            {
+              "type": "paragraph",
               "text": "The anchor at the bottom of history pins the window above other apps. Escape or selecting a clip closes it. For side-by-side work, choose a left or right edge panel in Appearance settings."
             }
           ]

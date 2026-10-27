@@ -21,6 +21,8 @@ func checkThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStrin
 }
 
 let checks: [(String, (HistoryStoreTests) -> () throws -> Void)] = [
+    ("Labels preserve payloads, dates and privacy across the record lifecycle", HistoryStoreTests.testLabelsPreservePayloadAndSurviveLifecycle),
+    ("Version nine migration preserves records and adds empty labels", HistoryStoreTests.testVersionNineMigrationAddsEmptyLabels),
     ("Read-only open never creates or migrates history", HistoryStoreTests.testReadOnlyDoesNotCreateOrMigrateHistory),
     ("Read-only connection rejects writes and sees writer commits", HistoryStoreTests.testReadOnlyRejectsWritesAndSeesNewWriterCommits),
     ("Read snapshots stay coherent across commits and recover after errors", HistoryStoreTests.testReadSnapshotIsCoherentAcrossConcurrentCommitsAndEndsAfterFailure),

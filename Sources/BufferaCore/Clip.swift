@@ -63,6 +63,8 @@ public struct ClipSummary: Identifiable, Sendable {
     public let isConcealed: Bool
     public let isFavorite: Bool
     public let isRemote: Bool
+    /// User-written, unencrypted description; never part of the clipboard payload.
+    public let label: String
 
     /// Translate generated labels only; user content and persisted titles stay intact.
     public var displayTitle: String {
@@ -78,11 +80,12 @@ public struct ClipSummary: Identifiable, Sendable {
 
     public init(id: Int64, date: Date, kind: ClipKind, title: String, text: String,
                 source: String, byteCount: Int, isConcealed: Bool = false, isFavorite: Bool = false,
-                isRemote: Bool = false) {
+                isRemote: Bool = false, label: String = "") {
         self.id = id; self.date = date; self.kind = kind; self.title = title; self.text = text
         self.source = source; self.byteCount = byteCount; self.isConcealed = isConcealed
         self.isFavorite = isFavorite
         self.isRemote = isRemote
+        self.label = label
     }
 }
 

@@ -36,6 +36,7 @@ extension HistoryStore {
                 // Merge it into the protected row rather than hitting the unique constraint.
                 if let protected = existing.first, let original = originalMatch.first {
                     if original.isFavorite { try setFavorite(id: protected.id, isFavorite: true) }
+                    try inheritLabel(from: original, to: protected.id)
                     try delete(id: original.id)
                 }
                 // Promote an existing visible row, preserving its ID and favorite.
@@ -144,6 +145,7 @@ extension HistoryStore {
                                        bindings: [.text(fingerprint), .integer(id)])
         for duplicate in duplicates {
             if duplicate.isFavorite { try setFavorite(id: id, isFavorite: true) }
+            try inheritLabel(from: duplicate, to: id)
             try delete(id: duplicate.id)
         }
         let update = try prepare("UPDATE payloads SET data=?,encoding=1 WHERE clip_id=?")

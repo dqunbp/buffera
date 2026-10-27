@@ -123,6 +123,30 @@ func runLocalizationSmokeTest() throws {
     guard let tabs = descendants(content).compactMap({ $0 as? NSSegmentedControl }).first else {
         throw HistoryError.database("Settings tabs missing")
     }
+    guard let setup = descendants(content).first(where: { $0.identifier?.rawValue == "settings.showSetup" }) as? NSButton else {
+        throw HistoryError.database("Appearance page is missing the setup action")
+    }
+    var setupRequests = 0
+    controller.onShowSetup = { setupRequests += 1 }
+    setup.performClick(nil)
+    try check(setupRequests == 1, "Setup action is disconnected or duplicated")
+    for index in 1..<tabs.segmentCount {
+        tabs.selectedSegment = index
+        _ = tabs.sendAction(tabs.action, to: tabs.target)
+        try check(!descendants(content).contains(where: { $0 === setup }),
+                  "Setup action must only appear on the appearance page")
+    }
+    tabs.selectedSegment = 0
+    _ = tabs.sendAction(tabs.action, to: tabs.target)
+    content.layoutSubtreeIfNeeded()
+    try check(descendants(content).contains(where: { $0 === setup }), "Returning to appearance lost the setup action")
+    content.wantsLayer = true
+    content.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+    if let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+        content.cacheDisplay(in: content.bounds, to: bitmap)
+        try bitmap.representation(using: .png, properties: [:])?.write(
+            to: URL(fileURLWithPath: "/tmp/buffera-settings-appearance-\(activeLanguage).png"))
+    }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
     guard let resetEnabled = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.enabled" }) as? NSButton,

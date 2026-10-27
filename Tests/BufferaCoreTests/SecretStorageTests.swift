@@ -176,11 +176,30 @@ func runSecretStorageChecks() -> Int {
             f.keyAvailable = false
             let visible = try f.insert(value, secret: false)
             try f.store.setFavorite(id: visible, isFavorite: true)
+            try f.store.setLabel(id: visible, label: "Router password")
             f.keyAvailable = true
             try checkEqual(try f.insert(value), secret)
+            try checkEqual(try f.store.summary(id: secret).label, "Router password")
             try checkEqual(try f.store.count(), 1)
             try check(try f.store.summary(id: secret).isFavorite)
             try checkEqual(try f.store.payload(id: secret), f.payload(value))
+        }),
+        ("concealing a visible duplicate inherits a label without overwriting an existing one", { f in
+            for hasOwnLabel in [false, true] {
+                let value = "label-merge-\(hasOwnLabel)"
+                let secret = try f.insert(value)
+                try f.store.setFavorite(id: secret, isFavorite: true)
+                try f.store.setLabel(id: secret, label: "Protected label")
+                f.keyAvailable = false
+                let visible = try f.insert(value, secret: false)
+                try f.store.setFavorite(id: visible, isFavorite: true)
+                if hasOwnLabel { try f.store.setLabel(id: visible, label: "Visible label") }
+                f.keyAvailable = true
+                try f.store.conceal(id: visible)
+                try checkEqual(try f.store.summary(id: visible).label, hasOwnLabel ? "Visible label" : "Protected label")
+                try checkThrows(try f.store.summary(id: secret))
+                try checkEqual(try f.store.payload(id: visible), f.payload(value))
+            }
         }),
         ("key access never holds a write transaction or payload read snapshot", { f in
             f.onKeyAccess = { [unowned f] in
@@ -275,6 +294,7 @@ func runSecretStorageChecks() -> Int {
                 DELETE FROM old_data;
                 DROP TABLE old_data;
                 DROP TABLE secret_maintenance;
+                ALTER TABLE clips DROP COLUMN label;
                 PRAGMA user_version=8;
                 PRAGMA wal_checkpoint(TRUNCATE);
                 """)

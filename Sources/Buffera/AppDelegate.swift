@@ -433,6 +433,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        panel.onLabel = { [weak self] id, label, completion in
+            guard let self else { return }
+            self.work.async {
+                do {
+                    try self.store.setLabel(id: id, label: label)
+                    DispatchQueue.main.async { completion(nil) }
+                } catch {
+                    DispatchQueue.main.async { completion(error); self.showError(error) }
+                }
+            }
+        }
         panel.onPreview = { [weak self] clip, token in
             guard let self, !clip.isConcealed else { return }
             let current = self.generation
