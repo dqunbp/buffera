@@ -93,6 +93,7 @@ final class SettingsWindow: NSWindowController {
         settings.refreshShortcuts()
         settings.refreshMCPAccess()
         settings.refreshSecrets()
+        settings.refreshTextFileNaming()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
@@ -166,6 +167,7 @@ private final class SettingsContentController: NSViewController {
     private let restartNotice = NSStackView()
     private let sidebar = NSButton(checkboxWithTitle: L10n.text("Показывать боковую панель с фильтрами"), target: nil, action: nil)
     private let count = NSPopUpButton()
+    private let textFileNaming = NSPopUpButton()
     private let bytes = NSSlider()
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
@@ -363,7 +365,24 @@ private final class SettingsContentController: NSViewController {
 
     func refreshSecrets() { secrets.refresh() }
 
+    func refreshTextFileNaming() {
+        textFileNaming.selectItem(at: TextFileNaming.allCases.firstIndex(of: .load(from: limitsDefaults)) ?? 0)
+    }
+
+    @objc private func textFileNamingChanged() {
+        guard TextFileNaming.allCases.indices.contains(textFileNaming.indexOfSelectedItem) else { return }
+        limitsDefaults.set(TextFileNaming.allCases[textFileNaming.indexOfSelectedItem].rawValue,
+                           forKey: TextFileNaming.preferenceKey)
+    }
+
     private func historyPage() -> NSView {
+        configure(textFileNaming, label: L10n.text("Имя текстового файла"), action: #selector(textFileNamingChanged))
+        textFileNaming.identifier = NSUserInterfaceItemIdentifier("settings.textFileNaming")
+        textFileNaming.addItems(withTitles: TextFileNaming.allCases.map(\.title))
+        refreshTextFileNaming()
+        let namingNote = paragraph(L10n.text("Для «Как файл .txt» и «Как файл .md». Если первая строка не подходит для имени, используется время копирования."))
+        let naming = vertical([label(L10n.text("Имя текстового файла")), textFileNaming, namingNote], spacing: 8)
+        namingNote.widthAnchor.constraint(equalTo: naming.widthAnchor).isActive = true
         configure(count, label: L10n.text("Лимит записей"), action: #selector(countLimitChanged))
         count.identifier = NSUserInterfaceItemIdentifier("settings.countLimit")
         bytes.minValue = Double(HistoryLimits.byteRange.lowerBound / HistoryLimits.bytesPerGigabyte)
@@ -392,8 +411,8 @@ private final class SettingsContentController: NSViewController {
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         folder.imagePosition = .imageLeading
         let storage = paragraph(L10n.text("История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится."))
-        let page = vertical([secrets, grid, note, ocr, folder, storage], spacing: 14)
-        for child in [secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let page = vertical([naming, secrets, grid, note, ocr, folder, storage], spacing: 14)
+        for child in [naming, secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 

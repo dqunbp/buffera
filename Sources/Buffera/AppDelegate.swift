@@ -347,7 +347,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let clip = try self.store.summary(id: id)
                     guard CopyTransformOperation.available(for: clip).contains(operation) else { throw CopyTransformError.unavailable }
                     return try CopyTransformService.clipboardPayload(text: text, operation: operation,
-                                                                     id: id, exports: self.temporaryImageExports)
+                                                                     id: id, exports: self.temporaryImageExports,
+                                                                     naming: .load())
                 }
                 DispatchQueue.main.async {
                     guard token == self.confirmationToken, self.panel.isAvailableForShortcut,

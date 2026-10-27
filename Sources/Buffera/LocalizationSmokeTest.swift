@@ -125,6 +125,24 @@ func runLocalizationSmokeTest() throws {
     }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
+    guard let naming = descendants(content).first(where: { $0.identifier?.rawValue == "settings.textFileNaming" }) as? NSPopUpButton else {
+        throw HistoryError.database("Text file naming selector missing")
+    }
+    let namingTitles = activeLanguage == "ru" ? ["Первая непустая строка", "Дата и время"] : ["First nonempty line", "Date and time"]
+    try check(naming.itemTitles == namingTitles && naming.indexOfSelectedItem == 0,
+              "Text file naming must default to first line and translate both options")
+    for (index, mode) in TextFileNaming.allCases.enumerated() {
+        naming.selectItem(at: index)
+        try check(naming.sendAction(naming.action, to: naming.target), "Naming selector action disconnected")
+        try check(TextFileNaming.load(from: defaults) == mode, "Naming preference must apply immediately")
+        let reopened = makeSettings()
+        let reopenedContent = reopened.window!.contentView!
+        let reopenedTabs = descendants(reopenedContent).compactMap { $0 as? NSSegmentedControl }.first!
+        reopenedTabs.selectedSegment = 1
+        _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
+        let restored = descendants(reopenedContent).first { $0.identifier?.rawValue == "settings.textFileNaming" } as? NSPopUpButton
+        try check(restored?.indexOfSelectedItem == index, "Naming choice must survive settings reopening")
+    }
     guard let secrets = descendants(content).first(where: { $0.identifier?.rawValue == "settings.secretHistoryMode" }) as? NSPopUpButton else {
         throw HistoryError.database("Secret history selector missing")
     }
@@ -190,8 +208,12 @@ func runLocalizationSmokeTest() throws {
     let reopenedSlider = descendants(reopenedContent).first { $0.identifier?.rawValue == "settings.byteLimit" } as? NSSlider
     try check(reopenedSlider?.doubleValue == 20, "Reopening settings lost the size limit")
     for view in descendants(content) where !view.isHiddenOrHasHiddenAncestor && view is NSControl {
-        let frame = content.convert(view.bounds, from: view)
-        try check(content.bounds.insetBy(dx: -1, dy: -1).contains(frame), "History control lies outside the window")
+        // The history page scrolls as settings grow; offscreen controls must
+        // remain within the scrollable document and be reachable by scrolling.
+        let container = view.enclosingScrollView?.documentView ?? content
+        let frame = container.convert(view.bounds, from: view)
+        // Native text fields extend two points beyond their alignment rectangle.
+        try check(container.bounds.insetBy(dx: -3, dy: -3).contains(frame), "History control \(view.identifier?.rawValue ?? String(describing: type(of: view))) \(frame) lies outside \(container.bounds)")
     }
     print("PASS: \(activeLanguage) settings theme and language selection, persistence, restart action, history size slider and layout")
 }

@@ -122,3 +122,40 @@ try manager.createSymbolicLink(at: redirectedLegacyDirectory, withDestinationURL
 try TemporaryImageExports(directory: renamedDirectory, legacyDirectory: redirectedLegacyDirectory).cleanup()
 try check(manager.fileExists(atPath: redirectedLegacyFile.path), "A linked legacy cache must not be traversed")
 print("PASS: temporary image export reuse, expiry, shared legacy capacity, permissions and path isolation")
+
+let namedDirectory = sandbox.appendingPathComponent("Named")
+let namedCache = TemporaryImageExports(directory: namedDirectory, maximumBytes: 8)
+let a = try namedCache.file(data: Data([1, 2, 3]), id: 1, fileExtension: "txt", basename: "План")
+let b = try namedCache.file(data: Data([4, 5, 6]), id: 2, fileExtension: "txt", basename: "План")
+try check(a.lastPathComponent == "План.txt" && b.lastPathComponent == "План.txt" && a != b,
+          "Identical names from different records must keep independent paths")
+try check(try Data(contentsOf: a) == Data([1, 2, 3]), "A second record must not overwrite the first")
+try check((try manager.attributesOfItem(atPath: a.deletingLastPathComponent().path)[.posixPermissions] as? NSNumber)?.intValue == 0o700,
+          "Named export folders must be private")
+try manager.setAttributes([.modificationDate: oldDate], ofItemAtPath: a.path)
+try namedCache.cleanup()
+try check(!manager.fileExists(atPath: a.deletingLastPathComponent().path), "Expired named exports and empty folders must be removed")
+try manager.setAttributes([.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: b.path)
+let c = try namedCache.file(data: Data([1, 2, 3, 4, 5, 6]), id: 3, fileExtension: "md", basename: "New")
+try check(!manager.fileExists(atPath: b.path) && manager.fileExists(atPath: c.path), "Named exports must participate in cache size eviction")
+let changed = try namedCache.file(data: Data([1]), id: 3, fileExtension: "md", basename: "Changed")
+try check(manager.fileExists(atPath: c.path) && changed != c, "Changing naming mode must not rename an existing clipboard file")
+for invalid in ["../escape", ".", "..", "bad/name", "bad:name", "", String(repeating: "x", count: 181)] {
+    do {
+        _ = try namedCache.file(data: Data([1]), id: 4, fileExtension: "txt", basename: invalid)
+        fatalError("Invalid basename was accepted")
+    } catch let error as CocoaError {
+        try check(error.code == .fileWriteInvalidFileName, "Invalid basename must fail before writing")
+    }
+}
+let namedLink = namedDirectory.appendingPathComponent("Text-5")
+try manager.createSymbolicLink(at: namedLink, withDestinationURL: sandbox)
+do {
+    _ = try namedCache.file(data: Data([1]), id: 5, fileExtension: "txt", basename: "outside")
+    fatalError("Linked named export folder was accepted")
+} catch let error as CocoaError {
+    try check(error.code == .fileWriteNoPermission, "Named export must reject a linked folder")
+}
+try namedCache.cleanup()
+try check(try Data(contentsOf: outside) == Data([10]), "Named cleanup must never traverse a linked folder")
+print("PASS: named export collision isolation, expiry, size eviction, permissions and path validation")

@@ -242,7 +242,7 @@ for format in CopyTransformOperation.TextFileFormat.allCases {
     let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
     check(urls?.count == 1, "file export is readable as a file URL by pasteboard consumers")
     let url = urls!.first!
-    check(url.pathExtension == format.rawValue, "export has the requested extension")
+    check(url.lastPathComponent == "Заголовок 📝.\(format.rawValue)", "export uses the cleaned first nonempty line")
     check(try Data(contentsOf: url) == Data(fileText.utf8), "export preserves full UTF-8 bytes, whitespace and Markdown")
     check(pasteboard.string(forType: .string) == nil, "file copy does not fall back to inline text")
     check(captures == 0, "file copy is not recaptured")
@@ -256,4 +256,33 @@ let previousChange = pasteboard.changeCount
 let failedExport = Result { try CopyTransformService.clipboardPayload(text: "test", operation: .textFile(.txt),
     id: exportID, exports: TemporaryImageExports(directory: blockedDirectory)) }
 check(fails(failedExport) && pasteboard.changeCount == previousChange, "file preparation failure leaves clipboard untouched")
+let namingSuite = "Buffera.NamingChecks.\(UUID().uuidString)"
+let namingDefaults = UserDefaults(suiteName: namingSuite)!
+defer { namingDefaults.removePersistentDomain(forName: namingSuite) }
+check(TextFileNaming.load(from: namingDefaults) == .firstLine, "fresh naming preference defaults to first line")
+for mode in TextFileNaming.allCases {
+    namingDefaults.set(mode.rawValue, forKey: TextFileNaming.preferenceKey)
+    check(TextFileNaming.load(from: namingDefaults) == mode, "naming preference persists")
+}
+namingDefaults.set("invalid", forKey: TextFileNaming.preferenceKey)
+check(TextFileNaming.load(from: namingDefaults) == .firstLine, "unknown naming preference falls back safely")
+let fixedDate = Date(timeIntervalSince1970: 0)
+let utc = TimeZone(secondsFromGMT: 0)!
+let dateName = TextFileNaming.dateTime.basename(for: "ignored", date: fixedDate, timeZone: utc)
+check(dateName.hasSuffix("-1970-01-01-00-00-00"), "date name uses deterministic Gregorian date and supplied timezone")
+check(TextFileNaming.firstLine.basename(for: " \r\n\t\n##  План / недели: тест?\nsecond") == "План недели тест", "naming skips blank lines, Markdown heading and unsafe characters")
+for input in ["", " \n\t", "...", "/\\:*?<>|", "### "] {
+    check(TextFileNaming.firstLine.basename(for: input, date: fixedDate, timeZone: utc) == dateName,
+          "unusable names fall back to copy time")
+}
+for input in [String(repeating: "я", count: 200), String(repeating: "👨‍👩‍👧‍👦", count: 200)] {
+    let name = TextFileNaming.firstLine.basename(for: input)
+    check(!name.isEmpty && name.count <= 60 && name.utf8.count <= 180, "long Unicode filenames fit character and byte bounds")
+}
+let datedPayload = try CopyTransformService.clipboardPayload(text: fileText, operation: .textFile(.txt),
+    id: exportID, exports: exports, naming: .dateTime, date: fixedDate)
+let datedURL = URL(string: String(data: datedPayload.items[0][0].data, encoding: .utf8)!)!
+check(datedURL.deletingPathExtension().lastPathComponent == TextFileNaming.dateTime.basename(for: fileText, date: fixedDate),
+      "date mode reaches the actual exported filename")
+check(try Data(contentsOf: datedURL) == Data(fileText.utf8), "changing the filename preserves file contents")
 print("Passed \(checkCount) copy transform service checks")

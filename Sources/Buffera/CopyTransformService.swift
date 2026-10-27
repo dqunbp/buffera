@@ -126,11 +126,13 @@ final class CopyTransformService {
     /// Prepare on the storage queue before touching the pasteboard. File URLs are
     /// the sole representation so destinations receive an attachment, not text.
     static func clipboardPayload(text: String, operation: CopyTransformOperation,
-                                 id: Int64, exports: TemporaryImageExports) throws -> ClipPayload {
+                                 id: Int64, exports: TemporaryImageExports,
+                                 naming: TextFileNaming = .firstLine, date: Date = Date()) throws -> ClipPayload {
         guard !text.isEmpty else { throw CopyTransformError.noText }
         let representation: Representation
         if case .textFile(let format) = operation {
-            let url = try exports.file(data: Data(text.utf8), id: id, fileExtension: format.rawValue)
+            let url = try exports.file(data: Data(text.utf8), id: id, fileExtension: format.rawValue,
+                                       basename: naming.basename(for: text, date: date))
             representation = Representation(type: NSPasteboard.PasteboardType.fileURL.rawValue,
                                             data: Data(url.absoluteString.utf8))
         } else {

@@ -572,3 +572,8 @@
 "Как файл .txt" = "As .txt file";
 "Как файл .md" = "As .md file";
 "Скопировать полный текст как файл UTF-8 без изменения содержимого." = "Copy the full text as a UTF-8 file without changing its contents.";
+"Первая непустая строка" = "First nonempty line";
+"Дата и время" = "Date and time";
+"Заметка" = "Note";
+"Имя текстового файла" = "Text file name";
+"Для «Как файл .txt» и «Как файл .md». Если первая строка не подходит для имени, используется время копирования." = "For “As .txt file” and “As .md file”. If the first line cannot form a filename, the copy time is used.";

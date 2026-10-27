@@ -35,10 +35,11 @@ final class TemporaryImageExports {
         let data: Data
         let fileExtension: String
         var itemIndex: Int? = nil
+        var basename: String? = nil
     }
 
-    func file(data: Data, id: Int64, fileExtension: String) throws -> URL {
-        try files([Image(data: data, fileExtension: fileExtension)], id: id)[0]
+    func file(data: Data, id: Int64, fileExtension: String, basename: String? = nil) throws -> URL {
+        try files([Image(data: data, fileExtension: fileExtension, basename: basename)], id: id)[0]
     }
 
     /// Export a whole drag together so cache eviction cannot remove another
@@ -47,12 +48,18 @@ final class TemporaryImageExports {
         guard id > 0, !images.isEmpty,
               images.reduce(Int64(0), { $0 + Int64($1.data.count) }) <= maximumBytes,
               images.allSatisfy({ !$0.data.isEmpty && ($0.itemIndex ?? 0) >= 0 &&
+                  ($0.basename == nil || (Self.validBasename($0.basename!) && ["txt", "md"].contains($0.fileExtension))) &&
                   $0.fileExtension.range(of: "^[a-z0-9]{1,10}$", options: .regularExpression) != nil }) else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
         lock.lock(); defer { lock.unlock() }
         try prepareDirectory()
-        let urls = images.map { image in
+        let urls = try images.map { image in
+            if let basename = image.basename {
+                let folder = directory.appendingPathComponent("Text-\(id)", isDirectory: true)
+                try prepareDirectory(folder)
+                return folder.appendingPathComponent("\(basename).\(image.fileExtension)")
+            }
             let suffix = image.itemIndex.map { "-\($0)" } ?? ""
             return directory.appendingPathComponent("Buffera-\(id)\(suffix).\(image.fileExtension)")
         }
@@ -78,18 +85,26 @@ final class TemporaryImageExports {
         try prune()
     }
 
+    private static func validBasename(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && name.utf8.count <= 180 &&
+            !name.hasPrefix(".") && name.rangeOfCharacter(from:
+                CharacterSet(charactersIn: "/\\:").union(.controlCharacters)) == nil
+    }
+
     private func prepareDirectory() throws {
-        for url in directories {
-            if let attributes = try attributesIfPresent(url) {
-                guard attributes[.type] as? FileAttributeType == .typeDirectory else {
-                    throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
-                }
-            } else {
-                try fileManager.createDirectory(at: url, withIntermediateDirectories: false,
-                                                attributes: [.posixPermissions: 0o700])
+        for url in directories { try prepareDirectory(url) }
+    }
+
+    private func prepareDirectory(_ url: URL) throws {
+        if let attributes = try attributesIfPresent(url) {
+            guard attributes[.type] as? FileAttributeType == .typeDirectory else {
+                throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
             }
-            try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        } else {
+            try fileManager.createDirectory(at: url, withIntermediateDirectories: false,
+                                            attributes: [.posixPermissions: 0o700])
         }
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
     }
 
     private struct Entry {
@@ -100,30 +115,54 @@ final class TemporaryImageExports {
 
     private func prune(excluding protectedURLs: Set<URL> = []) throws {
         let deadline = Date().addingTimeInterval(-maximumAge)
+        let protectedPaths = Set(protectedURLs.map(\.path))
         var entries: [Entry] = []
         var caches = [(directory, "Buffera")]
         if let legacyDirectory = try existingLegacyDirectory() {
             // Never create or rename the old cache, and never write new files into it.
             caches.append((legacyDirectory, "Bufera"))
         }
+        var textFolders: [URL] = []
         for (cacheDirectory, prefix) in caches {
-            for url in try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil) {
-                guard url.lastPathComponent.range(of: "^\(prefix)-[1-9][0-9]*(?:-[0-9]+)?\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil,
-                      let attributes = try attributesIfPresent(url), isOwnedRegularFile(attributes),
-                      let modified = attributes[.modificationDate] as? Date,
-                      let bytes = attributes[.size] as? NSNumber else { continue }
-                if modified < deadline && !protectedURLs.contains(url) {
-                    try fileManager.removeItem(at: url)
-                } else {
-                    entries.append(Entry(url: url, modified: modified, bytes: bytes.int64Value))
+            // Rebuild URLs from names: Foundation enumeration can resolve /var to /private/var.
+            for name in try fileManager.contentsOfDirectory(atPath: cacheDirectory.path) {
+                let url = cacheDirectory.appendingPathComponent(name)
+                var candidates: [URL] = []
+                if cacheDirectory == directory,
+                   url.lastPathComponent.range(of: "^Text-[1-9][0-9]*$", options: .regularExpression) != nil,
+                   try attributesIfPresent(url)?[.type] as? FileAttributeType == .typeDirectory {
+                    // Only our one-level named export folders are traversed, never links.
+                    textFolders.append(url)
+                    candidates = try fileManager.contentsOfDirectory(atPath: url.path)
+                        .map { url.appendingPathComponent($0) }
+                        .filter { ["txt", "md"].contains($0.pathExtension) &&
+                            Self.validBasename($0.deletingPathExtension().lastPathComponent) }
+                } else if url.lastPathComponent.range(of: "^\(prefix)-[1-9][0-9]*(?:-[0-9]+)?\\.[a-z0-9]{1,10}$", options: .regularExpression) != nil {
+                    candidates = [url]
+                }
+                for candidate in candidates {
+                    guard let attributes = try attributesIfPresent(candidate), isOwnedRegularFile(attributes),
+                          let modified = attributes[.modificationDate] as? Date,
+                          let bytes = attributes[.size] as? NSNumber else { continue }
+                    if modified < deadline && !protectedPaths.contains(candidate.path) {
+                        try fileManager.removeItem(at: candidate)
+                    } else {
+                        entries.append(Entry(url: candidate, modified: modified, bytes: bytes.int64Value))
+                    }
                 }
             }
         }
         // Both generations share one size budget until the old files have expired.
         var total = entries.reduce(Int64(0)) { $0 + $1.bytes }
-        for entry in entries.sorted(by: { $0.modified < $1.modified }) where total > maximumBytes && !protectedURLs.contains(entry.url) {
+        for entry in entries.sorted(by: { $0.modified < $1.modified }) where total > maximumBytes && !protectedPaths.contains(entry.url.path) {
             try fileManager.removeItem(at: entry.url)
             total -= entry.bytes
+        }
+        let protectedFolders = Set(protectedURLs.map { $0.deletingLastPathComponent().path })
+        for folder in textFolders where !protectedFolders.contains(folder.path) {
+            if try fileManager.contentsOfDirectory(atPath: folder.path).isEmpty {
+                try fileManager.removeItem(at: folder)
+            }
         }
     }
 
