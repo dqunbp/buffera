@@ -296,14 +296,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let sources: [String]? = refreshSources
                         ? try await self.historySources() : nil
                     try Task.checkCancellation()
-                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
+                    guard searchGeneration == self.searchGeneration, self.panel.isPresenting else { return }
                     if let sources { self.panel.setSources(sources) }
                     self.panel.updateSearchMode(response.mode, reason: response.fallbackReason)
                     self.panel.receive(response.rows, total: response.total, offset: offset)
                 } catch is CancellationError {
                     return
                 } catch {
-                    guard searchGeneration == self.searchGeneration, self.panel.window.isVisible else { return }
+                    guard searchGeneration == self.searchGeneration, self.panel.isPresenting else { return }
                     self.panel.searchFailed(error); self.showError(error)
                 }
             }
@@ -416,7 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
                     DispatchQueue.main.async {
                         self.historyChat?.historyChanged(id: id)
-                        if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) }
+                        self.panel.refresh(preservingSelection: true)
                     }
                 }
                 catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
@@ -477,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
                     DispatchQueue.main.async {
                         self.historyChat?.historyChanged(id: id)
-                        if self.panel.window.isVisible { self.panel.refresh(preservingSelection: true) }
+                        self.panel.refresh(preservingSelection: true)
                     }
                 }
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
@@ -670,7 +670,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showChat() {
         guard assistantEnabled, let historyChat else { return }
         if panel?.window.attachedSheet != nil { return }
-        if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
+        if panel?.isPresenting == true { panel.close(restoreFocus: false) }
         historyChat.show()
     }
 
@@ -862,7 +862,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.updateBackgroundPreparation(onlyOnExternalPower: preparationPolicy.onlyOnExternalPower)
             showEmbeddingProgress(embeddingStatus)
         }
-        if panel?.window.isVisible == true { panel.close(restoreFocus: false) }
+        if panel?.isPresenting == true { panel.close(restoreFocus: false) }
         if showUpdates { settings?.selectUpdates() }
         settings?.show()
     }

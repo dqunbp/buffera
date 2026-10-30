@@ -47,6 +47,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let currentFrontmostApplication: () -> NSRunningApplication?
     private var changingFrame = false
     private var isClosing = false
+    private var presentationPending = false
     private let thumbnails = NSCache<NSNumber, NSImage>()
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
@@ -102,6 +103,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var rows: [ClipSummary] = []
     private var total = 0
     private var loading = false
+    // Retained cards are a visual snapshot until the replacement query completes.
+    private var awaitingSearchResult = false
     private var searchIndexDirty = false
     private var searchIndexTimer: Timer?
     private var silentSearchRefresh = false
@@ -133,14 +136,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onShowFeatures: (() -> Void)?
     var onShowChat: (() -> Void)?
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
-    var selected: ClipSummary? { rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
+    var selected: ClipSummary? { !awaitingSearchResult && rows.indices.contains(cards.selectedIndex) ? rows[cards.selectedIndex] : nil }
     var isConfirmingCopyTransform: Bool { copyTransformSourceID != nil && confirming }
     var isRefreshingSearchIndex: Bool { silentSearchRefresh }
     var isShowingNearby: Bool { nearbyState != nil }
     var isPinned: Bool { pinButton.state == .on }
     var searchMode: HistorySearchMode { semanticSearchAvailable && semanticSearch.state == .on ? .automatic : .literal }
     var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || nearbyIntroduction != nil || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
-    var isAvailableForShortcut: Bool { window.isVisible && !isClosing && nearbyIntroduction == nil }
+    var isPresenting: Bool { window.isVisible || presentationPending }
+    var isAvailableForShortcut: Bool { isPresenting && !isClosing && nearbyIntroduction == nil }
 
     init(introductionDefaults: UserDefaults = .standard, monitorsOutsideInteractions: Bool = true,
          resetDefaults: UserDefaults = .standard, currentDate: @escaping () -> Date = Date.init,
@@ -171,7 +175,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.onFlagsChanged = { [weak self] flags in
             self?.modifiersChanged(flags)
         }
-        filters.onChange = { [weak self] in self?.refresh() }
+        filters.onChange = { [weak self] in self?.refresh(retainingCards: true) }
         filters.onPopoverClosed = { [weak self] in self?.closeIfUnfocused() }
         preview.onClose = { [weak self] in
             self?.commandHeld = NSEvent.modifierFlags.contains(.command)
@@ -188,7 +192,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 width: width, maximumHeight: maximumHeight)
         }
         cards.onSelect = { [weak self] _ in self?.updateSelection() }
-        cards.onActivate = { [weak self] _ in self?.confirm() }
+        cards.onActivate = { [weak self] _ in
+            guard let self, !self.awaitingSearchResult else { return }
+            self.confirm()
+        }
         cards.onNeedMore = { [weak self] in self?.loadMore() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidResignActive),
                                                name: NSApplication.didResignActiveNotification, object: NSApp)
@@ -238,11 +245,22 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
         else { positionDockedWindow() }
-        focusHistoryWindow(token: token)
+        // On a cold opening there is no snapshot to display. Prepare the first
+        // result before ordering the window front, including its card layout.
+        presentationPending = !window.isVisible && rows.isEmpty
+        if !presentationPending { focusHistoryWindow(token: token) }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
-        refresh(preservingSelection: !reset)
+        refresh(preservingSelection: !reset, retainingCards: true)
         if fromShortcut { recordShortcutPress() }
         return reset
+    }
+
+    private func presentLoadedHistory() {
+        guard presentationPending, !isClosing else { return }
+        window.contentView?.layoutSubtreeIfNeeded()
+        cards.layoutSubtreeIfNeeded()
+        presentationPending = false
+        focusHistoryWindow(token: presentationToken)
     }
 
     private func rememberPreviousApp() {
@@ -272,7 +290,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
               !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         // A visible panel may never have received focus after app activation.
         // Recover focus before interpreting another global press as navigation.
-        if !window.isKeyWindow, fromGlobalShortcut || (isPinned && !shortcutGesture.isActive) {
+        if !presentationPending, !window.isKeyWindow, fromGlobalShortcut || (isPinned && !shortcutGesture.isActive) {
             cancelShortcutGesture()
             rememberPreviousApp()
             presentationToken += 1
@@ -321,7 +339,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard !isClosing, !confirming, !commitWhenLoaded, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if preview.isShown { dismissPreview(); window.makeKey() }
         window.makeFirstResponder(cards)
-        guard !rows.isEmpty else { pendingMoveDelta += delta; return }
+        guard !awaitingSearchResult, !rows.isEmpty else { pendingMoveDelta += delta; return }
         let index = max(0, min(rows.count - 1, cards.selectedIndex + delta))
         cards.select(index, scrollIntoView: true)
         updateSelection()
@@ -344,20 +362,26 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             request(filter(), 0, min(total, max(result.count + 150, result.count * 2)))
             return
         }
-        loading = false; self.total = total
+        loading = false; awaitingSearchResult = false; self.total = total
         if offset == 0 { rows = result } else { rows += result }
         let capturedIndex = recentCaptureID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
         let retainedIndex = capturedIndex ?? pendingSelectionID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
         let restoredIndex = rows.isEmpty ? -1 : max(0, min(rows.count - 1, (retainedIndex ?? 0) + pendingMoveDelta))
         let index = offset == 0 ? restoredIndex : cards.selectedIndex
         if offset == 0 { pendingSelectionID = nil; pendingMoveDelta = 0; recentCaptureID = nil }
-        cards.reload(count: rows.count, selectedIndex: index, scrollToSelection: offset == 0 && pendingViewport == nil)
+        if offset == 0 {
+            cards.replace(count: rows.count, selectedIndex: index)
+            if pendingViewport == nil { cards.scrollToSelection() }
+        } else {
+            cards.reload(count: rows.count, selectedIndex: index, scrollToSelection: false)
+        }
         if offset == 0, let viewport = pendingViewport {
             pendingViewport = nil
             cards.restoreScrollPosition(viewport)
         }
         updateSelection()
         updateCount()
+        presentLoadedHistory()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
     }
 
@@ -372,6 +396,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         if isShowingNearby { nearbyState?.needsReload = true; return }
         recentCaptureID = id
+        // A recaptured row can have become concealed during deduplication.
+        if !isAvailableForShortcut, rows.contains(where: { $0.id == id }) {
+            refresh(preservingSelection: true)
+        }
         guard isAvailableForShortcut, !confirming, !commitWhenLoaded else { return }
         let moves = pendingMoveDelta
         refresh(preservingSelection: true)
@@ -463,7 +491,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         nearbyState?.anchorID = anchorID; nearbyState?.anchorDate = date
         pendingSelectionID = preservingSelection ? selected?.id : nil
         pendingViewport = nil; pendingMoveDelta = 0; recentCaptureID = nil
-        loading = true; rows = []; total = 0
+        loading = true; awaitingSearchResult = false; rows = []; total = 0
         cards.replace(count: 0, selectedIndex: -1)
         updateNavigationControls(); updateSelection()
         status.stringValue = L10n.text("Загружаем соседние записи…")
@@ -473,7 +501,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func receiveNearby(_ result: [ClipSummary], anchorID: Int64, token: Int) {
-        guard window.isVisible, !isClosing, token == nearbyToken, nearbyState?.anchorID == anchorID else { return }
+        guard isAvailableForShortcut, token == nearbyToken, nearbyState?.anchorID == anchorID else { return }
         guard let anchor = result.first(where: { $0.id == anchorID }) else {
             nearbyFailed(HistoryError.missing, token: token); return
         }
@@ -486,11 +514,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cards.replace(count: rows.count, selectedIndex: index)
         cards.scrollToSelection(centered: true)
         updateSelection(); updateCount()
+        presentLoadedHistory()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
     }
 
     func nearbyFailed(_ error: Error, token: Int) {
-        guard window.isVisible, !isClosing, isShowingNearby, token == nearbyToken else { return }
+        guard isAvailableForShortcut, isShowingNearby, token == nearbyToken else { return }
         failed(error)
     }
 
@@ -503,7 +532,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview(); invalidateReveal()
         nearbyToken += 1; onNavigate?()
         nearbyState = nil
-        loading = false; confirming = false; commitWhenLoaded = false
+        loading = false; awaitingSearchResult = false; confirming = false; commitWhenLoaded = false
         pendingSelectionID = nil; pendingMoveDelta = 0; pendingViewport = nil; recentCaptureID = nil
         retainedSelectionID = context.returnPoint.selectedID
         retainedRowCount = max(150, context.returnPoint.rows.count)
@@ -601,17 +630,34 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func failed(_ error: Error) {
         cancelShortcutGesture()
         loading = false; commitWhenLoaded = false; confirming = false
+        if awaitingSearchResult {
+            awaitingSearchResult = false
+            rows = []; total = 0
+            cards.replace(count: 0, selectedIndex: -1)
+        }
         updateNavigationControls()
         let revealedRow = revealed.flatMap { value in rows.firstIndex(where: { $0.id == value.id }) }
         invalidateReveal()
         if let revealedRow { cards.reloadCard(at: revealedRow) }
         updateSelection()
         status.stringValue = error.localizedDescription
+        presentLoadedHistory()
     }
 
-    func refresh(preservingSelection: Bool = false) {
-        guard !isClosing, !confirming, !commitWhenLoaded else { return }
-        thumbnails.removeAllObjects()
+    func refresh(preservingSelection: Bool = false, retainingCards: Bool = false) {
+        guard !isClosing, !confirming, !commitWhenLoaded else {
+            if !retainingCards {
+                // A hide/delete may finish during closing or confirmation.
+                // Its obsolete snapshot must not survive into the next opening.
+                retainedSelectionID = selected?.id ?? pendingSelectionID ?? retainedSelectionID
+                nearbyState?.needsReload = true
+                invalidateReveal(); thumbnails.removeAllObjects()
+                rows = []
+                cards.replace(count: 0, selectedIndex: -1)
+            }
+            return
+        }
+        if !retainingCards { thumbnails.removeAllObjects() }
         if let context = nearbyState {
             nearbyState?.needsReload = true
             loadNearby(anchorID: context.anchorID, date: context.anchorDate, preservingSelection: preservingSelection)
@@ -623,12 +669,18 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let limit = preservingSelection ? max(150, rows.count, retainedRowCount) : 150
         dismissPreview()
         invalidateReveal()
-        loading = true
+        loading = window.isVisible || presentationPending
+        awaitingSearchResult = loading
         actualSearchMode = .literal; searchFallbackReason = nil
-        pendingMoveDelta = 0; rows = []; cards.reload(count: 0, selectedIndex: -1, scrollToSelection: false); updateSelection()
+        pendingMoveDelta = 0
+        if !retainingCards {
+            rows = []
+            cards.replace(count: 0, selectedIndex: -1)
+        }
+        updateSelection()
         status.stringValue = L10n.text("Загружаем историю…")
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
-        request?(filter(), 0, limit)
+        if loading { request?(filter(), 0, limit) }
     }
 
     func close(restoreFocus: Bool = true) {
@@ -640,7 +692,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         cancelShortcutGesture()
         guard !isClosing else { return }
-        if window.isVisible { closedAt = currentDate() }
+        if window.isVisible || presentationPending { closedAt = currentDate() }
+        presentationPending = false
         cancelCopyTransform(refreshHistory: false)
         copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
         restoreSearchFromNearby(reloadIfNeeded: false, render: false)
@@ -715,6 +768,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func observeMouseDown(_ event: NSEvent, source: OutsideInteractionSource) {
+        if presentationPending {
+            if !isPinned { close(restoreFocus: false) }
+            return
+        }
         guard window.isVisible, !isClosing else { return }
         let eventWindow = event.window
         // AppKit can send unassociated mouse events in screen coordinates,
@@ -736,6 +793,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func applicationDidActivate(_ app: NSRunningApplication) {
+        if presentationPending, app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+           currentFrontmostApplication()?.processIdentifier == app.processIdentifier {
+            if isPinned { previousApp = app }
+            else { close(restoreFocus: false) }
+            return
+        }
         guard window.isVisible, !isClosing,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               currentFrontmostApplication()?.processIdentifier == app.processIdentifier else { return }
@@ -856,7 +919,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             flags.intersection([.command, .option, .control, .shift]) == [.command, .shift] {
             let quickKeys: [UInt16: Int] = [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8]
             if !flags.contains(.shift), let index = quickKeys[event.keyCode] {
-                if rows.indices.contains(index) { select(id: rows[index].id); confirm() }
+                if !awaitingSearchResult, rows.indices.contains(index) { select(id: rows[index].id); confirm() }
                 return nil
             }
             if event.keyCode == 29 { resetEverything(); return nil }
@@ -884,7 +947,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             search.stringValue = characters
             window.makeFirstResponder(search)
             if let editor = search.currentEditor() { editor.selectedRange = NSRange(location: (characters as NSString).length, length: 0) }
-            refresh(); return nil
+            refresh(retainingCards: true); return nil
         }
         return event
     }
@@ -896,7 +959,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private func confirm() {
         cancelShortcutGesture()
         guard !isClosing, nearbyIntroduction == nil, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
-        if loading && rows.isEmpty {
+        if loading && (awaitingSearchResult || rows.isEmpty) {
             commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
             scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
             status.stringValue = L10n.text("Ожидаем историю…"); logger.notice("Confirm waiting for history")
@@ -918,13 +981,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         return false
     }
 
-    func controlTextDidChange(_ obj: Notification) { refresh() }
-    @objc private func scopeChanged() { refresh() }
-    @objc private func searchModeChanged() { refresh(preservingSelection: true) }
+    func controlTextDidChange(_ obj: Notification) { refresh(retainingCards: true) }
+    @objc private func scopeChanged() { refresh(retainingCards: true) }
+    @objc private func searchModeChanged() { refresh(preservingSelection: true, retainingCards: true) }
     @objc private func resetEverything() {
         guard !confirming, !commitWhenLoaded else { return }
         resetNavigationState()
-        window.makeFirstResponder(cards); refresh()
+        window.makeFirstResponder(cards); refresh(retainingCards: true)
     }
 
     private func resetNavigationState() {
@@ -947,7 +1010,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func perform(_ action: ClipCardAction, id: Int64) {
         guard nearbyIntroduction == nil else { return }
-        guard !isClosing, !confirming, !commitWhenLoaded, window.attachedSheet == nil,
+        guard !isClosing, !awaitingSearchResult, !confirming, !commitWhenLoaded, window.attachedSheet == nil,
               let clip = rows.first(where: { $0.id == id }) else { return }
         select(id: id, scrollIntoView: false)
         if action != .preview { dismissPreview() }
@@ -1029,7 +1092,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func copyTransformed(_ operation: CopyTransformOperation, id: Int64) {
-        guard isAvailableForShortcut, !confirming, !commitWhenLoaded, pendingFavorites.isEmpty,
+        guard isAvailableForShortcut, !awaitingSearchResult, !confirming, !commitWhenLoaded, pendingFavorites.isEmpty,
               window.attachedSheet == nil, let clip = rows.first(where: { $0.id == id }),
               ClipCardAction.copyDifferently.isAvailable(for: clip),
               copyOptionsID == id, copyOptions?.contains(operation) == true,
@@ -1342,10 +1405,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private func configure(_ card: ClipCardView, row: Int) {
         card.setSelected(cards.selectedIndex == row)
         card.setCopyTransformOperations(copyOptionsID == rows[row].id ? copyOptions : nil)
-        if cards.selectedIndex == row { prepareCopyTransformOperations(for: rows[row], card: card) }
+        if !awaitingSearchResult, cards.selectedIndex == row { prepareCopyTransformOperations(for: rows[row], card: card) }
         card.setNearbyAnchor(nearbyState?.anchorID == rows[row].id)
         card.setQuickShortcut(commandHeld && row < 9 ? row + 1 : nil)
-        card.setActionsEnabled(!confirming && !commitWhenLoaded && !pendingFavorites.contains(rows[row].id)
+        card.setActionsEnabled(!awaitingSearchResult && !confirming && !commitWhenLoaded && !pendingFavorites.contains(rows[row].id)
                                && !(revealing && selected?.id == rows[row].id))
     }
 

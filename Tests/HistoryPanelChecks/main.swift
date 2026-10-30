@@ -92,6 +92,7 @@ _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
 historyResetChecks()
+loadingPresentationChecks()
 labelChecks()
 
 func photoThumbnailChecks() {
