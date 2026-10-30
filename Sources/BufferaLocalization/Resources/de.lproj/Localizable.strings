@@ -341,7 +341,7 @@
 "Соединяет строки пробелами, сохраняя разделение на абзацы." = "Zeilen durch Leerzeichen verbinden und Absätze beibehalten.";
 "Оставляет первое появление каждой строки. Регистр, пробелы и пустые строки сохраняются." = "Das erste Vorkommen jeder Zeile behalten. Groß-/Kleinschreibung, Leerzeichen und Leerzeilen bleiben erhalten.";
 "Удаляет utm_* и известные рекламные метки, сохраняя остальные параметры ссылки." = "utm_* und bekannte Tracking-Parameter entfernen, andere Linkparameter beibehalten.";
-"BufferaMCP — локальный MCP через stdio.\nИспользование: BufferaMCP [--data-directory /absolute/path]\nПо умолчанию: ~/Library/Application Support/Buffera.\nДоступ включается в Buffera → Настройки → Агенты." = "BufferaMCP — lokales MCP über stdio.\nVerwendung: BufferaMCP [--data-directory /absolute/path]\nStandard: ~/Library/Application Support/Buffera.\nAktiviere den Zugriff unter Buffera → Einstellungen → Agenten.";
+"BufferaMCP — локальный MCP через stdio.\nИспользование: BufferaMCP [--data-directory /absolute/path]\nПо умолчанию: ~/Library/Application Support/Buffera.\nДоступ включается в Buffera → Настройки → MCP." = "BufferaMCP — lokales MCP über stdio.\nVerwendung: BufferaMCP [--data-directory /absolute/path]\nStandard: ~/Library/Application Support/Buffera.\nAktiviere den Zugriff unter Buffera → Einstellungen → MCP.";
 "Неверные параметры. Используйте --help." = "Ungültige Argumente. Verwende --help.";
 "Buffera ещё не готова отвечать: нужные файлы не скачаны или не прошли проверку." = "Buffera ist nicht bereit zu antworten: Erforderliche Dateien wurden noch nicht heruntergeladen oder überprüft.";
 "«Спросить Buffera» выключено в настройках." = "„Buffera fragen“ ist in den Einstellungen deaktiviert.";

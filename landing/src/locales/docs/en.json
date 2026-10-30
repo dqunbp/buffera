@@ -142,6 +142,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Reopening before the reset interval expires preserves the query, filters, Favorites view and selected clip. By default, after the window has been closed for one minute, history opens with no search or filters and the first clip selected. Change the interval or disable the reset in Settings → History. An open window is never reset."
+            },
+            {
+              "type": "paragraph",
               "text": "Thumbnails are stored in ~/Library/Caches/Buffera/Thumbnails (up to 64 MB and 512 files). Opening history uses the cache or saved image bytes and does not read original files. A file without a cached thumbnail shows an icon. An explicit preview with Space or ⌘Y may read the original and request folder access, then cache its thumbnail. Concealed clips are not cached; hiding or deleting a clip removes its thumbnail."
             }
           ]
@@ -160,7 +164,7 @@
             },
             {
               "type": "paragraph",
-              "text": "The anchor at the bottom of history pins the window above other apps. Escape keeps a pinned window open; confirming a copy still closes it. For side-by-side work, choose a left or right edge panel in Appearance settings."
+              "text": "The pin button to the right of the search field pins the window above other apps. Escape keeps a pinned window open; confirming a copy still closes it. For side-by-side work, choose a left or right edge panel in Appearance settings."
             }
           ]
         },
@@ -426,7 +430,7 @@
                 ],
                 [
                   "Esc",
-                  "Close preview, go back or close history"
+                  "Close preview or cancel a temporary action; close history only if it is not pinned"
                 ]
               ]
             }
@@ -509,8 +513,8 @@
               "type": "steps",
               "items": [
                 "Launch the current Buffera version at least once to prepare history.",
-                "Open Settings → Agents and enable Allow agents to read history.",
-                "Choose Command for Claude Code or Command for Codex. Run the copied command in Terminal with the chosen agent’s CLI installed.",
+                "Open Settings → MCP and enable Allow agents to read history.",
+                "Choose Claude Code Command or Codex Command. Run the copied command in Terminal with the chosen agent’s CLI installed.",
                 "Reconnect MCP in your agent. Restart the connected MCP process after updating Buffera."
               ]
             },
@@ -575,7 +579,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Turn off permission in Agents to block further reads. A running process checks it on every request. Previously read content may remain in the agent’s context."
+              "text": "Turn off permission in the MCP tab to block further reads. A running process checks it on every request. Previously read content may remain in the agent’s context."
             },
             {
               "type": "note",
@@ -641,7 +645,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Launch the current Buffera version, enable access in Agents and check the path in your client configuration. Restart MCP in the agent after an app update. Hidden clips always return without content."
+              "text": "Launch the current Buffera version, enable access in the MCP tab and check the path in your client configuration. Restart MCP in the agent after an app update. Hidden clips always return without content."
             }
           ]
         },

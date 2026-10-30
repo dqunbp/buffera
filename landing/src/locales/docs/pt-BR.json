@@ -142,6 +142,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Reabrir antes de terminar o intervalo de redefinição preserva a consulta, os filtros, a visualização de Favoritos e o item selecionado. Por padrão, após um minuto com a janela fechada, o histórico abre sem busca nem filtros e com o primeiro item selecionado. Altere o intervalo ou desative a redefinição em Ajustes → Histórico. Uma janela aberta nunca é redefinida."
+            },
+            {
+              "type": "paragraph",
               "text": "As miniaturas são armazenadas em ~/Library/Caches/Buffera/Thumbnails (até 64 MB e 512 arquivos). Abrir o histórico usa o cache ou os dados salvos da imagem, sem ler os arquivos originais. Um arquivo sem miniatura em cache mostra um ícone. Uma prévia explícita com Espaço ou ⌘Y pode ler o original e solicitar acesso à pasta, depois armazenar sua miniatura em cache. Itens ocultos não entram nesse cache; ocultar ou apagar um item remove sua miniatura."
             }
           ]
@@ -160,7 +164,7 @@
             },
             {
               "type": "paragraph",
-              "text": "A âncora na parte inferior do histórico fixa a janela sobre outros apps. Escape mantém uma janela fixada aberta; confirmar uma cópia ainda a fecha. Para trabalhar lado a lado, escolha um painel na borda esquerda ou direita nos ajustes de Aparência."
+              "text": "O botão de alfinete à direita do campo de busca fixa a janela sobre outros apps. Escape mantém uma janela fixada aberta; confirmar uma cópia ainda a fecha. Para trabalhar lado a lado, escolha um painel na borda esquerda ou direita nos ajustes de Aparência."
             }
           ]
         },
@@ -426,7 +430,7 @@
                 ],
                 [
                   "Esc",
-                  "Fechar a prévia, voltar ou fechar o histórico"
+                  "Fechar a prévia ou cancelar uma ação temporária; fechar o histórico apenas se não estiver fixado"
                 ]
               ]
             }
@@ -509,7 +513,7 @@
               "type": "steps",
               "items": [
                 "Abra a versão atual do Buffera pelo menos uma vez para preparar o histórico.",
-                "Abra Ajustes → Agentes e ative Permitir que agentes leiam o histórico.",
+                "Abra Ajustes → MCP e ative Permitir que agentes leiam o histórico.",
                 "Escolha Comando do Claude Code ou Comando do Codex. Execute o comando copiado no Terminal com a CLI do agente escolhido instalada.",
                 "Reconecte o MCP no seu agente. Reinicie o processo MCP conectado após atualizar o Buffera."
               ]
@@ -575,7 +579,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Desative a permissão em Agentes para bloquear novas leituras. Um processo em execução a verifica em cada solicitação. O conteúdo já lido pode permanecer no contexto do agente."
+              "text": "Desative a permissão na aba MCP para bloquear novas leituras. Um processo em execução a verifica em cada solicitação. O conteúdo já lido pode permanecer no contexto do agente."
             },
             {
               "type": "note",
@@ -641,7 +645,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Abra a versão atual do Buffera, ative o acesso em Agentes e confira o caminho na configuração do cliente. Reinicie o MCP no agente após atualizar o app. Itens ocultos sempre são retornados sem conteúdo."
+              "text": "Abra a versão atual do Buffera, ative o acesso na aba MCP e confira o caminho na configuração do cliente. Reinicie o MCP no agente após atualizar o app. Itens ocultos sempre são retornados sem conteúdo."
             }
           ]
         },

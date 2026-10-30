@@ -341,7 +341,7 @@
 "Соединяет строки пробелами, сохраняя разделение на абзацы." = "用空格连接行，同时保留段落。";
 "Оставляет первое появление каждой строки. Регистр, пробелы и пустые строки сохраняются." = "每行仅保留首次出现的内容。保留大小写、空格和空行。";
 "Удаляет utm_* и известные рекламные метки, сохраняя остальные параметры ссылки." = "移除 utm_* 和已知的跟踪参数，同时保留其他链接参数。";
-"BufferaMCP — локальный MCP через stdio.\nИспользование: BufferaMCP [--data-directory /absolute/path]\nПо умолчанию: ~/Library/Application Support/Buffera.\nДоступ включается в Buffera → Настройки → Агенты." = "BufferaMCP — 通过 stdio 运行的本地 MCP。\n用法：BufferaMCP [--data-directory /absolute/path]\n默认：~/Library/Application Support/Buffera。\n在 Buffera → 设置 → 智能体 中启用访问权限。";
+"BufferaMCP — локальный MCP через stdio.\nИспользование: BufferaMCP [--data-directory /absolute/path]\nПо умолчанию: ~/Library/Application Support/Buffera.\nДоступ включается в Buffera → Настройки → MCP." = "BufferaMCP — 通过 stdio 运行的本地 MCP。\n用法：BufferaMCP [--data-directory /absolute/path]\n默认：~/Library/Application Support/Buffera。\n在 Buffera → 设置 → MCP 中启用访问权限。";
 "Неверные параметры. Используйте --help." = "参数无效。请使用 --help。";
 "Buffera ещё не готова отвечать: нужные файлы не скачаны или не прошли проверку." = "Buffera 尚未准备好回答：所需文件尚未下载或验证。";
 "«Спросить Buffera» выключено в настройках." = "“询问 Buffera”已在设置中禁用。";

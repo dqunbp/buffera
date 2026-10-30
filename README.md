@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.md"><strong>English</strong></a> | <a href="README.ru.md">Русский</a>
+  <a href="README.md"><strong>English</strong></a> | <a href="README.ru.md">Русский</a> | <a href="README.es.md">Español</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.ja.md">日本語</a>
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>Text, links, images and files — still within reach after your next ⌘C.</strong><br>
-  macOS 14+ · Apple Silicon · English &amp; Russian
+  macOS 14+ · Apple Silicon · English, Russian, Spanish, German, French, Portuguese (Brazil), Simplified Chinese &amp; Japanese
 </p>
 
 <p align="center">
@@ -68,9 +68,9 @@ zsh scripts/build-app.sh
 open dist/Buffera.app
 ```
 
-Technical documentation is currently in Russian:
+See the [technical documentation index](docs/README.md) for available translations:
 
-[Build details](docs/guide.md#сборка-и-запуск) · [Checks](docs/guide.md#проверка) · [Architecture](docs/architecture.md) · [Localization](docs/localization.md) · [Release workflow](docs/releases.md)
+[Build details](docs/en/guide.md#build-and-run) · [Checks](docs/en/guide.md#checks) · [Architecture](docs/en/architecture.md) · [Localization](docs/en/localization.md) · [Release workflow](docs/en/releases.md)
 
 </details>
 

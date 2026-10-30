@@ -1,3 +1,5 @@
+English
+
 Buffera for Mac — Apple Silicon, macOS 14 or later
 
 1. Open the DMG and drag Buffera into Applications.
@@ -18,6 +20,8 @@ Source code and releases: https://github.com/dqunbp/buffera
 
 --------------------------------------------------------------------------
 
+Русский
+
 Buffera для Mac — Apple Silicon, macOS 14 или новее
 
 1. Открой DMG и перетащи Buffera в Applications (Программы).
@@ -35,3 +39,145 @@ Buffera для Mac — Apple Silicon, macOS 14 или новее
 История хранится локально. Модели для умных функций скачиваются отдельно,
 когда включаешь поиск по смыслу или помощника в настройках.
 Исходники и новые версии: https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+Español
+
+Buffera para Mac — Apple Silicon, macOS 14 o posterior
+
+1. Abre el DMG y arrastra Buffera a Aplicaciones.
+2. Abre Buffera desde Aplicaciones. Su icono aparecerá en la barra de menús.
+3. Pulsa Command + Option + V para abrir el historial del portapapeles.
+4. Para las próximas versiones, abre Ajustes > Actualizaciones > Actualizar…
+   y confirma la instalación. Reinicia los procesos MCP conectados después
+   de actualizar.
+
+Las versiones oficiales en DMG están firmadas con Developer ID y notarizadas
+por Apple. Descarga Buffera desde github.com/dqunbp/buffera. macOS puede pedirte
+que confirmes la primera apertura de una app descargada de internet.
+La versión 0.4.0 y las anteriores requieren esta instalación manual una vez
+para obtener el actualizador integrado. Conserva el historial y los elementos
+del Llavero existentes al actualizar.
+
+La app guarda el historial localmente. Los modelos de IA opcionales se descargan
+por separado cuando activas la búsqueda semántica o el asistente en Ajustes.
+Código fuente y versiones: https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+Deutsch
+
+Buffera für Mac — Apple Silicon, macOS 14 oder neuer
+
+1. Öffne die DMG-Datei und ziehe Buffera in den Ordner „Programme“.
+2. Öffne Buffera aus „Programme“. Das Symbol erscheint in der Menüleiste.
+3. Drücke Command + Option + V, um den Zwischenablageverlauf zu öffnen.
+4. Öffne für künftige Versionen „Einstellungen > Updates > Aktualisieren…“
+   und bestätige die Installation. Starte nach dem Update alle verbundenen
+   MCP-Prozesse neu.
+
+Offizielle DMG-Versionen sind mit Developer ID signiert und von Apple
+notarisiert. Lade Buffera von github.com/dqunbp/buffera herunter. macOS kann
+beim ersten Öffnen einer aus dem Internet geladenen App eine Bestätigung
+verlangen. Version 0.4.0 und ältere Versionen müssen einmal manuell aktualisiert
+werden, um die integrierte Updatefunktion zu erhalten. Behalte beim Update
+deinen bestehenden Verlauf und deine Schlüsselbundeinträge.
+
+Die App speichert den Verlauf lokal. Optionale KI-Modelle werden separat
+heruntergeladen, wenn du in den Einstellungen die semantische Suche oder
+den Assistenten aktivierst.
+Quellcode und Versionen: https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+Français
+
+Buffera pour Mac — Apple Silicon, macOS 14 ou version ultérieure
+
+1. Ouvre le DMG et fais glisser Buffera dans Applications.
+2. Ouvre Buffera depuis Applications. Son icône apparaît dans la barre des menus.
+3. Appuie sur Command + Option + V pour ouvrir l’historique du presse-papiers.
+4. Pour les prochaines versions, ouvre « Réglages > Mises à jour >
+   Mettre à jour… » et confirme l’installation. Redémarre les processus MCP
+   connectés après la mise à jour.
+
+Les versions officielles au format DMG sont signées avec Developer ID et
+notariées par Apple. Télécharge Buffera depuis github.com/dqunbp/buffera.
+macOS peut te demander de confirmer la première ouverture d’une app téléchargée
+sur Internet. La version 0.4.0 et les versions antérieures nécessitent une
+installation manuelle unique pour obtenir la fonction de mise à jour intégrée.
+Conserve l’historique et les éléments du trousseau existants lors de la mise à jour.
+
+L’app conserve l’historique localement. Les modèles d’IA facultatifs sont
+téléchargés séparément lorsque tu actives la recherche sémantique ou l’assistant
+dans les réglages.
+Code source et versions : https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+Português (Brasil)
+
+Buffera para Mac — Apple Silicon, macOS 14 ou posterior
+
+1. Abra o DMG e arraste o Buffera para Aplicativos.
+2. Abra o Buffera em Aplicativos. O ícone aparecerá na barra de menus.
+3. Pressione Command + Option + V para abrir o histórico da área de transferência.
+4. Para as próximas versões, abra Ajustes > Atualizações > Atualizar…
+   e confirme a instalação. Reinicie os processos MCP conectados após atualizar.
+
+As versões oficiais em DMG são assinadas com Developer ID e passaram pela
+notarização da Apple. Baixe o Buffera em github.com/dqunbp/buffera. O macOS pode solicitar
+confirmação ao abrir pela primeira vez um app baixado da internet.
+A versão 0.4.0 e as anteriores exigem esta instalação manual uma vez para
+obter o atualizador integrado. Preserve o histórico e os itens existentes
+das Chaves ao atualizar.
+
+O app mantém o histórico localmente. Os modelos opcionais de IA são baixados
+separadamente quando você ativa a busca semântica ou o assistente nos Ajustes.
+Código-fonte e versões: https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+简体中文
+
+Mac 版 Buffera — 适用于 Apple Silicon，要求 macOS 14 或更高版本
+
+1. 打开 DMG，将 Buffera 拖入“应用程序”文件夹。
+2. 从“应用程序”打开 Buffera，其图标会显示在菜单栏中。
+3. 按 Command + Option + V 打开剪贴板历史记录。
+4. 以后更新版本时，打开“设置 > 更新 > 更新…”，然后确认安装。
+   更新后请重新启动已连接的 MCP 进程。
+
+官方 DMG 发行版均使用 Developer ID 签名，并已通过 Apple 公证。
+请从 github.com/dqunbp/buffera 下载 Buffera。首次打开从互联网下载的 App 时，
+macOS 可能会要求确认。
+0.4.0 及更早版本需要先手动安装更新一次，才能获得 App 内更新功能。
+更新时请保留现有的历史记录和钥匙串项目。
+
+App 将历史记录保存在本地。可选的 AI 模型会在你于设置中启用语义搜索或助手时
+单独下载。
+源代码和发行版：https://github.com/dqunbp/buffera
+
+--------------------------------------------------------------------------
+
+日本語
+
+Mac 用 Buffera — Apple Silicon、macOS 14 以降に対応
+
+1. DMG を開き、Buffera を「アプリケーション」にドラッグします。
+2. 「アプリケーション」から Buffera を開くと、メニューバーにアイコンが表示されます。
+3. Command + Option + V を押すと、クリップボードの履歴が開きます。
+4. 今後のバージョンへの更新は「設定 > アップデート > アップデート…」を開き、
+   インストールを確認してください。更新後は、接続している MCP プロセスを再起動してください。
+
+公式の DMG リリースは Developer ID で署名され、Apple の公証を受けています。
+Buffera は github.com/dqunbp/buffera からダウンロードしてください。
+インターネットからダウンロードしたアプリを初めて開くときは、macOS で確認が
+求められることがあります。
+0.4.0 以前のバージョンでは、アプリ内の更新機能を利用するために、一度手動で
+更新する必要があります。更新時は、既存の履歴とキーチェーン項目を保持してください。
+
+履歴はローカルに保存されます。オプションの AI モデルは、設定で意味による検索や
+アシスタントを有効にすると、別途ダウンロードされます。
+ソースコードとリリース：https://github.com/dqunbp/buffera

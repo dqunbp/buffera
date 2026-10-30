@@ -142,6 +142,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Beim erneuten Öffnen vor Ablauf des Rücksetzintervalls bleiben Suchanfrage, Filter, Favoritenansicht und ausgewählter Eintrag erhalten. Standardmäßig öffnet sich der Verlauf nach einer Minute mit geschlossenem Fenster ohne Suche und Filter; der erste Eintrag ist ausgewählt. Unter „Einstellungen → Verlauf“ kannst du das Intervall ändern oder das Zurücksetzen deaktivieren. Ein geöffnetes Fenster wird nie zurückgesetzt."
+            },
+            {
+              "type": "paragraph",
               "text": "Vorschaubilder werden unter ~/Library/Caches/Buffera/Thumbnails gespeichert (bis zu 64 MB und 512 Dateien). Beim Öffnen des Verlaufs werden der Cache oder gespeicherte Bilddaten verwendet, keine Originaldateien gelesen. Dateien ohne zwischengespeichertes Vorschaubild zeigen ein Symbol. Eine ausdrücklich mit Leertaste oder ⌘Y geöffnete Vorschau kann das Original lesen, Ordnerzugriff anfordern und das Vorschaubild speichern. Verborgene Einträge werden nicht zwischengespeichert; Verbergen oder Löschen entfernt ihr Vorschaubild."
             }
           ]
@@ -160,7 +164,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Der Anker unten im Verlauf heftet das Fenster über anderen Apps an. Escape lässt ein angeheftetes Fenster offen; das Bestätigen einer Kopie schließt es dennoch. Wähle zum Arbeiten nebeneinander in den Darstellungseinstellungen eine linke oder rechte Seitenleiste."
+              "text": "Die Stecknadel-Schaltfläche rechts neben dem Suchfeld heftet das Fenster über anderen Apps an. Escape lässt ein angeheftetes Fenster offen; das Bestätigen einer Kopie schließt es dennoch. Wähle zum Arbeiten nebeneinander in den Darstellungseinstellungen eine linke oder rechte Seitenleiste."
             }
           ]
         },
@@ -426,7 +430,7 @@
                 ],
                 [
                   "Esc",
-                  "Vorschau schließen, zurückgehen oder Verlauf schließen"
+                  "Vorschau schließen oder vorübergehende Aktion abbrechen; Verlauf nur schließen, wenn er nicht angeheftet ist"
                 ]
               ]
             }
@@ -509,7 +513,7 @@
               "type": "steps",
               "items": [
                 "Starte die aktuelle Buffera-Version mindestens einmal, um den Verlauf vorzubereiten.",
-                "Öffne „Einstellungen → Agenten“ und aktiviere „Agenten das Lesen des Verlaufs erlauben“.",
+                "Öffne „Einstellungen → MCP“ und aktiviere „Agenten das Lesen des Verlaufs erlauben“.",
                 "Wähle „Befehl für Claude Code“ oder „Codex-Befehl“. Führe den kopierten Befehl im Terminal aus; die CLI des gewählten Agenten muss installiert sein.",
                 "Verbinde MCP in deinem Agenten erneut. Starte den verbundenen MCP-Prozess nach einem Buffera-Update neu."
               ]
@@ -575,7 +579,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Deaktiviere die Berechtigung unter „Agenten“, um weiteres Lesen zu verhindern. Ein laufender Prozess prüft sie bei jeder Anfrage. Bereits gelesene Inhalte können im Agentenkontext verbleiben."
+              "text": "Deaktiviere die Berechtigung im Tab „MCP“, um weiteres Lesen zu verhindern. Ein laufender Prozess prüft sie bei jeder Anfrage. Bereits gelesene Inhalte können im Agentenkontext verbleiben."
             },
             {
               "type": "note",
@@ -641,7 +645,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Starte die aktuelle Buffera-Version, aktiviere den Zugriff unter „Agenten“ und prüfe den Pfad in deiner Clientkonfiguration. Starte MCP im Agenten nach einem App-Update neu. Verborgene Einträge werden immer ohne Inhalt zurückgegeben."
+              "text": "Starte die aktuelle Buffera-Version, aktiviere den Zugriff im Tab „MCP“ und prüfe den Pfad in deiner Clientkonfiguration. Starte MCP im Agenten nach einem App-Update neu. Verborgene Einträge werden immer ohne Inhalt zurückgegeben."
             }
           ]
         },

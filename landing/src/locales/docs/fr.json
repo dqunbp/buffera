@@ -142,6 +142,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Une réouverture avant la fin du délai de réinitialisation conserve la requête, les filtres, la vue Favoris et l’élément sélectionné. Par défaut, après une minute avec la fenêtre fermée, l’historique s’ouvre sans recherche ni filtres, avec le premier élément sélectionné. Modifiez le délai ou désactivez la réinitialisation dans Réglages → Historique. Une fenêtre ouverte n’est jamais réinitialisée."
+            },
+            {
+              "type": "paragraph",
               "text": "Les miniatures sont stockées dans ~/Library/Caches/Buffera/Thumbnails (jusqu’à 64 Mo et 512 fichiers). L’ouverture de l’historique utilise le cache ou les données d’image enregistrées sans lire les fichiers d’origine. Un fichier sans miniature en cache affiche une icône. Un aperçu demandé avec Espace ou ⌘Y peut lire l’original et demander l’accès au dossier, puis mettre sa miniature en cache. Les éléments masqués ne sont pas mis en cache ; masquer ou supprimer un élément retire sa miniature."
             }
           ]
@@ -160,7 +164,7 @@
             },
             {
               "type": "paragraph",
-              "text": "L’ancre en bas de l’historique épingle la fenêtre au-dessus des autres apps. Échap laisse une fenêtre épinglée ouverte ; confirmer une copie la ferme tout de même. Pour travailler côte à côte, choisissez un panneau sur le bord gauche ou droit dans les réglages Apparence."
+              "text": "Le bouton en forme d’épingle à droite du champ de recherche épingle la fenêtre au-dessus des autres apps. Échap laisse une fenêtre épinglée ouverte ; confirmer une copie la ferme tout de même. Pour travailler côte à côte, choisissez un panneau sur le bord gauche ou droit dans les réglages Apparence."
             }
           ]
         },
@@ -426,7 +430,7 @@
                 ],
                 [
                   "Esc",
-                  "Fermer l’aperçu, revenir ou fermer l’historique"
+                  "Fermer l’aperçu ou annuler une action temporaire ; fermer l’historique uniquement s’il n’est pas épinglé"
                 ]
               ]
             }
@@ -509,7 +513,7 @@
               "type": "steps",
               "items": [
                 "Lancez au moins une fois la version actuelle de Buffera pour préparer l’historique.",
-                "Ouvrez Réglages → Agents et activez Autoriser les agents à lire l’historique.",
+                "Ouvrez Réglages → MCP et activez Autoriser les agents à lire l’historique.",
                 "Choisissez Commande Claude Code ou Commande Codex. Exécutez la commande copiée dans Terminal avec l’outil CLI de l’agent choisi installé.",
                 "Reconnectez MCP dans votre agent. Redémarrez le processus MCP connecté après une mise à jour de Buffera."
               ]
@@ -575,7 +579,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Désactivez l’autorisation dans Agents pour bloquer les lectures suivantes. Un processus en cours la vérifie à chaque demande. Le contenu déjà lu peut rester dans le contexte de l’agent."
+              "text": "Désactivez l’autorisation dans l’onglet MCP pour bloquer les lectures suivantes. Un processus en cours la vérifie à chaque demande. Le contenu déjà lu peut rester dans le contexte de l’agent."
             },
             {
               "type": "note",
@@ -641,7 +645,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Lancez la version actuelle de Buffera, activez l’accès dans Agents et vérifiez le chemin dans la configuration du client. Redémarrez MCP dans l’agent après une mise à jour de l’app. Les éléments masqués sont toujours renvoyés sans contenu."
+              "text": "Lancez la version actuelle de Buffera, activez l’accès dans l’onglet MCP et vérifiez le chemin dans la configuration du client. Redémarrez MCP dans l’agent après une mise à jour de l’app. Les éléments masqués sont toujours renvoyés sans contenu."
             }
           ]
         },

@@ -142,6 +142,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Si vuelves a abrir el historial antes de que termine el intervalo de restablecimiento, se conservan la consulta, los filtros, la vista Favoritos y el elemento seleccionado. Por defecto, tras un minuto con la ventana cerrada, el historial se abre sin búsqueda ni filtros y con el primer elemento seleccionado. Puedes cambiar el intervalo o desactivar el restablecimiento en Ajustes → Historial. La ventana nunca se restablece mientras está abierta."
+            },
+            {
+              "type": "paragraph",
               "text": "Las miniaturas se guardan en ~/Library/Caches/Buffera/Thumbnails (hasta 64 MB y 512 archivos). Al abrir el historial se usan la caché o los datos de imagen guardados, sin leer los archivos originales. Un archivo sin miniatura en caché muestra un icono. Una vista previa explícita con Espacio o ⌘Y puede leer el original y solicitar acceso a la carpeta, y después guardar su miniatura en caché. Los elementos ocultos no se almacenan en esta caché; al ocultar o eliminar un elemento, se elimina su miniatura."
             }
           ]
@@ -160,7 +164,7 @@
             },
             {
               "type": "paragraph",
-              "text": "El ancla en la parte inferior del historial fija la ventana sobre otras apps. Escape mantiene abierta una ventana fijada; confirmar una copia sí la cierra. Para trabajar con ventanas en paralelo, elige un panel lateral izquierdo o derecho en los ajustes de Aspecto."
+              "text": "El botón de la chincheta a la derecha del campo de búsqueda fija la ventana sobre otras apps. Escape mantiene abierta una ventana fijada; confirmar una copia sí la cierra. Para trabajar con ventanas en paralelo, elige un panel lateral izquierdo o derecho en los ajustes de Aspecto."
             }
           ]
         },
@@ -426,7 +430,7 @@
                 ],
                 [
                   "Esc",
-                  "Cerrar la vista previa, volver o cerrar el historial"
+                  "Cerrar la vista previa o cancelar una acción temporal; cerrar el historial solo si no está fijado"
                 ]
               ]
             }
@@ -509,7 +513,7 @@
               "type": "steps",
               "items": [
                 "Inicia la versión actual de Buffera al menos una vez para preparar el historial.",
-                "Abre Ajustes → Agentes y activa Permitir que los agentes lean el historial.",
+                "Abre Ajustes → MCP y activa Permitir que los agentes lean el historial.",
                 "Elige Comando de Claude Code o Comando de Codex. Ejecuta el comando copiado en Terminal con la CLI del agente elegido instalada.",
                 "Vuelve a conectar MCP en tu agente. Reinicia el proceso MCP conectado después de actualizar Buffera."
               ]
@@ -575,7 +579,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Desactiva el permiso en Agentes para bloquear nuevas lecturas. Un proceso en ejecución lo comprueba en cada solicitud. El contenido leído anteriormente puede permanecer en el contexto del agente."
+              "text": "Desactiva el permiso en la pestaña MCP para bloquear nuevas lecturas. Un proceso en ejecución lo comprueba en cada solicitud. El contenido leído anteriormente puede permanecer en el contexto del agente."
             },
             {
               "type": "note",
@@ -641,7 +645,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Inicia la versión actual de Buffera, activa el acceso en Agentes y comprueba la ruta en la configuración del cliente. Reinicia MCP en el agente después de actualizar la app. Los elementos ocultos siempre se devuelven sin contenido."
+              "text": "Inicia la versión actual de Buffera, activa el acceso en la pestaña MCP y comprueba la ruta en la configuración del cliente. Reinicia MCP en el agente después de actualizar la app. Los elementos ocultos siempre se devuelven sin contenido."
             }
           ]
         },

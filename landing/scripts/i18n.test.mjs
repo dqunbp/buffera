@@ -52,7 +52,7 @@ test('explicit language URLs render complete static pages without redirecting', 
     assertAlternateUrls(html);
     assertAssetsResolve(html, url);
     assert.ok(html.includes('https://t.me/crypto_and_pug'));
-    assert.ok(html.includes('made by <a href="https://github.com/dqunbp">@dqunbp</a>'));
+    assert.ok(html.includes(`${locales[lang].page.maker_credit} <a href="https://github.com/dqunbp">@dqunbp</a>`));
     assert.doesNotMatch(html, /\{\{[\w.]+\}\}/);
     assert.doesNotMatch(html, /language-redirect|language-switch|header-actions/);
     const runtime = JSON.parse(html.match(/id="locale-data" type="application\/json">([^]*?)<\/script>/)[1]);

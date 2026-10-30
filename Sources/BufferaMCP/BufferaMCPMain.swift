@@ -15,7 +15,7 @@ struct BufferaMCPMain {
                 BufferaMCP — локальный MCP через stdio.
                 Использование: BufferaMCP [--data-directory /absolute/path]
                 По умолчанию: ~/Library/Application Support/Buffera.
-                Доступ включается в Buffera → Настройки → Агенты.
+                Доступ включается в Buffera → Настройки → MCP.
                 """))
                 return
             }
