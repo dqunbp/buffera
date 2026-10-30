@@ -29,15 +29,34 @@ enum BrandIdentity {
     /// Draw separately from the template mark so macOS preserves the red color.
     static func updateDotsImage() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
-            NSColor.systemRed.setFill()
-            // Sit on the stroke, just outside each semicircle's lower extremum.
-            for x in [5.3, 14.7] {
-                NSBezierPath(ovalIn: NSRect(x: x - 1.5, y: 4.04 - 1.5, width: 3, height: 3)).fill()
-            }
+            drawUpdateDots()
             return true
         }
         image.isTemplate = false
+        image.cacheMode = .never
         return image
+    }
+
+    /// Menu images cannot mix template tinting with red dots, so draw the mark
+    /// with the current menu text color and avoid caching an earlier appearance.
+    static func updateMenuIcon(highlighted: Bool = false) -> NSImage {
+        let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
+            drawMark(in: NSRect(x: 0, y: 0, width: 20, height: 18),
+                     color: highlighted ? .selectedMenuItemTextColor : .labelColor)
+            drawUpdateDots()
+            return true
+        }
+        image.isTemplate = false
+        image.cacheMode = .never
+        return image
+    }
+
+    private static func drawUpdateDots() {
+        NSColor.systemRed.setFill()
+        // Sit on the stroke, just outside each semicircle's lower extremum.
+        for x in [5.3, 14.7] {
+            NSBezierPath(ovalIn: NSRect(x: x - 2, y: 4.04 - 2, width: 4, height: 4)).fill()
+        }
     }
 
     static func appIcon(size: CGFloat = 128) -> NSImage {

@@ -78,7 +78,7 @@ public actor HybridSearchService {
                        limit: Int = 150, offset: Int = 0) async throws -> HybridSearchResponse {
         try Task.checkCancellation()
         let query = filter.query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard mode != .literal, !query.isEmpty, !filter.concealedOnly else {
+        guard mode.usesSemanticSearch(for: filter) else {
             return try literal(databaseURL, filter: filter, limit: limit, offset: offset)
         }
 

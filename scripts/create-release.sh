@@ -13,9 +13,21 @@ if (( $# > 1 )) || [[ $# == 1 && "$1" != --disable-sandbox ]]; then
   exit 1
 fi
 source scripts/version.sh
+source scripts/signing.sh
+if [[ "$BUFFERA_SIGNING_IDENTITY" == - ]]; then
+  print -u2 'Releases with in-app installation require a configured Developer ID Application identity.'
+  exit 1
+fi
+if [[ -z "${BUFFERA_NOTARY_PROFILE:-}" ]]; then
+  print -u2 'Set BUFFERA_NOTARY_PROFILE to an existing notarytool Keychain profile.'
+  exit 1
+fi
+export BUFFERA_NOTARY_PROFILE
 REPO=dqunbp/buffera
 NOTES="docs/releases/$BUFFERA_VERSION.md"
 OUTPUT="$PWD/dist/releases/$BUFFERA_TAG"
+# Preserve Apple's job ID and diagnostic logs even when the isolated build fails.
+export BUFFERA_NOTARY_LOG_DIR="$OUTPUT/notarization"
 
 if [[ "$(uname -m)" != arm64 ]]; then
   print -u2 'Releases require an Apple Silicon Mac.'
@@ -64,14 +76,17 @@ tar -xf "$RELEASE_WORKSPACE/source.tar" -C "$RELEASE_SOURCE"
   # changing AppKit compatibility/layout behavior in the shipped executable.
   zsh scripts/build-app.sh --build-system native "$@"
   zsh scripts/package-release.sh
+  zsh scripts/notarize-release.sh
+  zsh scripts/create-appcast.sh
 )
 mkdir -p "$OUTPUT"
 cp "$RELEASE_SOURCE/dist/Buffera-macOS-arm64.dmg" "$OUTPUT/"
 cp "$RELEASE_SOURCE/dist/SHA256SUMS.txt" "$OUTPUT/"
+cp "$RELEASE_SOURCE/dist/appcast.xml" "$OUTPUT/"
 cp "$RELEASE_SOURCE/$NOTES" "$OUTPUT/RELEASE_NOTES.md"
 print "Verified release artifacts: $OUTPUT"
 gh release create "$BUFFERA_TAG" \
-  "$OUTPUT/Buffera-macOS-arm64.dmg" "$OUTPUT/SHA256SUMS.txt" \
+  "$OUTPUT/Buffera-macOS-arm64.dmg" "$OUTPUT/SHA256SUMS.txt" "$OUTPUT/appcast.xml" \
   --repo "$REPO" --verify-tag --draft \
   --title "Buffera $BUFFERA_VERSION" --notes-file "$OUTPUT/RELEASE_NOTES.md"
-print 'Draft created. Review its notes and both assets on GitHub before publishing.'
+print 'Draft created. Review its notes, DMG, signed appcast and checksums on GitHub before publishing.'

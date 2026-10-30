@@ -12,7 +12,7 @@
   <meta property="og:site_name" content="Buffera">
   <meta property="og:url" content="{{canonical}}">
   <meta property="og:locale" content="{{ogLocale}}">
-  <meta property="og:locale:alternate" content="{{ogAlternate}}">
+  {{ogAlternates}}
   <meta property="og:image" content="{{ogImage}}">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
@@ -24,8 +24,7 @@
   <meta name="twitter:image" content="{{ogImage}}">
   <meta name="twitter:image:alt" content="{{page.og_image_alt}}">
   <link rel="canonical" href="{{canonical}}">
-  <link rel="alternate" hreflang="ru" href="{{ruUrl}}">
-  <link rel="alternate" hreflang="en" href="{{enUrl}}">
+  {{languageAlternates}}
   <link rel="alternate" hreflang="x-default" href="{{defaultUrl}}">
   <title>{{page.html_content_2}}</title>
   <link rel="icon" href="{{assetPrefix}}favicon.svg" type="image/svg+xml">

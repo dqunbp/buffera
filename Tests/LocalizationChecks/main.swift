@@ -8,11 +8,13 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String) {
     checks += 1
 }
 
+let activeLanguage = L10n.language
 let suite = "Buffera.LocalizationChecks.\(UUID().uuidString)"
 let defaults = UserDefaults(suiteName: suite)!
+defaults.setVolatileDomain([:], forName: UserDefaults.argumentDomain)
 defer { defaults.removePersistentDomain(forName: suite) }
 check(LanguagePreference.load(from: defaults) == .system, "First launch must follow the system")
-for value: Any in ["fr", "", 12, true, ["ru"]] {
+for value: Any in ["hy", "", 12, true, ["ru"]] {
     defaults.set(value, forKey: LanguagePreference.key)
     check(LanguagePreference.load(from: defaults) == .system, "Invalid preference must fall back to system")
 }
@@ -30,16 +32,56 @@ check(saved[LanguagePreference.key] == nil && saved["AppleLanguages"] == nil,
       "System must remove app language overrides while inheriting global languages")
 for (languages, expected) in [
     (["ru-RU", "en-US"], "ru"), (["en-GB", "ru"], "en"),
-    (["hy-AM", "ru-AM", "en"], "ru"), (["fr-FR", "en"], "en"),
-    (["ru"], "ru"), (["ru_RU"], "ru"), (["hy-AM"], "en"), ([], "en")
+    (["hy-AM", "ru-AM", "en"], "ru"), (["fr-FR", "en"], "fr"),
+    (["ru"], "ru"), (["ru_RU"], "ru"), (["hy-AM"], "en"), ([], "en"),
+    (["de-AT", "en"], "de"), (["es-MX", "en"], "es"),
+    (["pt-BR", "en"], "pt-BR"), (["pt-PT", "en"], "pt-BR"), (["PT_br"], "pt-BR"),
+    (["zh-Hans-CN", "en"], "zh-Hans"), (["zh-CN"], "zh-Hans"), (["zh-SG"], "zh-Hans"),
+    (["zh"], "zh-Hans"), (["zh-TW", "ja-JP"], "ja"), (["zh-Hant", "fr"], "fr"),
+    (["zh-HK"], "en"), (["zh-MO"], "en"), (["ja-JP", "en"], "ja")
 ] {
     check(LanguagePreference.system.resolved(preferredLanguages: languages) == expected,
           "System language order and fallback: \(languages)")
-    check(LanguagePreference.russian.resolved(preferredLanguages: languages) == "ru", "Explicit Russian")
-    check(LanguagePreference.english.resolved(preferredLanguages: languages) == "en", "Explicit English")
+    for preference in LanguagePreference.allCases where preference != .system {
+        check(preference.resolved(preferredLanguages: languages) == preference.rawValue,
+              "Explicit language must override system preferences")
+    }
 }
-check(L10n.text("Настройки", language: "en") == "Settings", "English resource lookup")
-check(L10n.text("Настройки", language: "ru") == "Настройки", "Russian resource lookup")
+let settingsTitles = ["en": "Settings", "ru": "Настройки", "es": "Ajustes", "de": "Einstellungen",
+                      "fr": "Réglages", "pt-BR": "Ajustes", "zh-Hans": "设置", "ja": "設定"]
+check(Set(settingsTitles.keys) == Set(LanguagePreference.supportedLanguages), "Every language needs a lookup fixture")
+for (language, title) in settingsTitles {
+    check(L10n.text("Настройки", language: language) == title, "\(language) resource lookup")
+}
+let searchStatuses = [
+    "en": ("Searching by meaning…", "Finding text matches…"),
+    "ru": ("Ищу смыслы…", "Ищу совпадения…"),
+    "es": ("Buscando por significado…", "Buscando coincidencias…"),
+    "de": ("Suche nach Bedeutung…", "Suche nach Texttreffern…"),
+    "fr": ("Recherche par sens…", "Recherche de correspondances…"),
+    "pt-BR": ("Buscando por significado…", "Buscando correspondências…"),
+    "zh-Hans": ("正在按含义搜索…", "正在查找文字匹配…"),
+    "ja": ("意味で検索中…", "一致するテキストを検索中…")
+]
+check(Set(searchStatuses.keys) == Set(LanguagePreference.supportedLanguages),
+      "Every language needs semantic and literal search statuses")
+for (language, statuses) in searchStatuses {
+    check(L10n.text("Ищу смыслы…", language: language) == statuses.0,
+          "\(language) semantic search status")
+    check(L10n.text("Ищу совпадения…", language: language) == statuses.1,
+          "\(language) literal search status")
+}
+check(L10n.text("Настройки", language: "hy") == "Settings", "Unsupported language uses English")
+check(L10n.text("Настройки", language: "de-AT") == "Einstellungen", "Regional resource lookup")
+let expectedLanguageCode = ["pt-BR": "pt", "zh-Hans": "zh"][activeLanguage] ?? activeLanguage
+check(L10n.locale.language.languageCode?.identifier == expectedLanguageCode,
+      "Number/date locale must retain the interface language")
+if activeLanguage == "zh-Hans" {
+    check(L10n.locale.language.script?.identifier == "Hans", "Date locale must retain Simplified Chinese script")
+}
+if let region = Locale.current.region {
+    check(L10n.locale.region == region, "Number/date locale must retain the user's region")
+}
 check(L10n.text("Объектов: \(3)", language: "en") == "Items: 3", "English multi-item drag preview")
 check(L10n.text("Объектов: \(3)", language: "ru") == "Объектов: 3", "Russian multi-item drag preview")
 check(L10n.text("Настройки \( "Buffera" )", language: "en") == "Buffera Settings",
@@ -72,24 +114,33 @@ func catalog(_ language: String) throws -> [String: String] {
     let data = try Data(contentsOf: root.appendingPathComponent("\(language).lproj/Localizable.strings"))
     return try PropertyListSerialization.propertyList(from: data, format: nil) as! [String: String]
 }
-let ru = try catalog("ru"), en = try catalog("en")
-check(Set(ru.keys) == Set(en.keys), "Both languages must cover the same keys")
+let en = try catalog("en")
+let directories = try FileManager.default.contentsOfDirectory(atPath: root.path)
+    .filter { $0.hasSuffix(".lproj") }.map { String($0.dropLast(6)) }
+check(Set(directories) == Set(LanguagePreference.supportedLanguages), "Catalogs and selectable languages must agree")
 let placeholders = try NSRegularExpression(pattern: #"%\d+\$@"#)
 func arguments(_ value: String) -> [String] {
     placeholders.matches(in: value, range: NSRange(value.startIndex..., in: value))
         .map { (value as NSString).substring(with: $0.range) }.sorted()
 }
-for (key, value) in en {
-    check(!value.isEmpty, "Empty English translation")
-    check(arguments(key) == arguments(value) && arguments(key) == arguments(ru[key]!),
-          "Interpolation mismatch for \(key)")
-    for format in [key, value, ru[key]!] {
-        let literals = placeholders.stringByReplacingMatches(in: format,
-            range: NSRange(format.startIndex..., in: format), withTemplate: "")
-        check(!literals.replacingOccurrences(of: "%%", with: "").contains("%"),
-              "Unescaped or unsupported format specifier for \(key)")
+for language in LanguagePreference.supportedLanguages {
+    let translations = try catalog(language)
+    check(Set(translations.keys) == Set(en.keys), "\(language) must cover all English keys")
+    check(L10n.diagnostic(translations["Файл модели не найден."]!) == L10n.text("Файл модели не найден."),
+          "Saved \(language) diagnostics must translate into the active language")
+    for (key, value) in translations {
+        check(!value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Empty \(language) translation: \(key)")
+        check(arguments(key) == arguments(value), "\(language) interpolation mismatch for \(key)")
+        for format in [key, value] {
+            let literals = placeholders.stringByReplacingMatches(in: format,
+                range: NSRange(format.startIndex..., in: format), withTemplate: "")
+            check(!literals.replacingOccurrences(of: "%%", with: "").contains("%"),
+                  "\(language) unescaped or unsupported format specifier for \(key)")
+        }
+        if language != "ru" {
+            check(value.range(of: "[А-Яа-яЁё]", options: .regularExpression) == nil,
+                  "Untranslated Russian in \(language): \(key)")
+        }
     }
-    check(value.range(of: "[А-Яа-яЁё]", options: .regularExpression) == nil,
-          "Untranslated Russian in English catalog: \(key)")
 }
-print("PASS \(checks) localization checks; \(en.count) translated messages; active language: \(L10n.language)")
+print("PASS \(checks) localization checks; \(en.count) translated messages; active language: \(activeLanguage)")

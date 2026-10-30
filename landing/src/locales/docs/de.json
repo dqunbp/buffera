@@ -1,0 +1,661 @@
+{
+  "ui": {
+    "title": "Dokumentation",
+    "home": "Zurück zur Website",
+    "search": "Dokumentation durchsuchen",
+    "searchPlaceholder": "Antwort finden…",
+    "searchHint": "Die Suche benötigt JavaScript",
+    "noResults": "Keine Ergebnisse. Versuche „Suche“, „vertraulich“ oder „MCP“.",
+    "results": "Gefunden: {count}",
+    "clear": "Suche leeren",
+    "menu": "Dokumentationsbereiche",
+    "toc": "Auf dieser Seite",
+    "overview": "Überblick",
+    "start": "Erste Schritte",
+    "read": "Anleitung lesen",
+    "previous": "Vorherige Anleitung",
+    "next": "Nächste Anleitung",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "copyFailed": "Kopieren fehlgeschlagen. Wähle den Text aus und kopiere ihn manuell.",
+    "source": "Quellcode und technische Details",
+    "footer": "Alles griffbereit. Auch Antworten.",
+    "download": "Buffera herunterladen",
+    "groupBasics": "Im Alltag",
+    "groupMore": "Funktionen und Einstellungen",
+    "allGuides": "Fühl dich wie zu Hause",
+    "allGuidesText": "Von der ersten Kopie bis zu einem Arbeitsablauf, der zu dir passt."
+  },
+  "overview": {
+    "title": "Dein zweites\nGedächtnis.",
+    "description": "Kurze Anleitungen, damit du Kopiertes wiederfindest und weniger Zeit mit doppelter Arbeit verbringst.",
+    "quickTitle": "Kopiere etwas.\nKomm darauf zurück.",
+    "quickText": "Installiere Buffera, kopiere etwas und öffne deinen Verlauf. Alles beginnt mit drei Tasten.",
+    "keyCaption": "Dein Verlauf, nur einen Kurzbefehl entfernt",
+    "keyNote": "Der Standard · passe ihn an dich an",
+    "metaTitle": "Buffera-Dokumentation — alles griffbereit",
+    "metaDescription": "Installiere Buffera, entdecke Zwischenablageverlauf und Kurzbefehle, nutze lokale Suche, verwalte den Datenschutz und verbinde Agenten."
+  },
+  "articles": [
+    {
+      "id": "getting-started",
+      "icon": "start",
+      "title": "Erste Schritte",
+      "description": "Installation, erster Start und dein erster gespeicherter Eintrag.",
+      "sections": [
+        {
+          "id": "install",
+          "title": "Buffera installieren",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Die veröffentlichte Version läuft auf einem Mac mit Apple Silicon und macOS 14 oder neuer. Der lokale Verlauf benötigt kein Konto."
+            },
+            {
+              "type": "steps",
+              "items": [
+                "Lade Buffera über die Taste oben auf dieser Seite herunter.",
+                "Öffne das DMG und ziehe Buffera in „Programme“.",
+                "Starte Buffera. Sein Symbol erscheint in der Menüleiste."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "Buffera 1.0.0 ist mit Developer ID signiert und von Apple notarisiert. Bestätige beim ersten Start das Öffnen der heruntergeladenen App, wenn macOS danach fragt."
+            }
+          ]
+        },
+        {
+          "id": "updates",
+          "title": "Updates",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera prüft GitHub Releases im Hintergrund höchstens einmal täglich. Wenn eine neuere stabile Version mit einem fertigen DMG für Apple Silicon verfügbar ist, erscheinen zwei kleine rote Punkte auf dem Buffera-Symbol in der Menüleiste. Ein passender Menüeintrag öffnet direkt den Einstellungsbereich „Updates“. Im Verlaufsfenster erscheinen keine Update-Hinweise, und Hintergrundprüfungen öffnen keine Fenster."
+            },
+            {
+              "type": "paragraph",
+              "text": "Öffne „Einstellungen → Updates“, um installierte und verfügbare Versionen anzuzeigen, die GitHub-Veröffentlichung zu öffnen oder sie zu überspringen. Beim Überspringen verschwinden Punkte und Menüeintrag; die Version bleibt in den Einstellungen zugänglich. „Nach Updates suchen…“ und „Automatisch nach Updates suchen“ sind hier ebenfalls verfügbar."
+            },
+            {
+              "type": "paragraph",
+              "text": "Die Prüfung fragt nur öffentliche Veröffentlichungsmetadaten ab; der Zwischenablageverlauf wird nicht übertragen. Netzwerkfehler erscheinen in den Einstellungen und lassen ein bereits gefundenes Update bestehen. Die Anfragelimits von GitHub gelten auch für manuelle Prüfungen."
+            },
+            {
+              "type": "note",
+              "text": "In Versionen mit integriertem Installationsprogramm lädt „Aktualisieren…“ ein signiertes Update herunter und bietet an, es zu installieren und Buffera neu zu starten. Die Installation im Hintergrund ist deaktiviert. Schlägt ein Update fehl, bleibt „Veröffentlichung öffnen“ für die manuelle Installation verfügbar. Starte nach dem Update jeden verbundenen MCP-Prozess neu. Die veröffentlichte Version 0.4.0 enthält das Installationsprogramm nicht: Installiere die erste Version mit dieser Funktion manuell aus ihrem DMG."
+            }
+          ]
+        },
+        {
+          "id": "first-copy",
+          "title": "Kopieren. Finden. Zurückholen.",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Kopiere Text oder ein Bild in einer beliebigen App. Buffera speichert neue Kopien, solange es läuft.",
+                "Drücke ⌘⌥V. Wähle mit der Maus oder den Pfeiltasten einen Eintrag aus.",
+                "Drücke Enter, um den ausgewählten Eintrag zu kopieren und das Fenster zu schließen.",
+                "Kehre zu deiner App zurück und füge mit ⌘V ein."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "Buffera fügt nicht automatisch ein. Falls macOS nach dem Zugriff auf die Zwischenablage fragt, erlaube ihn, damit Buffera deinen Verlauf speichern kann."
+            }
+          ]
+        },
+        {
+          "id": "make-yours",
+          "title": "Nach deinen Wünschen",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Öffne die Einstellungen über das Zahnrad oder ⌘,. Wähle unter „Darstellung“ Erscheinungsbild, Sprache, Spaltenanzahl und Fensterposition. Das Erscheinungsbild ändert sich sofort; Sprachänderungen erfordern einen Neustart."
+            },
+            {
+              "type": "paragraph",
+              "text": "Füge Buffera unter „Systemeinstellungen → Allgemein → Anmeldeobjekte“ hinzu, damit es mit deinem Mac startet. Such- und Assistentenmodelle kannst du später herunterladen; der normale Zwischenablageverlauf funktioniert auch ohne sie."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "icon": "history",
+      "title": "Dein Zwischenablageverlauf",
+      "description": "Einträge, Favoriten, Filter und benachbarte Kopien.",
+      "sections": [
+        {
+          "id": "find",
+          "title": "Den richtigen Eintrag finden",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Öffne den Verlauf mit ⌘⌥V und beginne zu tippen. Die Suche umfasst Text, erkannte Wörter in Bildern, Dateinamen und die Quell-App. Grenze die Ergebnisse über Seitenleiste oder Filtertaste nach Typ, App und Datum ein."
+            },
+            {
+              "type": "paragraph",
+              "text": "⌘0 löscht Suchanfrage und Filter. Die Leertaste öffnet eine Vorschau, wenn die Einträge fokussiert sind; ⌘Y funktioniert auch im Suchfeld."
+            },
+            {
+              "type": "paragraph",
+              "text": "Vorschaubilder werden unter ~/Library/Caches/Buffera/Thumbnails gespeichert (bis zu 64 MB und 512 Dateien). Beim Öffnen des Verlaufs werden der Cache oder gespeicherte Bilddaten verwendet, keine Originaldateien gelesen. Dateien ohne zwischengespeichertes Vorschaubild zeigen ein Symbol. Eine ausdrücklich mit Leertaste oder ⌘Y geöffnete Vorschau kann das Original lesen, Ordnerzugriff anfordern und das Vorschaubild speichern. Verborgene Einträge werden nicht zwischengespeichert; Verbergen oder Löschen entfernt ihr Vorschaubild."
+            }
+          ]
+        },
+        {
+          "id": "keep",
+          "title": "Wichtige Einträge griffbereit halten",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Klicke auf den Stern oder drücke ⌘D, um einen Eintrag als Favorit zu markieren. Favoriten bleiben nach Neustarts erhalten und sind vor automatischer Bereinigung geschützt. Suche und Filter funktionieren auch in den Favoriten."
+            },
+            {
+              "type": "paragraph",
+              "text": "Klicke mit der rechten Maustaste auf einen Favoriten und wähle „Beschriftung…“, um eine Beschreibung wie „WLAN-Passwort zu Hause“ hinzuzufügen. Beschriftungen mit bis zu 120 Zeichen erscheinen über dem Inhalt, auch bei verborgenen Einträgen; das Passwort bleibt verdeckt. Lasse das Feld leer, um die Beschriftung zu entfernen. Sie bleibt nach Neustarts, erneutem Kopieren und dem Entfernen des Favoritensterns erhalten. Beschriftungen sind unverschlüsselte Metadaten: Trage keinen vertraulichen Inhalt selbst ein. Sie werden nicht in Inhaltssuche, MCP-Antworten oder Chat aufgenommen."
+            },
+            {
+              "type": "paragraph",
+              "text": "Der Anker unten im Verlauf heftet das Fenster über anderen Apps an. Escape lässt ein angeheftetes Fenster offen; das Bestätigen einer Kopie schließt es dennoch. Wähle zum Arbeiten nebeneinander in den Darstellungseinstellungen eine linke oder rechte Seitenleiste."
+            }
+          ]
+        },
+        {
+          "id": "neighbors",
+          "title": "Was davor und danach kam",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Klicke auf die Uhr eines Eintrags oder drücke ⇧⌘N. Buffera zeigt den Bezugseintrag sowie bis zu zehn zeitlich davor und danach liegende Kopien. Diese Liste verwendet den gesamten Verlauf unabhängig von den aktuellen Filtern."
+            },
+            {
+              "type": "paragraph",
+              "text": "„Zurück zum Verlauf“ stellt deine Suche und Listenposition wieder her. Das Kopieren identischer Inhalte aktualisiert den vorhandenen Eintrag; dies ist kein separates Protokoll jeder wiederholten Kopie."
+            }
+          ]
+        },
+        {
+          "id": "move",
+          "title": "Ziehen oder anders kopieren",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Ziehe Einträge in Editoren, Chats und den Finder. Originaldateien müssen unter ihren gespeicherten Pfaden noch verfügbar sein. Ziehen verändert die Systemzwischenablage nicht; die Formatunterstützung hängt von der Ziel-App ab."
+            },
+            {
+              "type": "paragraph",
+              "text": "Wähle „Anders kopieren“ im Kontextmenü, um Formatierung zu entfernen, Zeilenumbrüche zu bereinigen, JSON zu formatieren oder Tracking-Parameter aus einem Link zu entfernen. Die verfügbaren Aktionen hängen vom Inhalt ab. Der ursprüngliche Eintrag bleibt unverändert."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "icon": "search",
+      "title": "Suche nach Wörtern und Bedeutung",
+      "description": "Finde eine genaue Formulierung, Text in einem Bild oder eine verwandte Idee.",
+      "sections": [
+        {
+          "id": "words",
+          "title": "Mit Wörtern anfangen",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Die normale Suche funktioniert ohne Modelldownload. Jedes Suchwort muss im Suchindex vorkommen; Groß- und Kleinschreibung spielt keine Rolle. Typ-, App- und Datumsfilter grenzen die Ergebnisse ein."
+            },
+            {
+              "type": "paragraph",
+              "text": "Text in gespeicherten PNG-/TIFF-Bildern wird auf deinem Mac im Hintergrund von Apple Vision erkannt. Nach Abschluss der Erkennung ist er durchsuchbar. Die Auswahl des Bildes kopiert weiterhin das Bild."
+            }
+          ]
+        },
+        {
+          "id": "meaning",
+          "title": "Semantische Suche hinzufügen",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Öffne „Einstellungen → Suche und Antworten“.",
+                "Wähle unter „Semantische Suche“ die Option „Laden und aktivieren“. EmbeddingGemma 2 benötigt etwa 310 MB.",
+                "Warte, bis der relevante Teil deines Verlaufs indexiert ist. Der Fortschritt wird in den Einstellungen angezeigt.",
+                "Aktiviere „Semantische Suche einbeziehen“ im Verlaufsfenster."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Worttreffer erscheinen zuerst, danach verwandte Einträge. Alle Filter gelten weiterhin. Ist das Modell nicht verfügbar, bleibt die normale Suche verfügbar."
+            }
+          ]
+        },
+        {
+          "id": "power",
+          "title": "Modelle, Batterie und Suchlimits",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Die semantische Suche erfordert Apple Silicon. Das Modell wird separat heruntergeladen und läuft lokal. Die Hintergrundindexierung pausiert standardmäßig im Batteriebetrieb; „Jetzt fortsetzen“ setzt sie fort. Bereits indexierte Einträge bleiben durchsuchbar."
+            },
+            {
+              "type": "note",
+              "text": "Verborgene Inhalte werden nicht indexiert. Dateien auf dem Datenträger werden nicht geöffnet; die Suche verwendet ihre gespeicherten Pfade. Lange Einträge können teilweise indexiert werden, wie in den Einstellungen angezeigt."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "assistant",
+      "icon": "ask",
+      "title": "Buffera fragen",
+      "description": "Ein lokaler Assistent mit Antworten und Verweisen auf deine Einträge.",
+      "sections": [
+        {
+          "id": "enable",
+          "title": "Assistenten aktivieren",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Suche unter „Einstellungen → Suche und Antworten“ nach „Buffera fragen“ und wähle „Laden und aktivieren“. Gemma 4 E2B benötigt etwa 2,84 GB und läuft auf Apple Silicon."
+            },
+            {
+              "type": "paragraph",
+              "text": "Assistent und semantische Suche werden unabhängig aktiviert. Ohne Suchmodell sucht der Assistent nach Wörtern. Die Berechtigung für externe MCP-Agenten benötigt er nicht."
+            }
+          ]
+        },
+        {
+          "id": "ask",
+          "title": "Stelle deinem Verlauf eine Frage",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Klicke im Verlauf auf „Fragen“. Versuche „Welchen Verbindungsfehler habe ich gestern kopiert?“. Der Assistent findet und liest Einträge und prüft bei Bedarf benachbarte Kopien."
+            },
+            {
+              "type": "paragraph",
+              "text": "Die Antwort erscheint während der Generierung. Darunter zeigen die Quellen App und Kopierzeit. Öffne eine Quelle, um den ursprünglichen Eintrag zu prüfen."
+            },
+            {
+              "type": "list",
+              "items": [
+                "Enter sendet eine Frage; Umschalt+Enter fügt eine neue Zeile ein.",
+                "„Stoppen“ oder Escape während einer Antwort bricht die Generierung ab.",
+                "„Neues Gespräch“ löscht das aktuelle Gespräch."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "limits",
+          "title": "Was auf deinem Mac bleibt",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Das integrierte Modell verarbeitet den Verlauf lokal. Gespräche bleiben bis zum Beenden von Buffera im Arbeitsspeicher und werden nicht auf den Datenträger geschrieben. Das Schließen des Fensters stoppt die aktuelle Antwort."
+            },
+            {
+              "type": "note",
+              "text": "Antworten verwenden eine begrenzte Auswahl gefundener Einträge, nicht den gesamten Verlauf auf einmal. Verborgene Inhalte sind ausgeschlossen und Dateien auf dem Datenträger werden nicht gelesen. Prüfe wichtige Details anhand der Quellen."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "icon": "privacy",
+      "title": "Verlauf und Datenschutz",
+      "description": "Was auf deinem Mac bleibt, wie du Einträge verbirgst und Speicher verwaltest.",
+      "sections": [
+        {
+          "id": "local",
+          "title": "Dein Verlauf auf deinem Mac",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera speichert den Verlauf lokal unter ~/Library/Application Support/Buffera/. Normale Einträge werden von Buffera selbst nicht verschlüsselt. Lokale Suche, Bilderkennung und der integrierte Assistent erfordern keine Übertragung von Inhalten in die Cloud."
+            },
+            {
+              "type": "paragraph",
+              "text": "Die Aufzeichnung pausiert, wenn dein Mac gesperrt wird, den Benutzer wechselt oder schläft. In dieser Zeit angesammelte Kopien werden bei deiner Rückkehr übersprungen."
+            }
+          ]
+        },
+        {
+          "id": "secrets",
+          "title": "Vertrauliche Inhalte im Verlauf",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Unter „Einstellungen → Verlauf → Vertrauliche Inhalte im Verlauf“ ist „Vertrauliche Inhalte nicht speichern“ voreingestellt. Du kannst „Vertrauliche Inhalte verschlüsselt speichern“ wählen. Dies gilt für neue Kopien; bereits gespeicherte vertrauliche Inhalte bleiben verschlüsselt."
+            },
+            {
+              "type": "note",
+              "text": "Ein vertraulicher Inhalt wird anhand einer Markierung der Quell-App erkannt, nicht durch Prüfung seines Textes. Ohne diese Markierung kann ein Passwort als normaler Eintrag gespeichert werden."
+            },
+            {
+              "type": "paragraph",
+              "text": "„Verbergen“ verschlüsselt einen gespeicherten Texteintrag oder Link mit AES-256-GCM und entfernt den Inhalt aus den Suchindizes. Der Schlüssel bleibt im macOS-Schlüsselbund. Datum, App und andere Metadaten bleiben unverschlüsselt."
+            },
+            {
+              "type": "paragraph",
+              "text": "Verborgene Inhalte sind für Suche, OCR, integrierten Assistenten und MCP nicht verfügbar. Du kannst sie innerhalb von Buffera vorübergehend anzeigen oder kopieren."
+            }
+          ]
+        },
+        {
+          "id": "retention",
+          "title": "Verlaufsspeicher verwalten",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Lege die Limits unter „Einstellungen → Verlauf“ fest. Standard sind 50.000 normale Einträge und 5 GB für ihre Inhalte. Die Bereinigung erfolgt nach einer neuen Kopie. Favoriten zählen nicht zu diesen Limits und werden nicht automatisch entfernt."
+            },
+            {
+              "type": "note",
+              "text": "Modelle, OCR und der semantische Index benötigen zusätzlichen Speicherplatz. Dateien werden als Verweise auf die Originale gespeichert; Buffera kann gelöschte oder verschobene Dateien nicht wiederherstellen."
+            }
+          ]
+        },
+        {
+          "id": "external",
+          "title": "Wenn du einen Agenten verbindest",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "MCP-Zugriff ist standardmäßig deaktiviert. Nach deiner Erlaubnis kann ein Agent normale Einträge und sichere Metadaten verborgener Einträge lesen. Gelesene Inhalte gelangen in den Kontext des externen Agenten und können je nach Client an dessen Dienst gesendet werden."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shortcuts",
+      "icon": "keys",
+      "title": "Tastaturkurzbefehle",
+      "description": "Weniger Schritte zwischen Kopieren und Einfügen.",
+      "sections": [
+        {
+          "id": "everyday",
+          "title": "Kurzbefehle für den Alltag",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Tasten",
+                "Aktion"
+              ],
+              "rows": [
+                [
+                  "⌘⌥V",
+                  "Verlauf öffnen / nächster Eintrag"
+                ],
+                [
+                  "⌘⌥C",
+                  "Vorheriger Eintrag bei geöffnetem Verlauf"
+                ],
+                [
+                  "↑ ↓",
+                  "Zwischen Zeilen wechseln"
+                ],
+                [
+                  "Enter",
+                  "Ausgewählten Eintrag kopieren und schließen"
+                ],
+                [
+                  "⌘1–⌘9",
+                  "Einen der ersten neun Einträge auswählen"
+                ],
+                [
+                  "Space / ⌘Y",
+                  "Vorschau öffnen"
+                ],
+                [
+                  "⌘F",
+                  "Suche fokussieren"
+                ],
+                [
+                  "⌘0",
+                  "Suche und Filter leeren"
+                ],
+                [
+                  "Esc",
+                  "Vorschau schließen, zurückgehen oder Verlauf schließen"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "actions",
+          "title": "Eintragsaktionen",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Tasten",
+                "Aktion"
+              ],
+              "rows": [
+                [
+                  "⌘D",
+                  "Favoritenstatus umschalten"
+                ],
+                [
+                  "⇧⌘N",
+                  "Benachbarte Kopien anzeigen"
+                ],
+                [
+                  "⇧⌘H",
+                  "Verbergen / vorübergehend anzeigen"
+                ],
+                [
+                  "⇧⌘R",
+                  "Bild im Finder zeigen"
+                ],
+                [
+                  "⇧⌘S",
+                  "Bild als Datei speichern"
+                ],
+                [
+                  "⌘⌥S",
+                  "Seitenleiste ein-/ausblenden"
+                ],
+                [
+                  "⌘,",
+                  "Einstellungen öffnen"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "customize",
+          "title": "Kurzbefehl anpassen",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Wähle unter „Kurzbefehle“ gemeinsame Sondertasten und zwei unterschiedliche Buchstaben: einen zum Öffnen / Vorwärtsgehen und einen zum Zurückgehen. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Standard wiederherstellen“ stellt ⌘⌥V / ⌘⌥C wieder her."
+            },
+            {
+              "type": "paragraph",
+              "text": "Kurzbefehle verwenden physische Tasten der lateinischen Belegung und funktionieren daher auch beim Wechsel der Eingabesprache. Schlägt die Registrierung fehl, bleibt das vorherige Paar erhalten."
+            },
+            {
+              "type": "note",
+              "text": "Lässt du die Tasten nach dem Öffnen los, bleibt der Verlauf geöffnet. Zum schnellen Durchschalten hältst du ⌘⌥ gedrückt, drückst erneut V oder C und lässt dann die Sondertasten los, um den ausgewählten Eintrag zu kopieren."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "icon": "agents",
+      "title": "Einen Agenten verbinden",
+      "description": "Gib Codex oder Claude Code über MCP Zugriff auf den normalen Verlauf.",
+      "sections": [
+        {
+          "id": "connect",
+          "title": "Über die Einstellungen verbinden",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Starte die aktuelle Buffera-Version mindestens einmal, um den Verlauf vorzubereiten.",
+                "Öffne „Einstellungen → Agenten“ und aktiviere „Agenten das Lesen des Verlaufs erlauben“.",
+                "Wähle „Befehl für Claude Code“ oder „Codex-Befehl“. Führe den kopierten Befehl im Terminal aus; die CLI des gewählten Agenten muss installiert sein.",
+                "Verbinde MCP in deinem Agenten erneut. Starte den verbundenen MCP-Prozess nach einem Buffera-Update neu."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Buffera setzt seinen tatsächlichen Pfad ein. Das Kopieren eines Befehls aktiviert weder den Zugriff noch ändert es die Agenteneinstellungen. Such- und Assistentenmodelle sind für diese Verbindung optional."
+            }
+          ]
+        },
+        {
+          "id": "manual",
+          "title": "Manuelle Konfiguration",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "„Konfiguration kopieren“ liefert JSON mit dem aktuellen Pfad. Das folgende Beispiel geht von einer Installation unter /Applications aus. Verwendet dein Client ein anderes Format, ordne command und args den entsprechenden Feldern zu."
+            },
+            {
+              "type": "code",
+              "text": "{\n  \"mcpServers\": {\n    \"buffera\": {\n      \"command\": \"/Applications/Buffera.app/Contents/MacOS/BufferaMCP\",\n      \"args\": []\n    }\n  }\n}"
+            },
+            {
+              "type": "note",
+              "text": "Verwende einen absoluten Pfad ohne ~. Aktualisiere die Konfiguration, wenn du Buffera verschiebst. Der Agent startet den lokalen Prozess über stdio; eine Netzwerkadresse oder ein Port ist nicht nötig."
+            }
+          ]
+        },
+        {
+          "id": "tools",
+          "title": "Was der Agent tun kann",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Werkzeug",
+                "Zweck"
+              ],
+              "rows": [
+                [
+                  "search_history",
+                  "Nach Wörtern und Bedeutung mit Filtern suchen"
+                ],
+                [
+                  "read_clip",
+                  "Einen gefundenen Eintrag abschnittsweise lesen"
+                ],
+                [
+                  "get_neighbors",
+                  "Benachbarte Kopien nachschlagen"
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Alle Werkzeuge sind schreibgeschützt. Sie ändern weder Verlauf noch Systemzwischenablage. Bilder liefern zwischengespeicherte OCR, Dateien gespeicherte Pfade. Verborgene Inhalte werden nie geteilt, nur sichere Metadaten."
+            }
+          ]
+        },
+        {
+          "id": "revoke",
+          "title": "Zugriff kontrollieren",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Deaktiviere die Berechtigung unter „Agenten“, um weiteres Lesen zu verhindern. Ein laufender Prozess prüft sie bei jeder Anfrage. Bereits gelesene Inhalte können im Agentenkontext verbleiben."
+            },
+            {
+              "type": "note",
+              "text": "Ein externer Agent kann gelesene Einträge an seinen Dienst senden. Der integrierte Buffera-Assistent läuft lokal; daraus folgt nicht, wie ein verbundener Agent Daten verarbeitet."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "icon": "help",
+      "title": "Fehlerbehebung",
+      "description": "Praktische nächste Schritte, wenn etwas nicht wie erwartet funktioniert.",
+      "sections": [
+        {
+          "id": "open",
+          "title": "App oder Verlauf öffnen sich nicht",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Prüfe, ob dein Mac Apple Silicon und macOS 14 oder neuer hat. Falls macOS den Start blockiert, versuche die App einmal zu öffnen und erlaube Buffera dann unter „Datenschutz & Sicherheit“ in den Systemeinstellungen."
+            },
+            {
+              "type": "paragraph",
+              "text": "Falls ⌘⌥V nicht funktioniert, öffne den Verlauf über das Symbol in der Menüleiste. Beende eine andere App, die den Kurzbefehl verwendet, oder wähle einen neuen unter „Einstellungen → Kurzbefehle“."
+            }
+          ]
+        },
+        {
+          "id": "missing",
+          "title": "Ein erwarteter Eintrag fehlt",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "Prüfe, ob Buffera läuft und die Aufzeichnung nicht pausiert ist.",
+                "Erlaube den Zugriff auf die Zwischenablage, falls macOS danach fragt.",
+                "Drücke ⌘0, um Suchanfrage und Filter zu entfernen.",
+                "Kopiere den Inhalt erneut. Kopien während der Sperre oder des Ruhezustands werden übersprungen.",
+                "Prüfe die Einstellungen für vertrauliche Inhalte: Als vertraulich markierte Einträge werden standardmäßig nicht gespeichert."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "models",
+          "title": "Suche oder Assistent sind nicht bereit",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Öffne „Suche und Antworten“. Prüfe den Modelldownload und ob die entsprechende Funktion aktiviert ist. Die semantische Suche benötigt außerdem die Indexierung des Verlaufs. Wähle im Batteriebetrieb „Jetzt fortsetzen“ oder schließe eine Stromquelle an."
+            },
+            {
+              "type": "paragraph",
+              "text": "Falls Text in einem Bild nicht gefunden wird, prüfe den OCR-Fortschritt im Buffera-Menü in der Menüleiste. „Erkennung wiederholen“ startet fehlgeschlagene Versuche neu. Verborgene Bilder werden nicht erkannt."
+            }
+          ]
+        },
+        {
+          "id": "agent",
+          "title": "Der Agent kann nicht auf den Verlauf zugreifen",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Starte die aktuelle Buffera-Version, aktiviere den Zugriff unter „Agenten“ und prüfe den Pfad in deiner Clientkonfiguration. Starte MCP im Agenten nach einem App-Update neu. Verborgene Einträge werden immer ohne Inhalt zurückgegeben."
+            }
+          ]
+        },
+        {
+          "id": "file",
+          "title": "Eine Datei im Verlauf ist nicht verfügbar",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera speichert einen Verweis auf die Originaldatei, keine Sicherungskopie. Prüfe, ob sie verschoben oder gelöscht wurde. Um ein Bild dauerhaft aufzubewahren, wähle „Sichern unter…“; „Im Finder zeigen“ erstellt einen temporären Export."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

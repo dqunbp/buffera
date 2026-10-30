@@ -32,6 +32,7 @@ check(below.columns == 3 && below.itemSize.height == 96, "column boundary and de
 check(HistoryCardsMetrics.selection(9, count: 4) == 3 && HistoryCardsMetrics.selection(0, count: 0) == -1, "selection clamps after removal and empty list")
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
+copyTransformNamingMenuChecks()
 
 let menuEvent = NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
                                    timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,

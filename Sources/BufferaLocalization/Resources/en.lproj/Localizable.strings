@@ -189,6 +189,8 @@
 "Все слова запроса должны встретиться в записи." = "All search words must occur in the item.";
 "По словам и по смыслу, когда «Поиск по смыслу» включён в настройках. Пустой запрос показывает историю." = "Search by words and meaning when Semantic Search is enabled in settings. An empty query shows history.";
 "Загружаем историю…" = "Loading history…";
+"Ищу смыслы…" = "Searching by meaning…";
+"Ищу совпадения…" = "Finding text matches…";
 "В записи нет текста для показа." = "This item has no text to display.";
 "Ожидаем историю…" = "Waiting for history…";
 "Копируем в буфер…" = "Copying to clipboard…";
@@ -390,7 +392,7 @@
 "Системный" = "System";
 "Язык" = "Language";
 "Язык интерфейса" = "Interface language";
-"Язык применяется после перезапуска Buffera. «Системный» следует предпочитаемым языкам macOS; если русский и английский отсутствуют, используется английский." = "The language changes after restarting Buffera. System follows your preferred macOS languages, falling back to English if neither Russian nor English is listed.";
+"Язык применяется после перезапуска Buffera. «Системный» выбирает первый поддерживаемый язык из предпочтений macOS; если подходящего нет, используется английский." = "The language changes after restarting Buffera. System selects the first supported language in your macOS preferences, falling back to English if none is available.";
 "неизвестный формат" = "unknown format";
 "Данные: %1$@" = "Data: %1$@";
 "Элемент больше 64 МБ: он остался в буфере, но не сохранён в историю." = "The item exceeds 64 MB. It remains on the clipboard but was not saved to history.";
@@ -519,7 +521,7 @@
 "Применить новый язык?" = "Apply the new language?";
 "Пробел" = "Space";
 "Пройти настройку заново…" = "Run setup again…";
-"Откроет пошаговый мастер настройки Buffera с текущими параметрами." = "Opens Buffera’s step-by-step setup wizard with your current settings.";
+"Откроет тот же мастер настройки, что и при первом запуске Buffera, с вашими текущими параметрами." = "Reopens the setup wizard shown when you first launched Buffera, using your current settings.";
 "Пропустить шаг" = "Skip this step";
 "Размер истории: от 1 до 20 ГБ" = "History size: 1–20 GB";
 "Скопировать" = "Copy";
@@ -610,7 +612,6 @@
 "Проверьте, доступна ли новая версия Buffera." = "Check whether a newer version of Buffera is available.";
 "Установлена Buffera %1$@ (сборка %2$@)." = "Buffera %1$@ (build %2$@) is installed.";
 "Доступна Buffera %1$@. Настройки → Обновления." = "Buffera %1$@ is available. Settings → Updates.";
-"Откройте релиз на GitHub, чтобы прочитать об изменениях и скачать DMG. Установка выполняется вручную." = "Open the release on GitHub to read what’s new and download the DMG. Installation is manual.";
 "Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается двумя красными точками на значке Buffera и пунктом в его меню." = "Background checks run at most once a day. Clipboard history is not sent. Two red dots on Buffera’s icon and an item in its menu indicate a new version.";
 
 "Доступна Buffera %1$@…" = "Buffera %1$@ is available…";
@@ -624,3 +625,15 @@
 "Подпись должна содержать не более 120 символов без управляющих знаков." = "Labels must contain no more than 120 characters and no control characters.";
 "Подпись можно изменить только у записи в избранном." = "Only favorite items can have their labels edited.";
 "Сохранить" = "Save";
+"Обновить…" = "Update…";
+"Обновление…" = "Updating…";
+"Нажмите «Обновить…», чтобы скачать и установить новую версию. Buffera перезапустится после подтверждения. После обновления перезапустите подключённый MCP-процесс." = "Click Update… to download and install the new version. Buffera will restart after confirmation. Restart your connected MCP process after updating.";
+"Не удалось начать обновление. Повторите попытку или откройте релиз для ручной установки." = "Could not start the update. Try again or open the release to install it manually.";
+
+"Копирование" = "Copying";
+"Хранение записей" = "History storage";
+"При открытии окна" = "When opening history";
+"Копирование текста как файла" = "Copy text as a file";
+"В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "In an entry’s menu, choose “Copy Differently”, then “As .txt file” or “As .md file”. Buffera creates a file with the full text to paste into Finder or use as an attachment.";
+"Сбрасывать поиск и фильтры" = "Reset search and filters";
+"При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "On the next opening: an empty search, all entries without filters, and the first entry selected. An open window is never reset. Saved entries are not deleted.";

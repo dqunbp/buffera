@@ -3,7 +3,7 @@ import BufferaLocalization
 
 final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
     private let defaults: UserDefaults
-    private let enabled = NSButton(checkboxWithTitle: L10n.text("Сбрасывать состояние окна после закрытия"), target: nil, action: nil)
+    private let enabled = NSButton(checkboxWithTitle: L10n.text("Сбрасывать поиск и фильтры"), target: nil, action: nil)
     private let minutes = NSTextField(string: "1")
     private let stepper = NSStepper()
 
@@ -32,8 +32,8 @@ final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
         let delay = NSStackView(views: [NSTextField(labelWithString: L10n.text("Через")), minutes, stepper,
                                       NSTextField(labelWithString: L10n.text("мин. после закрытия"))])
         delay.orientation = .horizontal; delay.alignment = .centerY; delay.spacing = 8
-        let note = NSTextField(wrappingLabelWithString: L10n.text("При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается."))
-        note.font = .systemFont(ofSize: 12); note.textColor = .secondaryLabelColor
+        let note = NSTextField(wrappingLabelWithString: L10n.text("При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются."))
+        note.font = .systemFont(ofSize: 11); note.textColor = .secondaryLabelColor
         for child in [enabled, delay, note] { addArrangedSubview(child) }
         note.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         refresh()

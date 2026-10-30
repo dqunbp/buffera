@@ -43,7 +43,7 @@ func runLocalizationSmokeTest() throws {
     guard let theme = descendants(content).first(where: {
         $0.identifier?.rawValue == "settings.theme"
     }) as? NSPopUpButton else { throw HistoryError.database("Theme selector missing") }
-    let expectedThemes = activeLanguage == "ru" ? ["Системная", "Светлая", "Тёмная"] : ["System", "Light", "Dark"]
+    let expectedThemes = [L10n.text("Системная"), L10n.text("Светлая"), L10n.text("Тёмная")]
     try check(theme.itemTitles == expectedThemes && theme.indexOfSelectedItem == 0,
               "Theme options must be translated and initially follow the system")
     for invalid: Any in ["unknown", 7, true, ["dark"]] {
@@ -78,8 +78,7 @@ func runLocalizationSmokeTest() throws {
     var restartRequests = 0
     controller.onRestart = { restartRequests += 1 }
     try check(notice.isHidden, "Unchanged language must not request restart")
-    let expectedSystem = activeLanguage == "ru" ? "Системный" : "System"
-    try check(language.itemTitles == [expectedSystem, "Русский", "English"], "Language options are incomplete")
+    try check(language.itemTitles == LanguagePreference.allCases.map(\.title), "Language options are incomplete")
     try check(language.indexOfSelectedItem == 0, "Fresh settings must select System")
     let initialTitle = window.title
     for (index, preference) in LanguagePreference.allCases.enumerated() {
@@ -113,7 +112,7 @@ func runLocalizationSmokeTest() throws {
     try check(saved[LanguagePreference.key] == nil && saved["AppleLanguages"] == nil,
               "Returning to System did not clear language overrides")
     try check(notice.isHidden, "Returning to the launch preference must hide restart notice")
-    let expectedTitle = activeLanguage == "ru" ? "Настройки Buffera" : "Buffera Settings"
+    let expectedTitle = L10n.text("Настройки \("Buffera")")
     try check(window.title == expectedTitle, "Window title is not translated")
     try check(!window.isVisible, "Smoke check must not open a window")
     for view in descendants(content) where !view.isHiddenOrHasHiddenAncestor && view is NSControl {
@@ -123,6 +122,7 @@ func runLocalizationSmokeTest() throws {
     guard let tabs = descendants(content).compactMap({ $0 as? NSSegmentedControl }).first else {
         throw HistoryError.database("Settings tabs missing")
     }
+    try check(content.bounds.contains(content.convert(tabs.bounds, from: tabs)), "Settings tabs exceed the window width")
     guard let setup = descendants(content).first(where: { $0.identifier?.rawValue == "settings.showSetup" }) as? NSButton else {
         throw HistoryError.database("Appearance page is missing the setup action")
     }
@@ -149,6 +149,36 @@ func runLocalizationSmokeTest() throws {
     }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
+    func snapshot(_ name: String) throws {
+        content.layoutSubtreeIfNeeded()
+        if let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+            content.cacheDisplay(in: content.bounds, to: bitmap)
+            try bitmap.representation(using: .png, properties: [:])?.write(
+                to: URL(fileURLWithPath: "/tmp/buffera-settings-\(name)-\(activeLanguage).png"))
+        }
+    }
+    try check(tabs.segmentCount == 6 && !(0..<tabs.segmentCount).contains { tabs.label(forSegment: $0) == L10n.text("Копирование") },
+              "File naming must not have a separate settings tab")
+    try check(!descendants(content).contains { $0.identifier?.rawValue == "settings.textFileNaming" },
+              "File export must not appear among history settings")
+    for (section, controls) in [
+        ("storage", ["countLimit", "byteLimit", "revealData"]),
+        ("secrets", ["secretHistoryMode"]),
+        ("reopening", ["historyReset.enabled", "historyReset.minutes"])
+    ] {
+        guard let group = descendants(content).first(where: { $0.identifier?.rawValue == "settings.history.\(section)" }) else {
+            throw HistoryError.database("History settings group missing: \(section)")
+        }
+        for control in controls {
+            try check(descendants(group).contains { $0.identifier?.rawValue == "settings.\(control)" },
+                      "History control is outside its semantic group: \(control)")
+        }
+    }
+    var revealRequests = 0
+    controller.onRevealData = { revealRequests += 1 }
+    (descendants(content).first { $0.identifier?.rawValue == "settings.revealData" } as? NSButton)?.performClick(nil)
+    try check(revealRequests == 1, "Data folder action must stay connected after regrouping")
+    try snapshot("history")
     guard let resetEnabled = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.enabled" }) as? NSButton,
           let resetMinutes = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.minutes" }) as? NSTextField,
           let resetStepper = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.stepper" }) as? NSStepper else {
@@ -179,39 +209,46 @@ func runLocalizationSmokeTest() throws {
     resetEnabled.performClick(nil)
     try check(resetMinutes.isEnabled && HistoryResetPreferences.load(from: defaults).minutes == 12,
               "Re-enabling reset must preserve the custom duration")
-    guard let naming = descendants(content).first(where: { $0.identifier?.rawValue == "settings.textFileNaming" }) as? NSPopUpButton else {
-        throw HistoryError.database("Text file naming selector missing")
+    var copyRequests = 0
+    func namingMenu() throws -> NSMenu {
+        let menu = CopyTransformMenu(operations: [.textFile(.txt), .textFile(.md)], defaults: defaults) { _ in copyRequests += 1 }
+        guard let item = menu.items.last, item.title == L10n.text("Имя текстового файла"), item.submenu != nil else {
+            throw HistoryError.database("Copy menu is missing its translated file naming setting")
+        }
+        // Retain the parent: AppKit menu item targets and supermenu links are weak.
+        return menu
     }
-    let namingTitles = activeLanguage == "ru" ? ["Первая непустая строка", "Дата и время"] : ["First nonempty line", "Date and time"]
-    try check(naming.itemTitles == namingTitles && naming.indexOfSelectedItem == 0,
-              "Text file naming must default to first line and translate both options")
+    let naming = try namingMenu()
+    let choices = naming.items.last!.submenu!
+    try check(choices.items.map(\.title) == [L10n.text("Первая непустая строка"), L10n.text("Дата и время")]
+              && choices.items.first?.state == .on, "File naming choices must be translated and default to first line")
     for (index, mode) in TextFileNaming.allCases.enumerated() {
-        naming.selectItem(at: index)
-        try check(naming.sendAction(naming.action, to: naming.target), "Naming selector action disconnected")
-        try check(TextFileNaming.load(from: defaults) == mode, "Naming preference must apply immediately")
-        let reopened = makeSettings()
-        let reopenedContent = reopened.window!.contentView!
-        let reopenedTabs = descendants(reopenedContent).compactMap { $0 as? NSSegmentedControl }.first!
-        reopenedTabs.selectedSegment = 1
-        _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
-        let restored = descendants(reopenedContent).first { $0.identifier?.rawValue == "settings.textFileNaming" } as? NSPopUpButton
-        try check(restored?.indexOfSelectedItem == index, "Naming choice must survive settings reopening")
+        choices.performActionForItem(at: index)
+        try check(TextFileNaming.load(from: defaults) == mode && copyRequests == 0,
+                  "Choosing the filename style must persist without copying an entry")
+        let reopened = try namingMenu()
+        try check(reopened.items.last!.submenu!.items[index].state == .on,
+                  "Reopening the copy menu must retain the selected filename style")
     }
     guard let secrets = descendants(content).first(where: { $0.identifier?.rawValue == "settings.secretHistoryMode" }) as? NSPopUpButton else {
         throw HistoryError.database("Secret history selector missing")
     }
-    let secretTitles = activeLanguage == "ru"
-        ? ["Не сохранять секреты", "Сохранять секреты зашифрованными"]
-        : ["Do not save secrets", "Save secrets encrypted"]
+    let secretTitles = [L10n.text("Не сохранять секреты"), L10n.text("Сохранять секреты зашифрованными")]
     try check(secrets.itemTitles == secretTitles && secrets.indexOfSelectedItem == 0,
               "Secret storage defaults or translations are incorrect")
+    guard let secretStatus = descendants(content).first(where: { $0.identifier?.rawValue == "settings.secretHistoryStatus" }) as? NSTextField else {
+        throw HistoryError.database("Secret history status missing")
+    }
+    try check(secretStatus.isHidden, "Empty secret status must not leave a gap in the history page")
     var finishSecretChange: ((Result<Void, Error>) -> Void)?
     controller.onSecretHistoryChange = { _, completion in finishSecretChange = completion }
     secrets.selectItem(at: 1)
     try check(secrets.sendAction(secrets.action, to: secrets.target), "Secret setting is disconnected")
     try check(!secrets.isEnabled && SecretHistoryMode.load(from: defaults) == .skip,
               "Secret setting persisted before key preparation completed")
+    try check(!secretStatus.isHidden && !secretStatus.stringValue.isEmpty, "Pending secret change must be visible")
     finishSecretChange?(.failure(SecretStorageError.keyUnavailable))
+    try check(!secretStatus.isHidden && !secretStatus.stringValue.isEmpty, "Key preparation errors must remain visible")
     try check(secrets.isEnabled && secrets.indexOfSelectedItem == 0 && SecretHistoryMode.load(from: defaults) == .skip,
               "Failed key preparation changed the selected policy")
     secrets.selectItem(at: 1)
@@ -219,6 +256,7 @@ func runLocalizationSmokeTest() throws {
     finishSecretChange?(.success(()))
     try check(secrets.indexOfSelectedItem == 1 && SecretHistoryMode.load(from: defaults) == .encrypted,
               "Successful secret setting did not persist")
+    try check(secretStatus.isHidden, "Successful secret change must remove the empty status row")
     let secretReopened = makeSettings()
     let secretTabs = descendants(secretReopened.window!.contentView!).compactMap { $0 as? NSSegmentedControl }.first!
     secretTabs.selectedSegment = 1
@@ -265,9 +303,10 @@ func runLocalizationSmokeTest() throws {
         // The history page scrolls as settings grow; offscreen controls must
         // remain within the scrollable document and be reachable by scrolling.
         let container = view.enclosingScrollView?.documentView ?? content
-        let frame = container.convert(view.bounds, from: view)
-        // Native text fields extend two points beyond their alignment rectangle.
+        // Native buttons include shadow margins outside their layout rectangle.
+        let frame = container.convert(view.alignmentRect(forFrame: view.frame), from: view.superview)
+        // Native text fields may extend two points beyond their alignment rectangle.
         try check(container.bounds.insetBy(dx: -3, dy: -3).contains(frame), "History control \(view.identifier?.rawValue ?? String(describing: type(of: view))) \(frame) lies outside \(container.bounds)")
     }
-    print("PASS: \(activeLanguage) settings theme and language selection, persistence, restart action, history size slider and layout")
+    print("PASS: \(activeLanguage) settings theme and language selection, persistence, restart action, history groups, file naming menu, size slider and layout")
 }

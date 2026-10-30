@@ -132,8 +132,9 @@ func runShortcutSmokeTest() throws {
         let frame = root.convert(view.bounds, from: view)
         try check(frame.width > 0 && frame.height > 0 && root.bounds.contains(frame), "Shortcut controls are visible inside settings")
         if let scroll = view.enclosingScrollView {
-            let visibleFrame = scroll.contentView.convert(view.bounds, from: view)
-            try check(scroll.contentView.bounds.contains(visibleFrame), "Shortcut controls are inside the scroll viewport")
+            // Native popup frames include a one-point bezel above the layout rectangle.
+            let visibleFrame = scroll.contentView.convert(view.alignmentRect(forFrame: view.frame), from: view.superview)
+            try check(scroll.contentView.bounds.contains(visibleFrame), "Shortcut control \(view.identifier?.rawValue ?? "") \(visibleFrame) exceeds scroll viewport \(scroll.contentView.bounds)")
         }
     }
     try check(!window.isVisible, "Smoke test never opens user windows")

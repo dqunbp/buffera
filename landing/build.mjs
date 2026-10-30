@@ -9,7 +9,7 @@ const locales = await loadLocales();
 const template = await readFile(new URL('index.html', source), 'utf8');
 const docs = await loadDocs();
 const docsTemplate = await readFile(new URL('docs.html', source), 'utf8');
-const files = ['styles.css', 'app.js', 'docs.css', 'docs.js', 'favicon.svg', 'brand-pattern.svg', 'openai-mark.svg', 'demo-ru.svg', 'demo-en.svg', 'app-notes.png', 'app-safari.png', 'app-screenshot.png', 'app-terminal.png'];
+const files = ['styles.css', 'app.js', 'docs.css', 'docs.js', 'favicon.svg', 'brand-pattern.svg', 'openai-mark.svg', ...languages.map(lang => `demo-${lang}.svg`), 'app-notes.png', 'app-safari.png', 'app-screenshot.png', 'app-terminal.png'];
 const assetContents = await Promise.all(files.map(file => readFile(new URL(file, source))));
 const assetVersion = createHash('sha256').update(Buffer.concat(assetContents)).digest('hex').slice(0, 12);
 

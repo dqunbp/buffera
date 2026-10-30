@@ -1,0 +1,661 @@
+{
+  "ui": {
+    "title": "Documentación",
+    "home": "Volver al sitio",
+    "search": "Buscar en la documentación",
+    "searchPlaceholder": "Encuentra una respuesta…",
+    "searchHint": "La búsqueda requiere JavaScript",
+    "noResults": "No hay resultados. Prueba «búsqueda», «secretos» o «MCP».",
+    "results": "Encontrados: {count}",
+    "clear": "Borrar búsqueda",
+    "menu": "Secciones de la documentación",
+    "toc": "En esta página",
+    "overview": "Resumen",
+    "start": "Primeros pasos",
+    "read": "Leer guía",
+    "previous": "Guía anterior",
+    "next": "Siguiente guía",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
+    "source": "Código fuente y detalles técnicos",
+    "footer": "Todo a mano. Las respuestas también.",
+    "download": "Descargar Buffera",
+    "groupBasics": "Día a día",
+    "groupMore": "Funciones y ajustes",
+    "allGuides": "Siéntete como en casa",
+    "allGuidesText": "Desde tu primera copia hasta una forma de trabajar a tu medida."
+  },
+  "overview": {
+    "title": "Conoce tu\nsegunda memoria.",
+    "description": "Pequeñas guías para encontrar lo que copiaste y perder menos tiempo haciendo lo mismo dos veces.",
+    "quickTitle": "Copia algo.\nVuelve a encontrarlo.",
+    "quickText": "Instala Buffera, copia algo y abre el historial. Todo empieza con tres teclas.",
+    "keyCaption": "Tu historial, a un atajo de distancia",
+    "keyNote": "El predeterminado · personalízalo",
+    "metaTitle": "Documentación de Buffera — todo a mano",
+    "metaDescription": "Instala Buffera, explora el historial del portapapeles y los atajos, usa la búsqueda local, gestiona la privacidad y conecta agentes."
+  },
+  "articles": [
+    {
+      "id": "getting-started",
+      "icon": "start",
+      "title": "Primeros pasos",
+      "description": "Instalación, primer inicio y tu primer elemento guardado.",
+      "sections": [
+        {
+          "id": "install",
+          "title": "Instala Buffera",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "La versión publicada funciona en un Mac con Apple Silicon y macOS 14 o posterior. El historial local no necesita una cuenta."
+            },
+            {
+              "type": "steps",
+              "items": [
+                "Descarga Buffera con el botón de la parte superior de esta página.",
+                "Abre el DMG y arrastra Buffera a Aplicaciones.",
+                "Inicia Buffera. Su icono aparece en la barra de menús."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "Buffera 1.0.0 está firmada con Developer ID y notarizada por Apple. Al iniciarla por primera vez, confirma que quieres abrir la app descargada si macOS lo solicita."
+            }
+          ]
+        },
+        {
+          "id": "updates",
+          "title": "Actualizaciones",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera consulta GitHub Releases en segundo plano como máximo una vez al día. Cuando hay una versión estable más reciente con un DMG listo para Apple Silicon, aparecen dos pequeños puntos rojos en su icono de la barra de menús. La opción correspondiente del menú abre directamente la pestaña Actualizaciones de los ajustes. No hay avisos de actualización en el panel del historial y las comprobaciones en segundo plano no abren ventanas."
+            },
+            {
+              "type": "paragraph",
+              "text": "Abre Ajustes → Actualizaciones para ver las versiones instalada y disponible, abrir la publicación de GitHub u omitirla. Al omitirla, desaparecen los puntos y la opción del menú, pero la versión sigue accesible en los ajustes. Aquí también están Buscar actualizaciones… y Buscar actualizaciones automáticamente."
+            },
+            {
+              "type": "paragraph",
+              "text": "La comprobación solo solicita metadatos públicos de las versiones; no se envía el historial del portapapeles. Los errores de red aparecen en los ajustes y se conserva cualquier actualización ya encontrada. Los límites de solicitudes de GitHub también se aplican a las comprobaciones manuales."
+            },
+            {
+              "type": "note",
+              "text": "En las versiones con el instalador integrado, Actualizar… descarga una actualización firmada y ofrece instalarla y reiniciar Buffera. La instalación en segundo plano está desactivada. Si falla una actualización, Abrir versión sigue disponible para instalarla manualmente. Reinicia cualquier proceso MCP conectado después de actualizar. La versión publicada 0.4.0 no incluye el instalador: instala manualmente desde su DMG la primera versión que tenga esta función."
+            }
+          ]
+        },
+        {
+          "id": "first-copy",
+          "title": "Copia. Encuentra. Recupera.",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Copia texto o una imagen en cualquier app. Buffera guarda las nuevas copias mientras está en ejecución.",
+                "Pulsa ⌘⌥V. Selecciona un elemento con el ratón o las flechas.",
+                "Pulsa Enter para copiar el elemento seleccionado y cerrar la ventana.",
+                "Vuelve a tu app y pega con ⌘V."
+              ]
+            },
+            {
+              "type": "note",
+              "text": "Buffera no pega automáticamente. Si macOS solicita acceso al portapapeles, permítelo para que Buffera pueda guardar tu historial."
+            }
+          ]
+        },
+        {
+          "id": "make-yours",
+          "title": "Hazlo a tu medida",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Abre los ajustes con el botón del engranaje o ⌘,. En Aspecto, elige el tema, el idioma, el número de columnas y la posición de la ventana. Los cambios de tema se aplican inmediatamente; los de idioma requieren reiniciar."
+            },
+            {
+              "type": "paragraph",
+              "text": "Para iniciar Buffera con tu Mac, añádelo en Ajustes del Sistema → General → Ítems de inicio. Puedes descargar los modelos de búsqueda y del asistente más tarde; el historial normal del portapapeles funciona sin ellos."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "icon": "history",
+      "title": "Tu historial del portapapeles",
+      "description": "Elementos, favoritos, filtros y copias cercanas.",
+      "sections": [
+        {
+          "id": "find",
+          "title": "Encuentra el elemento que necesitas",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Abre el historial con ⌘⌥V y empieza a escribir. La búsqueda abarca el texto, las palabras reconocidas en imágenes, los nombres de archivos y la app de origen. Limita los resultados por tipo, app y fecha con la barra lateral o el botón de filtros."
+            },
+            {
+              "type": "paragraph",
+              "text": "⌘0 borra la consulta y los filtros. Espacio abre la vista previa cuando los elementos tienen el foco; ⌘Y también funciona desde el campo de búsqueda."
+            },
+            {
+              "type": "paragraph",
+              "text": "Las miniaturas se guardan en ~/Library/Caches/Buffera/Thumbnails (hasta 64 MB y 512 archivos). Al abrir el historial se usan la caché o los datos de imagen guardados, sin leer los archivos originales. Un archivo sin miniatura en caché muestra un icono. Una vista previa explícita con Espacio o ⌘Y puede leer el original y solicitar acceso a la carpeta, y después guardar su miniatura en caché. Los elementos ocultos no se almacenan en esta caché; al ocultar o eliminar un elemento, se elimina su miniatura."
+            }
+          ]
+        },
+        {
+          "id": "keep",
+          "title": "Ten cerca los elementos importantes",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Pulsa la estrella o ⌘D para añadir un elemento a favoritos. Los favoritos se conservan tras reiniciar y están protegidos de la limpieza automática. La búsqueda y los filtros también funcionan en Favoritos."
+            },
+            {
+              "type": "paragraph",
+              "text": "Haz clic derecho en un favorito y elige «Etiqueta…» para añadir una descripción, como «Contraseña del wifi de casa». Las etiquetas de hasta 120 caracteres aparecen encima del contenido, también en elementos ocultos; la contraseña sigue enmascarada. Deja el campo vacío para eliminar la etiqueta. Las etiquetas se conservan tras reiniciar, volver a copiar y quitar la estrella de favorito. Son metadatos sin cifrar: no escribas el propio secreto en ellas. No se incluyen en la búsqueda de contenido, las respuestas MCP ni el chat."
+            },
+            {
+              "type": "paragraph",
+              "text": "El ancla en la parte inferior del historial fija la ventana sobre otras apps. Escape mantiene abierta una ventana fijada; confirmar una copia sí la cierra. Para trabajar con ventanas en paralelo, elige un panel lateral izquierdo o derecho en los ajustes de Aspecto."
+            }
+          ]
+        },
+        {
+          "id": "neighbors",
+          "title": "Qué vino antes y después",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Pulsa el reloj de un elemento o ⇧⌘N. Buffera muestra el elemento de referencia y hasta 10 copias anteriores y posteriores. Esta lista usa todo el historial, sin tener en cuenta los filtros actuales."
+            },
+            {
+              "type": "paragraph",
+              "text": "Volver al historial recupera tu búsqueda y la posición en la lista. Copiar contenido idéntico actualiza el elemento existente; no es un registro separado de cada copia repetida."
+            }
+          ]
+        },
+        {
+          "id": "move",
+          "title": "Arrastra o copia de otra forma",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Arrastra elementos a editores, chats y Finder. Los archivos originales deben seguir disponibles en sus rutas guardadas. Arrastrar no modifica el portapapeles del sistema; la compatibilidad de formatos depende de la app receptora."
+            },
+            {
+              "type": "paragraph",
+              "text": "Usa Copiar de otra forma en el menú contextual para quitar el formato, limpiar saltos de línea, dar formato a JSON o eliminar parámetros de seguimiento de un enlace. Las acciones disponibles dependen del contenido. El elemento original permanece intacto."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "icon": "search",
+      "title": "Busca por palabras y significado",
+      "description": "Encuentra una frase exacta, texto en una imagen o una idea relacionada.",
+      "sections": [
+        {
+          "id": "words",
+          "title": "Empieza por las palabras",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "La búsqueda normal funciona sin descargar un modelo. Cada palabra de la consulta debe aparecer en el índice de búsqueda; no se distingue entre mayúsculas y minúsculas. Los filtros de tipo, app y fecha limitan los resultados."
+            },
+            {
+              "type": "paragraph",
+              "text": "Apple Vision reconoce en segundo plano en tu Mac el texto de las imágenes PNG/TIFF guardadas. Cuando termina el reconocimiento, esas palabras se pueden buscar. Al seleccionar la imagen se sigue copiando la imagen."
+            }
+          ]
+        },
+        {
+          "id": "meaning",
+          "title": "Añade búsqueda semántica",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Abre Ajustes → Búsqueda y respuestas.",
+                "En Búsqueda semántica, elige Descargar y activar. EmbeddingGemma 2 ocupa unos 310 MB.",
+                "Espera a que se indexe la parte pertinente del historial. Los ajustes muestran el progreso.",
+                "Activa Incluir búsqueda semántica en la ventana del historial."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Las coincidencias por palabras aparecen primero, seguidas de los elementos relacionados. Todos los filtros siguen aplicándose. Si el modelo no está disponible, la búsqueda normal sigue funcionando."
+            }
+          ]
+        },
+        {
+          "id": "power",
+          "title": "Modelos, batería y límites de búsqueda",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "La búsqueda semántica requiere Apple Silicon. El modelo se descarga por separado y se ejecuta localmente. La indexación en segundo plano se pausa de forma predeterminada al usar batería; Continuar ahora la reanuda. La búsqueda en elementos ya indexados sigue disponible."
+            },
+            {
+              "type": "note",
+              "text": "El contenido oculto no se indexa. Los archivos del disco no se abren; la búsqueda usa sus rutas guardadas. Los elementos largos pueden indexarse parcialmente, como se indica en los ajustes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "assistant",
+      "icon": "ask",
+      "title": "Pregunta a Buffera",
+      "description": "Un asistente local con respuestas enlazadas a tus elementos.",
+      "sections": [
+        {
+          "id": "enable",
+          "title": "Activa el asistente",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "En Ajustes → Búsqueda y respuestas, busca Preguntar a Buffera y elige Descargar y activar. Gemma 4 E2B ocupa unos 2,84 GB y se ejecuta en Apple Silicon."
+            },
+            {
+              "type": "paragraph",
+              "text": "El asistente y la búsqueda semántica se activan de forma independiente. Sin el modelo de búsqueda, el asistente busca por palabras. No necesita el permiso para agentes MCP externos."
+            }
+          ]
+        },
+        {
+          "id": "ask",
+          "title": "Hazle una pregunta a tu historial",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Pulsa Preguntar en el historial. Prueba «¿Qué error de conexión copié ayer?». El asistente encuentra y lee los elementos y consulta las copias cercanas cuando hace falta."
+            },
+            {
+              "type": "paragraph",
+              "text": "La respuesta aparece mientras se genera. Las fuentes que figuran debajo muestran la app y la hora de copia. Abre una fuente para comprobar el elemento original."
+            },
+            {
+              "type": "list",
+              "items": [
+                "Enter envía una pregunta; Shift+Enter añade una nueva línea.",
+                "Detener o Escape durante una respuesta cancela la generación.",
+                "Nueva conversación borra la conversación actual."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "limits",
+          "title": "Qué se queda en tu Mac",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "El modelo integrado procesa el historial localmente. Las conversaciones se mantienen en memoria hasta que se cierra Buffera y no se escriben en el disco. Cerrar la ventana detiene la respuesta actual."
+            },
+            {
+              "type": "note",
+              "text": "Las respuestas usan un conjunto limitado de elementos encontrados, no todo el historial a la vez. Se excluye el contenido oculto y no se leen los archivos del disco. Contrasta los detalles importantes con las fuentes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "icon": "privacy",
+      "title": "Historial y privacidad",
+      "description": "Qué se queda en tu Mac, cómo ocultar elementos y gestionar el almacenamiento.",
+      "sections": [
+        {
+          "id": "local",
+          "title": "Tu historial en tu Mac",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera guarda el historial localmente en ~/Library/Application Support/Buffera/. El propio Buffera no cifra los elementos normales. La búsqueda local, el reconocimiento de imágenes y el asistente integrado no requieren enviar contenido a la nube."
+            },
+            {
+              "type": "paragraph",
+              "text": "El registro se pausa cuando el Mac se bloquea, cambia de usuario o entra en reposo. Las copias acumuladas durante ese tiempo se omiten al volver."
+            }
+          ]
+        },
+        {
+          "id": "secrets",
+          "title": "Secretos en el historial",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Ajustes → Historial → Secretos en el historial usa No guardar secretos de forma predeterminada. Puedes elegir Guardar secretos cifrados. Esto se aplica a las nuevas copias; los secretos guardados anteriormente siguen cifrados."
+            },
+            {
+              "type": "note",
+              "text": "Un secreto se identifica por una marca de la app de origen, no por el análisis de su texto. Sin esa marca, una contraseña puede guardarse como un elemento normal."
+            },
+            {
+              "type": "paragraph",
+              "text": "Ocultar cifra un elemento de texto o enlace guardado con AES-256-GCM y elimina su contenido de los índices de búsqueda. La clave se queda en el Llavero de macOS. La fecha, la app y los demás metadatos permanecen sin cifrar."
+            },
+            {
+              "type": "paragraph",
+              "text": "El contenido oculto no está disponible para la búsqueda, el OCR, el asistente integrado ni MCP. Puedes mostrarlo temporalmente o copiarlo dentro de Buffera."
+            }
+          ]
+        },
+        {
+          "id": "retention",
+          "title": "Gestiona el almacenamiento del historial",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Establece los límites en Ajustes → Historial. Los valores predeterminados son 50 000 elementos normales y 5 GB de contenido. La limpieza se ejecuta tras una nueva copia. Los favoritos no cuentan para estos límites y no se eliminan automáticamente."
+            },
+            {
+              "type": "note",
+              "text": "Los modelos, el OCR y el índice semántico usan espacio adicional. Los archivos se guardan como referencias a los originales; Buffera no puede restaurar un archivo que hayas eliminado o movido."
+            }
+          ]
+        },
+        {
+          "id": "external",
+          "title": "Si conectas un agente",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "El acceso MCP está desactivado de forma predeterminada. Cuando das permiso, un agente puede leer los elementos normales y metadatos seguros de los ocultos. El contenido leído entra en el contexto del agente externo y, según el cliente, puede enviarse a su servicio."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shortcuts",
+      "icon": "keys",
+      "title": "Atajos de teclado",
+      "description": "Menos pasos entre copiar y pegar.",
+      "sections": [
+        {
+          "id": "everyday",
+          "title": "Atajos de cada día",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Teclas",
+                "Acción"
+              ],
+              "rows": [
+                [
+                  "⌘⌥V",
+                  "Abrir historial / siguiente elemento"
+                ],
+                [
+                  "⌘⌥C",
+                  "Elemento anterior con el historial abierto"
+                ],
+                [
+                  "↑ ↓",
+                  "Moverse entre filas"
+                ],
+                [
+                  "Enter",
+                  "Copiar el elemento seleccionado y cerrar"
+                ],
+                [
+                  "⌘1–⌘9",
+                  "Seleccionar uno de los nueve primeros elementos"
+                ],
+                [
+                  "Space / ⌘Y",
+                  "Abrir vista previa"
+                ],
+                [
+                  "⌘F",
+                  "Ir a la búsqueda"
+                ],
+                [
+                  "⌘0",
+                  "Borrar búsqueda y filtros"
+                ],
+                [
+                  "Esc",
+                  "Cerrar la vista previa, volver o cerrar el historial"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "actions",
+          "title": "Acciones de los elementos",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Teclas",
+                "Acción"
+              ],
+              "rows": [
+                [
+                  "⌘D",
+                  "Añadir o quitar de favoritos"
+                ],
+                [
+                  "⇧⌘N",
+                  "Mostrar copias cercanas"
+                ],
+                [
+                  "⇧⌘H",
+                  "Ocultar / mostrar temporalmente"
+                ],
+                [
+                  "⇧⌘R",
+                  "Mostrar imagen en Finder"
+                ],
+                [
+                  "⇧⌘S",
+                  "Guardar imagen como archivo"
+                ],
+                [
+                  "⌘⌥S",
+                  "Mostrar u ocultar la barra lateral"
+                ],
+                [
+                  "⌘,",
+                  "Abrir ajustes"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "customize",
+          "title": "Personaliza el atajo",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "En Atajos, elige teclas modificadoras comunes y dos letras diferentes: una para abrir o avanzar y otra para retroceder. Pulsa Aplicar; no hace falta reiniciar. Restablecer valores predeterminados recupera ⌘⌥V / ⌘⌥C."
+            },
+            {
+              "type": "paragraph",
+              "text": "Los atajos usan las teclas físicas de la distribución latina, por lo que siguen funcionando al cambiar el idioma de entrada. Si el registro falla, se conserva la pareja anterior."
+            },
+            {
+              "type": "note",
+              "text": "Soltar las teclas después de abrir deja el historial abierto. Para recorrerlo rápidamente, mantén ⌘⌥ pulsado, vuelve a pulsar V o C y suelta los modificadores para copiar el elemento seleccionado."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "icon": "agents",
+      "title": "Conecta un agente",
+      "description": "Da a Codex o Claude Code acceso al historial normal mediante MCP.",
+      "sections": [
+        {
+          "id": "connect",
+          "title": "Conecta desde los ajustes",
+          "blocks": [
+            {
+              "type": "steps",
+              "items": [
+                "Inicia la versión actual de Buffera al menos una vez para preparar el historial.",
+                "Abre Ajustes → Agentes y activa Permitir que los agentes lean el historial.",
+                "Elige Comando de Claude Code o Comando de Codex. Ejecuta el comando copiado en Terminal con la CLI del agente elegido instalada.",
+                "Vuelve a conectar MCP en tu agente. Reinicia el proceso MCP conectado después de actualizar Buffera."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Buffera inserta su ruta real. Copiar un comando no activa el acceso ni cambia los ajustes del agente. Los modelos de búsqueda y del asistente son opcionales para esta conexión."
+            }
+          ]
+        },
+        {
+          "id": "manual",
+          "title": "Configuración manual",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Copiar configuración proporciona un JSON con la ruta actual. El siguiente ejemplo supone una instalación en /Applications. Si tu cliente usa otro formato, adapta command y args a sus campos."
+            },
+            {
+              "type": "code",
+              "text": "{\n  \"mcpServers\": {\n    \"buffera\": {\n      \"command\": \"/Applications/Buffera.app/Contents/MacOS/BufferaMCP\",\n      \"args\": []\n    }\n  }\n}"
+            },
+            {
+              "type": "note",
+              "text": "Usa una ruta absoluta sin ~. Actualiza la configuración si mueves Buffera. El agente inicia el proceso local mediante stdio; no se necesita ninguna dirección de red ni puerto."
+            }
+          ]
+        },
+        {
+          "id": "tools",
+          "title": "Qué puede hacer el agente",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "Herramienta",
+                "Finalidad"
+              ],
+              "rows": [
+                [
+                  "search_history",
+                  "Buscar por palabras y significado con filtros"
+                ],
+                [
+                  "read_clip",
+                  "Leer un elemento encontrado por fragmentos"
+                ],
+                [
+                  "get_neighbors",
+                  "Consultar las copias cercanas"
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Todas las herramientas son de solo lectura. No modifican el historial ni el portapapeles del sistema. Las imágenes ofrecen el OCR en caché; los archivos, sus rutas guardadas. El contenido oculto nunca se comparte, solo los metadatos seguros."
+            }
+          ]
+        },
+        {
+          "id": "revoke",
+          "title": "Controla el acceso",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Desactiva el permiso en Agentes para bloquear nuevas lecturas. Un proceso en ejecución lo comprueba en cada solicitud. El contenido leído anteriormente puede permanecer en el contexto del agente."
+            },
+            {
+              "type": "note",
+              "text": "Un agente externo puede enviar los elementos que lee a su servicio. El asistente integrado de Buffera se ejecuta localmente; eso no determina cómo procesa los datos un agente conectado."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "icon": "help",
+      "title": "Solución de problemas",
+      "description": "Pasos prácticos cuando algo no funciona como esperabas.",
+      "sections": [
+        {
+          "id": "open",
+          "title": "La app o el historial no se abre",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Comprueba que tu Mac tenga Apple Silicon y macOS 14 o posterior. Si macOS bloquea el inicio, intenta abrirlo una vez y permite Buffera en Privacidad y seguridad de Ajustes del Sistema."
+            },
+            {
+              "type": "paragraph",
+              "text": "Si ⌘⌥V no funciona, abre el historial desde el icono de la barra de menús. Cierra otra app que use ese atajo o elige uno nuevo en Ajustes → Atajos."
+            }
+          ]
+        },
+        {
+          "id": "missing",
+          "title": "Falta un elemento que esperabas ver",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "Comprueba que Buffera esté en ejecución y que el registro no esté pausado.",
+                "Permite el acceso al portapapeles si macOS lo solicita.",
+                "Pulsa ⌘0 para quitar la consulta y los filtros.",
+                "Vuelve a copiar el contenido. Las copias hechas durante el bloqueo o el reposo se omiten.",
+                "Comprueba los ajustes de secretos: los elementos marcados como confidenciales no se guardan de forma predeterminada."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "models",
+          "title": "La búsqueda o el asistente no están listos",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Abre Búsqueda y respuestas. Comprueba la descarga del modelo y que la función correspondiente esté activada. La búsqueda semántica también requiere indexar el historial. Con batería, elige Continuar ahora o conecta la alimentación."
+            },
+            {
+              "type": "paragraph",
+              "text": "Si no encuentras el texto de una imagen, comprueba el progreso del OCR en el menú de Buffera de la barra de menús. Reintentar reconocimiento repite los intentos fallidos. Las imágenes ocultas no se reconocen."
+            }
+          ]
+        },
+        {
+          "id": "agent",
+          "title": "El agente no puede acceder al historial",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Inicia la versión actual de Buffera, activa el acceso en Agentes y comprueba la ruta en la configuración del cliente. Reinicia MCP en el agente después de actualizar la app. Los elementos ocultos siempre se devuelven sin contenido."
+            }
+          ]
+        },
+        {
+          "id": "file",
+          "title": "Un archivo del historial no está disponible",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Buffera guarda una referencia al archivo original, no una copia de seguridad. Comprueba si se ha movido o eliminado. Para conservar una imagen permanentemente, usa Guardar como; Mostrar en Finder crea una exportación temporal."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -32,7 +32,7 @@ final class SettingsWindow: NSWindowController {
         settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
                                              mcpAccess: mcpAccess, updateSettings: updateSettings, bundleURL: bundleURL, languageDefaults: languageDefaults,
                                              limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, shortcutDefaults: shortcutDefaults, launchLanguage: launchLanguage)
-        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 620),
+        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 720, height: 680),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
         window.isReleasedWhenClosed = false
@@ -47,10 +47,10 @@ final class SettingsWindow: NSWindowController {
         } else {
             window.center()
         }
-        // Preserve page space when migrating frames from before the support footer.
-        if window.contentLayoutRect.height < 620 {
+        // Preserve room for translated labels and the grouped history settings.
+        if window.contentLayoutRect.width < 720 || window.contentLayoutRect.height < 680 {
             let top = window.frame.maxY
-            window.setContentSize(NSSize(width: 620, height: 620))
+            window.setContentSize(NSSize(width: 720, height: 680))
             let bottom = window.screen?.visibleFrame.minY ?? 0
             window.setFrameOrigin(NSPoint(x: window.frame.minX, y: max(bottom, top - window.frame.height)))
         }
@@ -93,7 +93,6 @@ final class SettingsWindow: NSWindowController {
         settings.refreshShortcuts()
         settings.refreshMCPAccess()
         settings.refreshSecrets()
-        settings.refreshTextFileNaming()
         settings.refreshHistoryReset()
         settings.refreshModels()
         NSApp.activate(ignoringOtherApps: true)
@@ -172,7 +171,6 @@ private final class SettingsContentController: NSViewController {
     private let restartNotice = NSStackView()
     private let sidebar = NSButton(checkboxWithTitle: L10n.text("Показывать боковую панель с фильтрами"), target: nil, action: nil)
     private let count = NSPopUpButton()
-    private let textFileNaming = NSPopUpButton()
     private let bytes = NSSlider()
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
@@ -248,7 +246,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 620))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 720, height: 680))
         let icon = NSImageView(image: BrandIdentity.appIcon(size: 64))
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.setAccessibilityLabel(BrandIdentity.name)
@@ -360,7 +358,7 @@ private final class SettingsContentController: NSViewController {
         let note = paragraph(L10n.text("Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места."))
         let tip = info(symbol: "sidebar.left", title: L10n.text("У каждого вида — своё место"),
                        text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель появляется сразу у выбранного края экрана."))
-        let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» следует предпочитаемым языкам macOS; если русский и английский отсутствуют, используется английский."))
+        let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» выбирает первый поддерживаемый язык из предпочтений macOS; если подходящего нет, используется английский."))
         let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
         restart.bezelStyle = .rounded
         restart.identifier = NSUserInterfaceItemIdentifier("settings.restart")
@@ -374,7 +372,7 @@ private final class SettingsContentController: NSViewController {
         let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
         setupButton.bezelStyle = .inline
         setupButton.identifier = NSUserInterfaceItemIdentifier("settings.showSetup")
-        let setupNote = paragraph(L10n.text("Откроет пошаговый мастер настройки Buffera с текущими параметрами."))
+        let setupNote = paragraph(L10n.text("Откроет тот же мастер настройки, что и при первом запуске Buffera, с вашими текущими параметрами."))
         setupNote.identifier = NSUserInterfaceItemIdentifier("settings.setupNote")
         let setup = vertical([setupButton, setupNote], spacing: 4)
         setupNote.widthAnchor.constraint(equalTo: setup.widthAnchor).isActive = true
@@ -386,24 +384,7 @@ private final class SettingsContentController: NSViewController {
     func refreshSecrets() { secrets.refresh() }
     func refreshHistoryReset() { historyReset.refresh() }
 
-    func refreshTextFileNaming() {
-        textFileNaming.selectItem(at: TextFileNaming.allCases.firstIndex(of: .load(from: limitsDefaults)) ?? 0)
-    }
-
-    @objc private func textFileNamingChanged() {
-        guard TextFileNaming.allCases.indices.contains(textFileNaming.indexOfSelectedItem) else { return }
-        limitsDefaults.set(TextFileNaming.allCases[textFileNaming.indexOfSelectedItem].rawValue,
-                           forKey: TextFileNaming.preferenceKey)
-    }
-
     private func historyPage() -> NSView {
-        configure(textFileNaming, label: L10n.text("Имя текстового файла"), action: #selector(textFileNamingChanged))
-        textFileNaming.identifier = NSUserInterfaceItemIdentifier("settings.textFileNaming")
-        textFileNaming.addItems(withTitles: TextFileNaming.allCases.map(\.title))
-        refreshTextFileNaming()
-        let namingNote = paragraph(L10n.text("Для «Как файл .txt» и «Как файл .md». Если первая строка не подходит для имени, используется время копирования."))
-        let naming = vertical([label(L10n.text("Имя текстового файла")), textFileNaming, namingNote], spacing: 8)
-        namingNote.widthAnchor.constraint(equalTo: naming.widthAnchor).isActive = true
         configure(count, label: L10n.text("Лимит записей"), action: #selector(countLimitChanged))
         count.identifier = NSUserInterfaceItemIdentifier("settings.countLimit")
         bytes.minValue = Double(HistoryLimits.byteRange.lowerBound / HistoryLimits.bytesPerGigabyte)
@@ -425,16 +406,31 @@ private final class SettingsContentController: NSViewController {
         bytes.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         let grid = form([[label(L10n.text("Количество записей")), count], [label(L10n.text("Объём истории")), sizeControl]])
         let note = paragraph(L10n.text("При следующем копировании старые записи сверх лимита будут удалены. Избранное сохраняется и не входит в эти лимиты."))
-        let ocr = info(symbol: "text.viewfinder", title: L10n.text("Текст на картинках тоже находится"),
-                       text: L10n.text("Распознавание работает в фоне на Mac. Русский и английский текст участвуют в обычном поиске; скрытые записи пропускаются."))
         let folder = NSButton(title: L10n.text("Открыть папку данных"), target: self, action: #selector(revealData))
+        folder.identifier = NSUserInterfaceItemIdentifier("settings.revealData")
         folder.bezelStyle = .rounded
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         folder.imagePosition = .imageLeading
         let storage = paragraph(L10n.text("История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится."))
-        let page = vertical([historyReset, naming, secrets, grid, note, ocr, folder, storage], spacing: 14)
-        for child in [historyReset, naming, secrets, grid, note, ocr, storage] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let retention = vertical([label(L10n.text("Хранение записей"), size: 13, weight: .semibold),
+                                  grid, note, folder], spacing: 10)
+        retention.identifier = NSUserInterfaceItemIdentifier("settings.history.storage")
+        for child in [grid, note] { child.widthAnchor.constraint(equalTo: retention.widthAnchor).isActive = true }
+        let privacy = vertical([secrets, storage], spacing: 8)
+        privacy.identifier = NSUserInterfaceItemIdentifier("settings.history.secrets")
+        for child in [secrets, storage] { child.widthAnchor.constraint(equalTo: privacy.widthAnchor).isActive = true }
+        let reopening = vertical([label(L10n.text("При открытии окна"), size: 13, weight: .semibold), historyReset], spacing: 10)
+        reopening.identifier = NSUserInterfaceItemIdentifier("settings.history.reopening")
+        historyReset.widthAnchor.constraint(equalTo: reopening.widthAnchor).isActive = true
+        let page = vertical([retention, separator(), privacy, separator(), reopening], spacing: 14)
+        for child in page.arrangedSubviews { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
+    }
+
+    private func separator() -> NSView {
+        let line = NSBox()
+        line.boxType = .separator
+        return line
     }
 
     private func keyboardPage() -> NSView {

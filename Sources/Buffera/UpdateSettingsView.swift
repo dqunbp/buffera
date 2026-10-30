@@ -8,12 +8,14 @@ final class UpdateSettingsView: NSStackView {
     var onAutomaticChange: ((Bool) -> Void)?
     var onOpenRelease: (() -> Void)?
     var onSkip: (() -> Void)?
+    var onInstall: (() -> Void)?
 
     private let status = SetupUI.text("", size: 17, bold: true)
     private let detail = SetupUI.text("", size: 12)
     private let automatic = NSButton(checkboxWithTitle: L10n.text("Проверять обновления автоматически"), target: nil, action: nil)
     private let checkButton = NSButton(title: L10n.text("Проверить обновления…"), target: nil, action: nil)
     private let openButton = NSButton(title: L10n.text("Открыть релиз"), target: nil, action: nil)
+    private let installButton = NSButton(title: L10n.text("Обновить…"), target: nil, action: nil)
     private let skipButton = NSButton(title: L10n.text("Пропустить эту версию"), target: nil, action: nil)
 
     init() {
@@ -26,6 +28,7 @@ final class UpdateSettingsView: NSStackView {
         automatic.identifier = .init("updates.automatic")
         automatic.target = self; automatic.action = #selector(toggleAutomatic)
         for (button, name, action) in [(checkButton, "check", #selector(checkNow)),
+                                       (installButton, "install", #selector(installRelease)),
                                        (openButton, "open", #selector(openRelease)),
                                        (skipButton, "skip", #selector(skipRelease))] {
             button.identifier = .init("updates.\(name)")
@@ -34,7 +37,7 @@ final class UpdateSettingsView: NSStackView {
         }
         let installed = SetupUI.text(L10n.text("Установлена Buffera \(AppVersion.version) (сборка \(AppVersion.build))."), size: 12)
         installed.textColor = .secondaryLabelColor
-        let actions = NSStackView(views: [openButton, skipButton])
+        let actions = NSStackView(views: [installButton, openButton, skipButton])
         actions.spacing = 10; actions.alignment = .centerY
         let summary = SetupUI.card([installed, status, detail, actions], tinted: true)
         let note = SetupUI.text(L10n.text("Фоновая проверка выполняется не чаще раза в сутки. История буфера не передаётся. Новая версия отмечается двумя красными точками на значке Buffera и пунктом в его меню."), size: 12)
@@ -53,6 +56,7 @@ final class UpdateSettingsView: NSStackView {
         checkButton.isEnabled = !checking
         checkButton.title = checking ? L10n.text("Проверка обновлений…") : L10n.text("Проверить обновления…")
         openButton.isHidden = release == nil
+        installButton.isHidden = release == nil
         skipButton.isHidden = release == nil
         skipButton.isEnabled = !skipped
         skipButton.title = skipped ? L10n.text("Версия пропущена") : L10n.text("Пропустить эту версию")
@@ -60,7 +64,7 @@ final class UpdateSettingsView: NSStackView {
             ?? L10n.text("Обновления Buffera")
         detail.stringValue = release == nil
             ? L10n.text("Проверьте, доступна ли новая версия Buffera.")
-            : L10n.text("Откройте релиз на GitHub, чтобы прочитать об изменениях и скачать DMG. Установка выполняется вручную.")
+            : L10n.text("Нажмите «Обновить…», чтобы скачать и установить новую версию. Buffera перезапустится после подтверждения. После обновления перезапустите подключённый MCP-процесс.")
         if checking {
             if release == nil { status.stringValue = L10n.text("Проверка обновлений…") }
             return
@@ -81,6 +85,14 @@ final class UpdateSettingsView: NSStackView {
     }
 
     func showBrowserError() { detail.stringValue = L10n.text("Не удалось открыть браузер") }
+    func showInstallationError() {
+        detail.stringValue = L10n.text("Не удалось начать обновление. Повторите попытку или откройте релиз для ручной установки.")
+    }
+    func renderInstallation(busy: Bool) {
+        installButton.isEnabled = !busy
+        installButton.title = busy ? L10n.text("Обновление…") : L10n.text("Обновить…")
+    }
+    @objc private func installRelease() { onInstall?() }
     @objc private func checkNow() { onCheck?() }
     @objc private func toggleAutomatic() { onAutomaticChange?(automatic.state == .on) }
     @objc private func openRelease() { onOpenRelease?() }

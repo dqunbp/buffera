@@ -678,9 +678,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             cards.replace(count: 0, selectedIndex: -1)
         }
         updateSelection()
-        status.stringValue = L10n.text("Загружаем историю…")
+        let currentFilter = filter()
+        if currentFilter.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            status.stringValue = L10n.text("Загружаем историю…")
+        } else if searchMode.usesSemanticSearch(for: currentFilter) {
+            status.stringValue = L10n.text("Ищу смыслы…")
+        } else {
+            status.stringValue = L10n.text("Ищу совпадения…")
+        }
         resetSearch.isHidden = search.stringValue.isEmpty && !filters.hasActiveFilters && scope.selectedSegment == 0
-        if loading { request?(filter(), 0, limit) }
+        if loading { request?(currentFilter, 0, limit) }
     }
 
     func close(restoreFocus: Bool = true) {

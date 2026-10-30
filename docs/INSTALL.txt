@@ -3,12 +3,14 @@ Buffera for Mac — Apple Silicon, macOS 14 or later
 1. Open the DMG and drag Buffera into Applications.
 2. Open Buffera from Applications. Its icon appears in the menu bar.
 3. Press Command + Option + V to open your clipboard history.
+4. For future versions, open Settings > Updates > Update… and confirm installation.
+   Restart any connected MCP process after updating.
 
-This first release is ad-hoc signed, without an Apple Developer ID certificate
-or Apple notarization. macOS may block the first launch. If you downloaded
-Buffera from github.com/dqunbp/buffera and want to open it, first try launching
-the app, then open System Settings > Privacy & Security > Open Anyway.
-Apple's instructions: https://support.apple.com/en-us/102445
+Official DMG releases are signed with Developer ID and notarized by Apple.
+Download Buffera from github.com/dqunbp/buffera. macOS may ask you to confirm
+the first launch of an app downloaded from the internet.
+Version 0.4.0 and earlier require this manual installation once to gain the
+in-app updater. Keep your existing history and Keychain items when updating.
 
 The app keeps history locally. Optional AI models are downloaded separately
 when you enable search by meaning or the assistant in Settings.
@@ -21,13 +23,14 @@ Buffera для Mac — Apple Silicon, macOS 14 или новее
 1. Открой DMG и перетащи Buffera в Applications (Программы).
 2. Запусти Buffera из Программ. Значок появится в строке меню.
 3. Нажми Command + Option + V, чтобы открыть историю буфера обмена.
+4. Для следующих версий открой «Настройки → Обновления → Обновить…»
+   и подтверди установку. После обновления перезапусти подключённый MCP-процесс.
 
-Первый выпуск подписан локальной ad-hoc подписью, без сертификата Developer ID
-и нотарификации Apple. macOS может заблокировать первый запуск. Если файл
-скачан из github.com/dqunbp/buffera и ты хочешь его открыть, сначала попробуй
-запустить приложение, затем открой «Системные настройки → Конфиденциальность
-и безопасность» и разреши запуск Buffera кнопкой «Всё равно открыть».
-Инструкция Apple: https://support.apple.com/ru-ru/102445
+Официальные DMG-выпуски подписаны Developer ID и нотарифицированы Apple.
+Скачивай Buffera из github.com/dqunbp/buffera. macOS может запросить
+подтверждение первого запуска приложения, скачанного из интернета.
+Версию 0.4.0 и более ранние нужно один раз обновить вручную, чтобы получить
+установщик обновлений. Сохрани существующую историю и записи Связки ключей.
 
 История хранится локально. Модели для умных функций скачиваются отдельно,
 когда включаешь поиск по смыслу или помощника в настройках.

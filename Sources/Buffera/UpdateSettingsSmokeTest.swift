@@ -3,9 +3,27 @@ import BufferaCore
 import BufferaLocalization
 import BufferaUpdates
 
+@MainActor private final class FixtureUpdateInstaller: UpdateInstalling {
+    var isBusy = false
+    var onChange: (() -> Void)?
+    var onSkip: ((ReleaseUpdate) -> Void)?
+    var requests: [ReleaseUpdate] = []
+    var fail = false
+
+    func install(_ release: ReleaseUpdate) throws {
+        requests.append(release)
+        if fail { throw HistoryError.database("Fixture installation failure") }
+        isBusy = true
+        onChange?()
+    }
+
+    func finish() { isBusy = false; onChange?() }
+}
+
 /// Isolated preferences and transport; never reads clipboard/history or opens a browser.
 @MainActor func runUpdateSettingsSmokeTest() throws {
     NSApplication.shared.setActivationPolicy(.prohibited)
+    try checkUpdateInstallerReleasePin()
     let suite = "Buffera.UpdateUI.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
@@ -21,7 +39,8 @@ import BufferaUpdates
     var failure: UpdateCheckFailure?
     let checker = UpdateChecker(installedVersion: AppVersion.version, supportsRelease: true, defaults: defaults,
                                 fetch: { if let failure { throw failure }; return release })
-    let controller = AppUpdateController(checker: checker)
+    let installer = FixtureUpdateInstaller()
+    let controller = AppUpdateController(checker: checker, installer: installer)
     defer { controller.stop() }
     let statusButton = NSButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     statusButton.image = BrandIdentity.menuBarIcon()
@@ -29,6 +48,7 @@ import BufferaUpdates
     let indicator = UpdateMenuIndicator(button: statusButton)
     let menu = NSMenu()
     menu.addItem(indicator.menuItem)
+    menu.delegate = indicator
     var badge: ReleaseUpdate?
     controller.onIndicatorChange = { badge = $0; indicator.update(release: $0) }
     let settings = SettingsWindow(mcpAccess: MCPAccess(directory: directory), updateSettings: controller.settingsView,
@@ -58,7 +78,7 @@ import BufferaUpdates
         try check(predicate(), "Update controller did not finish the fixture request")
     }
     let tabs = descendants(root).compactMap { $0 as? NSSegmentedControl }.first!
-    try check(tabs.segmentCount == 6 && tabs.label(forSegment: 5) == (L10n.language == "en" ? "Updates" : "Обновления"),
+    try check(tabs.segmentCount == 6 && tabs.label(forSegment: 5) == L10n.text("Обновления"),
               "Updates settings tab is missing or untranslated: language=\(L10n.language), labels=\((0..<tabs.segmentCount).map { tabs.label(forSegment: $0) ?? "" })")
     tabs.selectedSegment = 5
     _ = tabs.sendAction(tabs.action, to: tabs.target)
@@ -67,19 +87,41 @@ import BufferaUpdates
     let detail = try control("detail", NSTextField.self)
     let checkButton = try control("check", NSButton.self)
     let open = try control("open", NSButton.self)
+    let install = try control("install", NSButton.self)
     let skip = try control("skip", NSButton.self)
     let automatic = try control("automatic", NSButton.self)
-    try check(open.isHidden && skip.isHidden && badge == nil && indicator.menuItem.isHidden,
+    try check(open.isHidden && install.isHidden && skip.isHidden && badge == nil && indicator.menuItem.isHidden,
               "Unknown version must not offer an update")
-    try check(checkButton.title == (L10n.language == "en" ? "Check for Updates…" : "Проверить обновления…"),
+    try check(checkButton.title == L10n.text("Проверить обновления…"),
               "Update controls must use the selected language")
     controller.start()
+    try waitFor { badge == release && !checker.isChecking }
+    try check(installer.requests.isEmpty, "Background discovery must never start installation")
+    try check(!install.isHidden && install.title == L10n.text("Обновить…"),
+              "Localized installation action missing")
+    install.performClick(nil)
+    controller.settingsView.onInstall?()
+    try check(installer.requests == [release] && !install.isEnabled,
+              "Installation must target the displayed release and reject duplicate clicks")
+    installer.finish()
+    try check(install.isEnabled, "Cancellation/completion must allow another attempt")
+    installer.fail = true
+    install.performClick(nil)
+    try check(install.isEnabled && !open.isHidden && detail.stringValue == L10n.text("Не удалось начать обновление. Повторите попытку или откройте релиз для ручной установки."),
+              "Start failure must retain retry and manual download")
+    installer.fail = false
+    installer.onSkip?(release)
+    try check(badge == nil && !install.isHidden, "Sparkle skip must reach the shared checker")
+    // Restore the indicator for the existing menu appearance and navigation checks.
+    defaults.removeObject(forKey: "updates.skippedVersion")
+    controller.settingsView.onCheck?()
     try waitFor { badge == release && !checker.isChecking }
     try check(!open.isHidden && !skip.isHidden && status.stringValue.contains("99.0.0"),
               "New release must appear in settings and on the menu-bar icon")
     try check(!indicator.menuItem.isHidden && indicator.menuItem.title ==
-              (L10n.language == "en" ? "Buffera 99.0.0 is available…" : "Доступна Buffera 99.0.0…"),
+              L10n.text("Доступна Buffera \("99.0.0")…"),
               "Available release must show a localized menu entry")
+    try checkUpdateMenuAppearance(indicator, menu: menu)
     for previousPage in [0, 4] {
         tabs.selectedSegment = previousPage
         _ = tabs.sendAction(tabs.action, to: tabs.target)
@@ -95,6 +137,10 @@ import BufferaUpdates
     try check(overlay.hitTest(NSPoint(x: 6, y: 8)) == nil && statusButton.hitTest(NSPoint(x: 12, y: 12)) === statusButton,
               "Dots must not intercept menu-bar clicks")
     skip.performClick(nil)
+    install.performClick(nil)
+    try check(installer.requests.count == 3 && installer.requests.last == release,
+              "A skipped release remains explicitly installable")
+    installer.finish()
     try check(badge == nil && !open.isHidden && !skip.isEnabled && overlay.isHidden && indicator.menuItem.isHidden,
               "Skipping must clear the dots/menu entry and keep the release accessible")
     menu.performActionForItem(at: 0)
@@ -141,6 +187,10 @@ import BufferaUpdates
         try check(left > 0 && right > 0, "Both update dots must be red in light and dark appearances")
     }
     try check(!settings.window!.isVisible, "Update checks must not open a window")
+    controller.stop()
+    let previousRequests = installer.requests.count
+    controller.settingsView.onInstall?()
+    try check(installer.requests.count == previousRequests, "Stopped controller must reject a late installation action")
     if let path = ProcessInfo.processInfo.environment["BUFFERA_UPDATE_PREVIEW_DIR"] {
         let bitmap = root.bitmapImageRepForCachingDisplay(in: root.bounds)!
         root.cacheDisplay(in: root.bounds, to: bitmap)

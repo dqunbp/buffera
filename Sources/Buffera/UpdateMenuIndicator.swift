@@ -3,7 +3,7 @@ import BufferaLocalization
 import BufferaUpdates
 
 /// One release state drives the colored overlay and its matching menu action.
-@MainActor final class UpdateMenuIndicator: NSObject {
+@MainActor final class UpdateMenuIndicator: NSObject, NSMenuDelegate {
     let menuItem = NSMenuItem(title: L10n.text("Обновления"), action: nil, keyEquivalent: "")
     var onOpenSettings: (() -> Void)?
     private weak var button: NSButton?
@@ -22,9 +22,17 @@ import BufferaUpdates
             dots.centerXAnchor.constraint(equalTo: button.centerXAnchor),
             dots.centerYAnchor.constraint(equalTo: button.centerYAnchor)
         ])
-        menuItem.image = BrandIdentity.updateDotsImage()
+        menuItem.image = BrandIdentity.updateMenuIcon()
         menuItem.target = self; menuItem.action = #selector(openSettings)
         update(release: nil)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menuItem.image = BrandIdentity.updateMenuIcon()
+    }
+
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        menuItem.image = BrandIdentity.updateMenuIcon(highlighted: item === menuItem)
     }
 
     func update(release: ReleaseUpdate?) {

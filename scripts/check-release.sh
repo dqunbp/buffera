@@ -8,7 +8,7 @@ REAL_GIT=$(command -v git)
 REAL_TAR=$(command -v tar)
 export REAL_GIT REAL_TAR
 mkdir -p "$CHECK_ROOT/repo/scripts" "$CHECK_ROOT/repo/Sources/BufferaCore" "$CHECK_ROOT/bin"
-cp scripts/{version,create-release}.sh "$CHECK_ROOT/repo/scripts/"
+cp scripts/{version,signing,create-release}.sh "$CHECK_ROOT/repo/scripts/"
 cp Sources/BufferaCore/AppVersion.swift "$CHECK_ROOT/repo/Sources/BufferaCore/"
 cat > "$CHECK_ROOT/bin/git" <<'SH'
 #!/bin/zsh
@@ -59,9 +59,17 @@ else
   exit 9
 fi
 SH
+cat > "$CHECK_ROOT/bin/security" <<'SH'
+#!/bin/zsh
+[[ "$*" == 'find-identity -v -p codesigning' ]] || exit 9
+print "  1) $RELEASE_CHECK_IDENTITY \"Developer ID Application: Fixture (TESTTEAM)\""
+SH
 chmod +x "$CHECK_ROOT/bin/"*
 export PATH="$CHECK_ROOT/bin:$PATH"
 export RELEASE_CHECK_CALL="$CHECK_ROOT/github-call.txt"
+unset BUFFERA_SIGNING_IDENTITY
+export RELEASE_CHECK_IDENTITY=0123456789ABCDEF0123456789ABCDEF01234567
+export BUFFERA_NOTARY_PROFILE=fixture-notary-profile
 cd "$CHECK_ROOT/repo"
 source scripts/version.sh
 export RELEASE_CHECK_TAG="$BUFFERA_TAG"
@@ -72,6 +80,8 @@ cat > scripts/build-app.sh <<'SH'
 set -euo pipefail
 [[ ! -e local-only.txt ]]
 [[ -z "${BUFFERA_BUILD_PATH:-}" ]]
+[[ "$BUFFERA_SIGNING_IDENTITY" == "$RELEASE_CHECK_IDENTITY" ]]
+[[ ! -e output/developer-id/signing-identity.txt ]]
 [[ "$1" == --build-system && "$2" == native && "$3" == --disable-sandbox ]]
 mkdir -p dist
 print 'fixture DMG' > dist/Buffera-macOS-arm64.dmg
@@ -82,11 +92,30 @@ set -euo pipefail
 cd dist
 shasum -a 256 Buffera-macOS-arm64.dmg > SHA256SUMS.txt
 SH
+cat > scripts/create-appcast.sh <<'SH'
+#!/bin/zsh
+set -euo pipefail
+[[ "${RELEASE_CHECK_MODE:-}" != appcast-error ]]
+[[ -f dist/notarized ]]
+print 'fixture signed appcast' > dist/appcast.xml
+(cd dist && shasum -a 256 Buffera-macOS-arm64.dmg appcast.xml > SHA256SUMS.txt)
+SH
+cat > scripts/notarize-release.sh <<'SH'
+#!/bin/zsh
+set -euo pipefail
+[[ "$BUFFERA_NOTARY_PROFILE" == fixture-notary-profile ]]
+[[ "$BUFFERA_NOTARY_LOG_DIR" == */dist/releases/*/notarization ]]
+[[ -f dist/SHA256SUMS.txt ]]
+[[ "${RELEASE_CHECK_MODE:-}" != notarization-error ]]
+touch dist/notarized
+SH
 git init -q
 git add .
 git -c user.name=ReleaseCheck -c user.email=release-check@example.invalid commit -qm fixture
 export RELEASE_CHECK_COMMIT=$(git rev-parse HEAD)
 git -c user.name=ReleaseCheck -c user.email=release-check@example.invalid tag -a "$BUFFERA_TAG" -m fixture
+mkdir -p output/developer-id
+print -r -- "$RELEASE_CHECK_IDENTITY" > output/developer-id/signing-identity.txt
 
 expect_failure() {
   local label="$1"
@@ -97,11 +126,13 @@ expect_failure() {
   [[ ! -e "$RELEASE_CHECK_CALL" ]]
   print "PASS: $label prevents upload"
 }
-for RELEASE_CHECK_MODE in wrong-remote api-error exists archive-error extract-error; do
+for RELEASE_CHECK_MODE in wrong-remote api-error exists archive-error extract-error notarization-error appcast-error; do
   export RELEASE_CHECK_MODE
   expect_failure "$RELEASE_CHECK_MODE"
 done
 unset RELEASE_CHECK_MODE
+BUFFERA_SIGNING_IDENTITY=- expect_failure 'ad-hoc release identity'
+BUFFERA_NOTARY_PROFILE= expect_failure 'missing notarization profile'
 print '// dirty' >> Sources/BufferaCore/AppVersion.swift
 expect_failure 'uncommitted metadata'
 git restore Sources/BufferaCore/AppVersion.swift
@@ -123,9 +154,11 @@ print 'must not enter the release' > local-only.txt
 export BUFFERA_BUILD_PATH=/invalid/caller/build-path
 zsh scripts/create-release.sh --disable-sandbox
 [[ -f "dist/releases/$BUFFERA_TAG/Buffera-macOS-arm64.dmg" ]]
+[[ -f "dist/releases/$BUFFERA_TAG/appcast.xml" ]]
 [[ "$(cat "dist/releases/$BUFFERA_TAG/RELEASE_NOTES.md")" == 'Fixture release notes' ]]
 /usr/bin/grep -Fxq -- --draft "$RELEASE_CHECK_CALL"
 /usr/bin/grep -Fxq -- --verify-tag "$RELEASE_CHECK_CALL"
 /usr/bin/grep -Fxq -- "$BUFFERA_TAG" "$RELEASE_CHECK_CALL"
+/usr/bin/grep -Fxq -- "$PWD/dist/releases/$BUFFERA_TAG/appcast.xml" "$RELEASE_CHECK_CALL"
 (cd "dist/releases/$BUFFERA_TAG" && shasum -a 256 -c SHA256SUMS.txt)
 print 'PASS: archive padding regression, exact tagged sources, isolated build, artifacts and draft-only GitHub call'

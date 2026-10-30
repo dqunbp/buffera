@@ -280,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let searchGeneration = self.searchGeneration
             self.searchTask?.cancel()
             let mode = self.panel.searchMode
-            let usesSemanticSearch = mode != .literal && self.embeddingEnabled == true
+            let usesSemanticSearch = mode.usesSemanticSearch(for: filter) && self.embeddingEnabled == true
             let databaseURL = self.folder.appendingPathComponent("history.sqlite")
             self.searchTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -959,6 +959,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             indicator.onOpenSettings = { [weak self] in self?.openSettings(showUpdates: true) }
             updateMenuIndicator = indicator
             menu.addItem(indicator.menuItem)
+            menu.delegate = indicator
         }
         pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
         menu.addItem(.separator())

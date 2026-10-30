@@ -56,6 +56,8 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
     let update = try GitHubReleaseClient.parse(data: payload(), response: response())!
     check(update.version.description == "0.3.0", "decode released DMG")
     check(update.pageURL.absoluteString == "https://github.com/dqunbp/buffera/releases/tag/v0.3.0", "ignore untrusted release page URL")
+    check(update.appcastURL.absoluteString == "https://github.com/dqunbp/buffera/releases/download/v0.3.0/appcast.xml",
+          "installation feed is pinned to the discovered release, not mutable latest")
     for (data, label) in [(payload(draft: true), "draft"), (payload(prerelease: true), "prerelease"),
                           (payload(asset: false), "missing DMG"), (payload(assetState: "new"), "unfinished upload"),
                           (payload(assetURL: "https://untrusted.example/app.dmg"), "foreign asset URL"),

@@ -42,6 +42,8 @@ final class SecretHistorySettingsView: NSStackView {
         }
         for child in [title, picker, note, retention, status] { addArrangedSubview(child) }
         for label in [note, retention, status] { label.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
+        status.identifier = NSUserInterfaceItemIdentifier("settings.secretHistoryStatus")
+        status.isHidden = true
         refresh()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -57,6 +59,7 @@ final class SecretHistorySettingsView: NSStackView {
         guard let onApply else { refresh(); return }
         applying = true; picker.isEnabled = false
         status.stringValue = L10n.text("Применяем настройку…")
+        status.isHidden = false
         onApply(mode) { [weak self] result in
             guard let self else { return }
             self.applying = false; self.picker.isEnabled = true
@@ -66,6 +69,7 @@ final class SecretHistorySettingsView: NSStackView {
                 self.status.stringValue = ""
             case .failure(let error): self.status.stringValue = error.localizedDescription
             }
+            self.status.isHidden = self.status.stringValue.isEmpty
             self.refresh()
         }
     }

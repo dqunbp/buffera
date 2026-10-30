@@ -10,7 +10,8 @@ let package = Package(
         .executable(name: "BufferaMCP", targets: ["BufferaMCP"])
     ],
     dependencies: [
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1")
     ],
     targets: [
         .target(name: "BufferaLocalization", resources: [.process("Resources")]),
@@ -23,8 +24,9 @@ let package = Package(
         .target(name: "BufferaUpdates"),
         .target(name: "BufferaSearch", dependencies: ["BufferaCore", "BufferaModels", "BufferaLocalization"]),
         .target(name: "BufferaChat", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaLocalization"]),
-        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat", "BufferaLocalization", "BufferaUpdates"],
-                          linkerSettings: [.linkedFramework("Carbon")]),
+        .executableTarget(name: "Buffera", dependencies: ["BufferaCore", "BufferaModels", "BufferaSearch", "BufferaChat", "BufferaLocalization", "BufferaUpdates", .product(name: "Sparkle", package: "Sparkle")],
+                          linkerSettings: [.linkedFramework("Carbon"),
+                                           .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
         .target(name: "BufferaMCPKit", dependencies: [
             "BufferaCore", "BufferaSearch", .product(name: "MCP", package: "swift-sdk")
         ]),

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
-import { loadLocales, renderPage, validateLocale, siteOrigin } from './i18n.mjs';
+import { loadLocales, renderPage, validateLocale, siteOrigin, languages, localeMetadata } from './i18n.mjs';
 
 const locales = await loadLocales();
 const template = await readFile(new URL('../src/index.html', import.meta.url), 'utf8');
@@ -20,7 +20,7 @@ function redirectsFor(navigator, { pathname = '/', search = '', hash = '' } = {}
 }
 
 function assertAlternateUrls(html) {
-  for (const [lang, path] of [['ru', '/ru/'], ['en', '/en/'], ['x-default', '/']]) {
+  for (const [lang, path] of [...languages.map(lang => [lang, `/${lang}/`]), ['x-default', '/']]) {
     assert.ok(html.includes(`<link rel="alternate" hreflang="${lang}" href="${siteOrigin}${path}">`));
   }
 }
@@ -37,7 +37,7 @@ function assertAssetsResolve(html, pageUrl) {
 }
 
 test('explicit language URLs render complete static pages without redirecting', () => {
-  for (const lang of ['ru', 'en']) {
+  for (const lang of languages) {
     const html = renderPage(template, locales[lang], lang);
     const url = `${siteOrigin}/${lang}/`;
     assert.ok(html.includes(`<html lang="${lang}">`));
@@ -45,8 +45,10 @@ test('explicit language URLs render complete static pages without redirecting', 
     assert.ok(html.includes(`<meta property="og:url" content="${url}">`));
     assert.ok(html.includes(`content="${siteOrigin}/og/${lang}.png"`));
     assert.ok(html.includes('name="twitter:card" content="summary_large_image"'));
-    assert.ok(html.includes(`property="og:locale" content="${lang === 'ru' ? 'ru_RU' : 'en_US'}"`));
-    assert.ok(html.includes(`property="og:locale:alternate" content="${lang === 'ru' ? 'en_US' : 'ru_RU'}"`));
+    assert.ok(html.includes(`property="og:locale" content="${localeMetadata[lang].ogLocale}"`));
+    for (const other of languages.filter(value => value !== lang)) {
+      assert.ok(html.includes(`property="og:locale:alternate" content="${localeMetadata[other].ogLocale}"`));
+    }
     assertAlternateUrls(html);
     assertAssetsResolve(html, url);
     assert.ok(html.includes('https://t.me/crypto_and_pug'));
@@ -56,7 +58,7 @@ test('explicit language URLs render complete static pages without redirecting', 
     const runtime = JSON.parse(html.match(/id="locale-data" type="application\/json">([^]*?)<\/script>/)[1]);
     assert.equal(runtime.samples.length, 4);
     assert.equal(runtime.count, locales[lang].runtime.count);
-    if (lang === 'en') assert.doesNotMatch(html, /[А-Яа-яЁё]/);
+    if (lang !== 'ru') assert.doesNotMatch(html, /[А-Яа-яЁё]/);
   }
 });
 
@@ -78,14 +80,37 @@ test('root has complete English fallback content and metadata without JavaScript
 test('root chooses the first supported preferred browser language including regional tags', () => {
   assert.deepEqual(redirectsFor({ languages: ['ru-RU', 'en-US'] }), ['/ru/']);
   assert.deepEqual(redirectsFor({ languages: ['en-GB', 'ru'] }), ['/en/']);
-  assert.deepEqual(redirectsFor({ languages: ['de-DE', 'RU-ru', 'en'] }), ['/ru/']);
-  assert.deepEqual(redirectsFor({ languages: ['fr', 'EN-us', 'ru'] }), ['/en/']);
+  assert.deepEqual(redirectsFor({ languages: ['de-DE', 'RU-ru', 'en'] }), ['/de/']);
+  assert.deepEqual(redirectsFor({ languages: ['fr', 'EN-us', 'ru'] }), ['/fr/']);
+  for (const [tag, expected] of [
+    ['es-MX', 'es'], ['de-AT', 'de'], ['fr-CA', 'fr'], ['pt', 'pt-BR'],
+    ['pt-PT', 'pt-BR'], ['PT_br', 'pt-BR'], ['pt-BR', 'pt-BR'],
+    ['zh', 'zh-Hans'], ['zh-CN', 'zh-Hans'], ['zh-SG', 'zh-Hans'],
+    ['zh-Hans-CN', 'zh-Hans'], ['ZH_hans', 'zh-Hans'], ['ja-JP', 'ja'],
+  ]) {
+    assert.deepEqual(redirectsFor({ languages: [tag, 'en'] }), [`/${expected}/`]);
+  }
+  for (const tag of ['zh-Hant', 'zh-TW', 'zh-HK', 'zh-MO', 'zh-Hant-CN']) {
+    assert.deepEqual(redirectsFor({ languages: [tag, 'ja'] }), ['/ja/']);
+    assert.deepEqual(redirectsFor({ languages: [tag] }), ['/en/']);
+  }
+});
+
+test('every language has its own demo image and a valid social card', async () => {
+  for (const lang of languages) {
+    const demo = await readFile(new URL(`../src/demo-${lang}.svg`, import.meta.url), 'utf8');
+    assert.match(demo, /<svg/);
+    const card = await readFile(new URL(`../src/og/${lang}.png`, import.meta.url));
+    assert.equal(card.toString('hex', 0, 8), '89504e470d0a1a0a');
+    assert.equal(card.readUInt32BE(16), 1200);
+    assert.equal(card.readUInt32BE(20), 630);
+  }
 });
 
 test('root falls back to navigator.language or English when browser preferences are missing or unsupported', () => {
   assert.deepEqual(redirectsFor({ language: 'ru-RU' }), ['/ru/']);
   assert.deepEqual(redirectsFor({ languages: [], language: 'ru' }), ['/ru/']);
-  assert.deepEqual(redirectsFor({ languages: ['de-DE', 'fr'] }), ['/en/']);
+  assert.deepEqual(redirectsFor({ languages: ['hy-AM', 'it'] }), ['/en/']);
   assert.deepEqual(redirectsFor({ languages: [null, 1, '', 'ru'] }), ['/ru/']);
   assert.deepEqual(redirectsFor({}), ['/en/']);
 });
@@ -94,11 +119,11 @@ test('root preserves the complete query string and hash during language selectio
   const search = '?q=%D0%BC%D0%B0%D0%BA&next=%2Fen%2F&tag=a&tag=b';
   const hash = '#features';
   assert.deepEqual(redirectsFor({ languages: ['ru'] }, { search, hash }), [`/ru/${search}${hash}`]);
-  assert.deepEqual(redirectsFor({ languages: ['de'] }, { search, hash }), [`/en/${search}${hash}`]);
+  assert.deepEqual(redirectsFor({ languages: ['de'] }, { search, hash }), [`/de/${search}${hash}`]);
 });
 
 test('the root redirect also guards explicit paths against hosting fallbacks and redirect loops', () => {
-  for (const pathname of ['/ru/', '/en/', '/ru/index.html', '/en/index.html', '/unknown']) {
+  for (const pathname of [...languages.flatMap(lang => [`/${lang}/`, `/${lang}/index.html`]), '/unknown']) {
     assert.deepEqual(redirectsFor({ languages: ['ru'] }, { pathname }), []);
     assert.deepEqual(redirectsFor({ languages: ['en'] }, { pathname }), []);
   }

@@ -7,19 +7,29 @@ import BufferaUpdates
     let settingsView = UpdateSettingsView()
     var onIndicatorChange: ((ReleaseUpdate?) -> Void)?
     private let checker: UpdateChecker
+    private let installer: UpdateInstalling
     private var timer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var running = false
     private var lastOutcome: UpdateCheckOutcome?
 
-    init(checker: UpdateChecker? = nil) {
+    init(checker: UpdateChecker? = nil, installer: UpdateInstalling? = nil) {
         #if arch(arm64)
         let supported = true
         #else
         let supported = false
         #endif
         self.checker = checker ?? UpdateChecker(installedVersion: AppVersion.version, supportsRelease: supported)
+        self.installer = installer ?? UpdateInstaller()
         self.checker.onChange = { [weak self] in self?.refreshInterface() }
+        self.installer.onChange = { [weak self] in self?.refreshInterface() }
+        self.installer.onSkip = { [weak self] release in self?.checker.skip(release) }
+        settingsView.onInstall = { [weak self] in
+            guard let self, self.running, !self.installer.isBusy,
+                  let release = self.checker.availableRelease else { return }
+            do { try self.installer.install(release) }
+            catch { self.settingsView.showInstallationError() }
+        }
         settingsView.onCheck = { [weak self] in self?.check(manual: true) }
         settingsView.onAutomaticChange = { [weak self] enabled in
             guard let self else { return }
@@ -74,6 +84,7 @@ import BufferaUpdates
         settingsView.render(automatic: checker.automaticEnabled, checking: checker.isChecking,
                             release: release, skipped: release != nil && checker.indicatorRelease == nil,
                             outcome: lastOutcome)
+        settingsView.renderInstallation(busy: installer.isBusy)
         onIndicatorChange?(checker.indicatorRelease)
     }
 }

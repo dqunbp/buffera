@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 // Run with a Node.js installation that provides sharp, or pass its package path:
-// SHARP_MODULE=/absolute/path/to/node_modules/sharp node generate.mjs [ru|en]
+// SHARP_MODULE=/absolute/path/to/node_modules/sharp node generate.mjs [locale]
 const require = createRequire(import.meta.url);
 const sharp = require(process.env.SHARP_MODULE || 'sharp');
 const output = fileURLToPath(new URL('.', import.meta.url));
@@ -25,6 +25,36 @@ const copy = {
     descriptionY: 430,
     description: 'Clipboard history for Mac',
     note: 'Search by meaning · Everything stays on your Mac',
+  },
+  es: {
+    lines: ['Buenos búferes.', 'Gran memoria.'], baseline: 270, lineHeight: 90, fontSize: 66, descriptionY: 430,
+    description: 'Historial del portapapeles para Mac',
+    note: 'Búsqueda por significado · Todo se queda en tu Mac',
+  },
+  de: {
+    lines: ['Schöne Puffer.', 'Starkes Gedächtnis.'], baseline: 270, lineHeight: 90, fontSize: 62, descriptionY: 430,
+    description: 'Zwischenablageverlauf für den Mac',
+    note: 'Suche nach Bedeutung · Alles bleibt auf deinem Mac',
+  },
+  fr: {
+    lines: ['Jolies formes.', 'Bonne mémoire.'], baseline: 270, lineHeight: 90, fontSize: 76, descriptionY: 430,
+    description: 'Historique du presse-papiers pour Mac',
+    note: 'Recherche par sens · Tout reste sur votre Mac',
+  },
+  'pt-BR': {
+    lines: ['Belos buffers.', 'Ótima memória.'], baseline: 270, lineHeight: 90, fontSize: 76, descriptionY: 430,
+    description: 'Histórico da área de transferência para Mac',
+    note: 'Busca pelo significado · Tudo fica no seu Mac',
+  },
+  'zh-Hans': {
+    lines: ['好看的剪贴板。', '好用的记忆。'], baseline: 270, lineHeight: 90, fontSize: 76, descriptionY: 430,
+    description: 'Mac 剪贴板历史记录',
+    note: '按含义搜索 · 一切留在你的 Mac 上',
+  },
+  ja: {
+    lines: ['いいバッファ。', 'いい記憶。'], baseline: 270, lineHeight: 90, fontSize: 76, descriptionY: 430,
+    description: 'Mac のクリップボード履歴',
+    note: '意味で検索 · すべて Mac の中に',
   },
 };
 

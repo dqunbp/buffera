@@ -1982,6 +1982,31 @@ details p {
   }
 }
 
+/* Keep translated keyboard captions inside compact tablet layouts too. */
+@media(max-width:620px) {
+  .keyboard-steps {
+    gap:22px;
+    width:100%;
+    justify-content:space-between;
+  }
+  .keyboard-steps kbd {
+    min-width:29px;
+    height:36px;
+    font-size:17px;
+    border-radius:7px;
+  }
+  .keyboard-steps li+li:before {
+    left:-16px;
+    top:10px;
+  }
+  .keyboard-steps li>span {
+    font-size:8px;
+    white-space:normal;
+    max-width:107px;
+    line-height:1.5;
+  }
+}
+
 @media(max-width:480px) {
   .wrap {
     width:calc(100% - 36px);
@@ -2004,6 +2029,10 @@ details p {
   }
   .hero h1 {
     font-size:clamp(43px,14vw,65px);
+  }
+  .hero:lang(zh-Hans) h1,
+  .hero:lang(ja) h1 {
+    font-size:clamp(38px,12vw,58px);
   }
   .hero-description {
     font-size:14px;
@@ -2150,27 +2179,6 @@ details p {
   .keyboard-layout h2 {
     font-size:33px;
     max-width:300px;
-  }
-  .keyboard-steps {
-    gap:22px;
-    width:100%;
-    justify-content:space-between;
-  }
-  .keyboard-steps kbd {
-    min-width:29px;
-    height:36px;
-    font-size:17px;
-    border-radius:7px;
-  }
-  .keyboard-steps li+li:before {
-    left:-16px;
-    top:10px;
-  }
-  .keyboard-steps li>span {
-    font-size:8px;
-    white-space:normal;
-    max-width:107px;
-    line-height:1.5;
   }
   .privacy-section {
     grid-template-columns:1fr;
@@ -2332,9 +2340,9 @@ details p {
 .demo-sidebar { flex:0 0 142px; overflow:auto; padding:6px 4px; border-radius:14px; background:color-mix(in srgb,var(--demo-card) 38%,transparent); scrollbar-width:thin; }
 .demo-sidebar-heading { font-size:10px; font-weight:600; color:var(--demo-muted); margin:12px 8px 5px; }
 #demo-kinds .demo-sidebar-heading { margin-top:3px; }
-.demo-sidebar-row { display:flex; align-items:center; gap:7px; width:100%; height:25px; padding:4px 8px; border:0; border-radius:5px; background:transparent; text-align:left; white-space:nowrap; font-size:11px !important; }
+.demo-sidebar-row { display:flex; align-items:center; gap:7px; width:100%; min-height:25px; padding:4px 8px; border:0; border-radius:5px; background:transparent; text-align:left; white-space:normal; overflow-wrap:anywhere; line-height:1.25; font-size:11px !important; }
 .demo-app-icon { width:16px; height:16px; object-fit:contain; flex:none; }
-.demo-sidebar-row svg { width:13px; height:13px; }
+.demo-sidebar-row svg { width:13px; height:13px; flex:none; }
 .demo-sidebar-row:hover { background:var(--demo-hover); }
 .demo-sidebar-row[aria-pressed="true"] { background:var(--demo-selected); color:var(--demo-accent); }
 .demo-date { display:flex; align-items:center; gap:5px; padding:0 8px; }

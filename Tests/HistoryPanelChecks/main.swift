@@ -91,6 +91,8 @@ final class PanelHarness {
 _ = NSApplication.shared
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
+searchStatusChecks()
+if CommandLine.arguments.contains("--search-status-checks") { exit(0) }
 historyResetChecks()
 loadingPresentationChecks()
 labelChecks()

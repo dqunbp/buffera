@@ -1,10 +1,14 @@
 import Foundation
 import BufferaLocalization
 
-guard L10n.text("Настройки", language: "en") == "Settings",
-      L10n.text("Настройки", language: "ru") == "Настройки",
-      L10n.text("Обновления", language: "en") == "Updates",
-      L10n.text("Обновления", language: "ru") == "Обновления" else {
-    fatalError("Packaged translations did not load")
+let expected = ["en": "Settings", "ru": "Настройки", "es": "Ajustes", "de": "Einstellungen",
+                "fr": "Réglages", "pt-BR": "Ajustes", "zh-Hans": "设置", "ja": "設定"]
+guard Set(expected.keys) == Set(LanguagePreference.supportedLanguages) else {
+    fatalError("Packaged check is missing a supported language")
 }
-print("PASS: packaged RU/EN translations with source checkout access denied")
+for (language, title) in expected {
+    guard L10n.text("Настройки", language: language) == title else {
+        fatalError("Packaged \(language) translations did not load")
+    }
+}
+print("PASS: all packaged translations with source checkout access denied")

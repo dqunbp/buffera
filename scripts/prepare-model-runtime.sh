@@ -3,6 +3,7 @@
 # Requires only Command Line Tools; Metal shaders are embedded in the upstream library.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/signing.sh
 
 if [[ "$(uname -m)" != arm64 ]]; then
   print -u2 "Local models currently require Apple Silicon."
@@ -104,9 +105,9 @@ Model weights are downloaded separately and are not included in this application
 NOTICE
 
 for LIBRARY in "$APP_RUNTIME"/*.dylib; do
-  codesign --force --sign - "$LIBRARY"
+  buffera_sign_code "$LIBRARY" library "local.buffera.app.${LIBRARY:t}"
 done
-codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaModelProbe"
-codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaEmbeddingWorker"
-codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/BufferaChatWorker"
+buffera_sign_code "$APP_BUNDLE/Contents/MacOS/BufferaModelProbe" executable local.buffera.app.model-probe
+buffera_sign_code "$APP_BUNDLE/Contents/MacOS/BufferaEmbeddingWorker" executable local.buffera.app.embedding-worker
+buffera_sign_code "$APP_BUNDLE/Contents/MacOS/BufferaChatWorker" executable local.buffera.app.chat-worker
 print "Prepared local model runtime: $APP_BUNDLE"

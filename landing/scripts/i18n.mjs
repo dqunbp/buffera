@@ -1,7 +1,17 @@
 import { readFile } from 'node:fs/promises';
 import { renderAnalytics } from './analytics.mjs';
 
-export const languages = ['ru', 'en'];
+export const localeMetadata = {
+  ru: { ogLocale: 'ru_RU' },
+  en: { ogLocale: 'en_US' },
+  es: { ogLocale: 'es_ES' },
+  de: { ogLocale: 'de_DE' },
+  fr: { ogLocale: 'fr_FR' },
+  'pt-BR': { ogLocale: 'pt_BR' },
+  'zh-Hans': { ogLocale: 'zh_CN' },
+  ja: { ogLocale: 'ja_JP' },
+};
+export const languages = Object.keys(localeMetadata);
 export const siteOrigin = 'https://buffera.app';
 const src = new URL('../src/', import.meta.url);
 const placeholders = value => [...value.matchAll(/\{([a-zA-Z]\w*)\}/g)].map(match => match[1]).sort();
@@ -55,8 +65,18 @@ function redirectToPreferredLanguage(supported, route = '') {
   const preferences = Array.isArray(navigator.languages) && navigator.languages.length
     ? navigator.languages : [navigator.language];
   const language = preferences
-    .map(value => typeof value === 'string' ? value.toLowerCase().split('-')[0] : '')
-    .find(value => supported.includes(value)) || 'en';
+    .map(value => {
+      if (typeof value !== 'string') return undefined;
+      const tag = value.toLowerCase().replace(/_/g, '-');
+      const parts = tag.split('-');
+      const base = parts[0];
+      // This release includes Simplified Chinese only; retain the user's script preference.
+      if (base === 'zh' && (parts.includes('hant') ||
+          (!parts.includes('hans') && parts.some(part => ['tw', 'hk', 'mo'].includes(part))))) return undefined;
+      return supported.find(candidate => candidate.toLowerCase() === tag) ||
+        supported.find(candidate => candidate.toLowerCase().split('-')[0] === base);
+    })
+    .find(Boolean) || 'en';
   location.replace(`/${language}/${route}${location.search}${location.hash}`);
 }
 
@@ -73,14 +93,18 @@ export function renderPage(template, locale, lang, assetVersion = 'local', { isR
     mcpDocsUrl: `/${lang}/docs/agents/`,
     canonical: `${siteOrigin}/${lang}/${route}`,
     defaultUrl: `${siteOrigin}/${route}`,
-    ruUrl: `${siteOrigin}/ru/${route}`,
-    enUrl: `${siteOrigin}/en/${route}`,
-    ogLocale: lang === 'ru' ? 'ru_RU' : 'en_US',
-    ogAlternate: lang === 'ru' ? 'en_US' : 'ru_RU',
+    ogLocale: localeMetadata[lang].ogLocale,
     ogImage: `${siteOrigin}/og/${lang}.png`,
   };
   return template.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
     if (key === 'analytics') return renderAnalytics({ isRoot });
+    if (key === 'languageAlternates') {
+      return languages.map(other => `<link rel="alternate" hreflang="${other}" href="${siteOrigin}/${other}/${route}">`).join('\n  ');
+    }
+    if (key === 'ogAlternates') {
+      return languages.filter(other => other !== lang)
+        .map(other => `<meta property="og:locale:alternate" content="${localeMetadata[other].ogLocale}">`).join('\n  ');
+    }
     if (Object.hasOwn(fragments, key)) return fragments[key];
     if (key === 'languageRedirect') {
       return isRoot

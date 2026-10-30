@@ -1,7 +1,7 @@
 import Foundation
 import BufferaLocalization
 
-/// Shared by settings and export; naming never changes the file's contents.
+/// Shared by the copy menu and export; naming never changes the file's contents.
 enum TextFileNaming: String, CaseIterable {
     case firstLine, dateTime
 

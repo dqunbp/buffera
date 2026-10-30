@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
-import { loadLocales, renderPage } from './i18n.mjs';
+import { loadLocales, renderPage, languages } from './i18n.mjs';
 import { loadDocs, renderDocs } from './docs.mjs';
 
 const locales = await loadLocales();
@@ -11,7 +11,7 @@ const landingTemplate = await readFile(new URL('../src/index.html', import.meta.
 const docsTemplate = await readFile(new URL('../src/docs.html', import.meta.url), 'utf8');
 
 test('all localized routes include one counter; language redirects only include the noscript fallback', () => {
-  for (const [lang, isRoot] of [['ru', false], ['en', false], ['en', true]]) {
+  for (const [lang, isRoot] of [...languages.map(lang => [lang, false]), ['en', true]]) {
     const pages = [renderPage(landingTemplate, locales[lang], lang, 'test', { isRoot })];
     for (const id of ['', ...docs[lang].articles.map(article => article.id)]) {
       pages.push(renderDocs(docsTemplate, locales[lang], docs[lang], lang, id, 'test', { isRoot }));

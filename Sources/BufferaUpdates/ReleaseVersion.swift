@@ -28,6 +28,9 @@ public struct ReleaseUpdate: Equatable, Sendable {
     public var downloadURL: URL {
         URL(string: "https://github.com/dqunbp/buffera/releases/download/\(tag)/Buffera-macOS-arm64.dmg")!
     }
+    public var appcastURL: URL {
+        URL(string: "https://github.com/dqunbp/buffera/releases/download/\(tag)/appcast.xml")!
+    }
 
     public init?(tag: String) {
         let value = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
