@@ -16,7 +16,6 @@ func runSetupSmokeTest() throws {
     }
     let access = MCPAccess(directory: directory)
     var initial = SetupPreferences(defaults: defaults, mcpEnabled: false, snapshots: [])
-    initial.appearance = HistoryAppearance(mode: .right, columns: 3, visibleRows: 9, sidebarVisible: false)
     initial.limits = HistoryLimits(maxCount: 42_000, maxBytes: 3_500_000_000)
     func check(_ value: @autoclosure () throws -> Bool, _ message: String) throws {
         if try !value() { throw HistoryError.database(message) }
@@ -32,9 +31,21 @@ func runSetupSmokeTest() throws {
                                  bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults)
     let root = controller.window!.contentView!
     func click(_ id: String) throws { try control(root, id, NSButton.self).performClick(nil) }
+    func checkStep(_ expected: SetupStep) throws {
+        try check(controller.step == expected, "Setup must follow the five-step sequence")
+        try check(try control(root, "setup.title", NSTextField.self).stringValue == expected.title &&
+                  control(root, "setup.progress", NSTextField.self).stringValue == L10n.text("Шаг \(expected.rawValue + 1) из \(5)"),
+                  "Setup title and progress must match the current step")
+        let removed = ["setup.mode", "setup.columns", "setup.rows", "setup.sidebar"]
+        try check(!views(root).contains { removed.contains($0.identifier?.rawValue ?? "") },
+                  "History layout controls must not appear in setup")
+    }
     func capture(_ name: String) throws {
         root.wantsLayer = true
         root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        root.layoutSubtreeIfNeeded()
+        // Nested NSBox content sizes settle on the next AppKit layout turn.
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
         root.layoutSubtreeIfNeeded()
         guard let bitmap = root.bitmapImageRepForCachingDisplay(in: root.bounds) else { return }
         root.cacheDisplay(in: root.bounds, to: bitmap)
@@ -51,30 +62,54 @@ func runSetupSmokeTest() throws {
     }
     var copied = ""
     controller.onCopyConfiguration = { copied = $0 }
+    try checkStep(.language)
     try capture("setup-language")
     let language = try control(root, "setup.language", NSPopUpButton.self)
     language.selectItem(at: 2)
     try click("setup.skip")
     try check(controller.draft.language == initial.language, "Skipping must discard page edits")
-    let columns = try control(root, "setup.columns", NSPopUpButton.self)
-    columns.selectItem(at: 3)
-    try click("setup.skip")
-    try check(controller.draft.appearance == initial.appearance, "Skipping must preserve existing appearance")
+    try checkStep(.shortcuts)
+    try click("setup.back")
+    try checkStep(.language)
+    try click("setup.next")
+    try checkStep(.shortcuts)
     try capture("setup-keys")
-    let keyTexts = views(root).compactMap { $0 as? NSTextField }.map(\.stringValue)
+    let keyFields = views(root).compactMap { $0 as? NSTextField }.filter { !$0.isHiddenOrHasHiddenAncestor }
+    for (index, field) in keyFields.enumerated() {
+        let frame = root.convert(field.bounds, from: field)
+        for other in keyFields.dropFirst(index + 1) {
+            try check(!frame.intersects(root.convert(other.bounds, from: other)),
+                      "Shortcut instructions must not overlap")
+        }
+    }
+    let keyTexts = keyFields.map(\.stringValue)
     try check(keyTexts.contains { $0.contains("⌘⌥C") && $0.contains("⌘⌥V") }, "Quick selection must show complete combinations")
     try check(!keyTexts.contains { $0.contains("Esc") || $0.contains("⌘V") }, "No redundant shortcuts in the setup reminder")
     try click("setup.next")
+    try checkStep(.storage)
     try capture("setup-storage")
     try click("setup.next")
     try check(controller.draft.limits == initial.limits, "An untouched storage page must preserve fractional and custom limits")
     try click("setup.back")
+    try control(root, "setup.count", NSPopUpButton.self).selectItem(at: 0)
+    let bytes = try control(root, "setup.bytes", NSSlider.self)
+    bytes.doubleValue = 8
+    _ = bytes.sendAction(bytes.action, to: bytes.target)
+    try click("setup.next")
+    try check(controller.draft.limits != initial.limits, "Storage edits must be retained in the draft")
+    try click("setup.back")
     try click("setup.skip")
     try check(controller.draft.limits == initial.limits, "Skipping storage preserves custom limits")
+    try checkStep(.mcp)
     try capture("setup-mcp")
-    let permission = try control(root, "mcp.enabled", NSButton.self)
-    permission.performClick(nil)
+    try control(root, "mcp.enabled", NSButton.self).performClick(nil)
     try check(controller.draft.mcpEnabled && !access.isEnabled(), "MCP permission must stay staged")
+    try click("setup.skip")
+    try checkStep(.models)
+    try check(controller.draft.mcpEnabled == initial.mcpEnabled, "Skipping MCP must restore the original permission")
+    try click("setup.back")
+    try checkStep(.mcp)
+    try control(root, "mcp.enabled", NSButton.self).performClick(nil)
     for (id, expected, name) in [
         ("mcp.copyClaudeCommand", MCPAccess.addCommand(for: .claudeCode, executableURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app/Contents/MacOS/BufferaMCP")), "Claude Code"),
         ("mcp.copyCodexCommand", MCPAccess.addCommand(for: .codex, executableURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app/Contents/MacOS/BufferaMCP")), "Codex"),
@@ -89,15 +124,35 @@ func runSetupSmokeTest() throws {
     try click("mcp.copyCodexCommand")
     try check(try control(root, "mcp.status", NSTextField.self).textColor == .systemRed, "Failed copy must not report success")
     try click("setup.next")
+    try checkStep(.models)
     try capture("setup-models")
     try control(root, "setup.embedding", NSButton.self).performClick(nil)
     try check(!access.isEnabled() && defaults.persistentDomain(forName: suite)?.isEmpty != false,
               "Walking through setup must not persist settings or permissions")
     try click("setup.next")
-    try check(applied == nil && controller.step == 5, "A failed finish must keep the draft and current page")
+    try check(applied == nil && controller.step == .models, "A failed finish must keep the draft and current page")
     try click("setup.next")
     try check(applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
               "Retry must apply the retained draft")
+
+    let skippedModels = SetupWindow(initial: initial, modelsAvailable: true, access: access)
+    let skippedRoot = skippedModels.window!.contentView!
+    var skippedDraft: SetupPreferences?
+    skippedModels.onFinish = { value, _ in skippedDraft = value }
+    for _ in 0..<4 { try control(skippedRoot, "setup.next", NSButton.self).performClick(nil) }
+    for id in ["embedding", "assistant", "power"] {
+        try control(skippedRoot, "setup." + id, NSButton.self).performClick(nil)
+    }
+    try control(skippedRoot, "setup.back", NSButton.self).performClick(nil)
+    try check(skippedModels.draft.embeddingEnabled && skippedModels.draft.assistantEnabled &&
+              skippedModels.draft.onlyOnExternalPower != initial.onlyOnExternalPower,
+              "Leaving the models page must retain its edits in the draft")
+    try control(skippedRoot, "setup.next", NSButton.self).performClick(nil)
+    try control(skippedRoot, "setup.skip", NSButton.self).performClick(nil)
+    try check(skippedDraft?.embeddingEnabled == initial.embeddingEnabled &&
+              skippedDraft?.assistantEnabled == initial.assistantEnabled &&
+              skippedDraft?.onlyOnExternalPower == initial.onlyOnExternalPower,
+              "Skipping the final step must restore model and power settings before finishing")
 
     let cancelled = SetupWindow(initial: initial, modelsAvailable: false, access: access)
     var skipped = false
@@ -183,5 +238,5 @@ func runSetupSmokeTest() throws {
               "Visible return must restore the original search and selection")
     invokeNearby()
     try check(panel.isShowingNearby && nearbyRequests == 2, "Remembered preference must bypass the next automatic explanation")
-    print("PASS: setup draft, skip, cancel, retry, MCP commands and feedback, nearby explanation; \(activeLanguage)")
+    print("PASS: five-step setup, navigation, draft, skip, cancel, retry, MCP commands and feedback, nearby explanation; \(activeLanguage)")
 }

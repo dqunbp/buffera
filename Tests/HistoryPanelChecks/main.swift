@@ -93,6 +93,7 @@ NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
 searchStatusChecks()
 if CommandLine.arguments.contains("--search-status-checks") { exit(0) }
+menuFocusChecks()
 historyResetChecks()
 loadingPresentationChecks()
 labelChecks()
@@ -470,14 +471,17 @@ func settingsChecks() -> [(Bool, String)] {
         harness.panel.applyAppearance(HistoryAppearance(mode: mode, columns: 2, visibleRows: 5, sidebarVisible: false))
         let targetFrame = harness.panel.window.frame
         harness.panel.open(fromShortcut: true)
+        results.append((harness.panel.window.isVisible, "\(mode) prepared history opens immediately"))
         results.append((harness.panel.window.isVisible && harness.panel.window.frame == targetFrame
                         && !harness.panel.window.permitsOffscreenFrame,
-                        "\(mode) history opens immediately at its final frame"))
+                        "\(mode) loaded history opens at its final frame"))
         harness.panel.close(restoreFocus: false)
         harness.panel.open(fromShortcut: true)
+        results.append((!harness.panel.window.isVisible, "\(mode) reopening during close hides obsolete cards"))
+        harness.panel.receive([fixture(2)], total: 1, offset: 0)
         results.append((harness.panel.window.isVisible && harness.panel.window.frame == targetFrame
                         && !harness.panel.window.permitsOffscreenFrame,
-                        "\(mode) history reopens immediately during close"))
+                        "\(mode) history reopens with fresh cards after interrupting close"))
         let animationDeadline = Date(timeIntervalSinceNow: 0.25)
         while Date() < animationDeadline {
             _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
@@ -798,18 +802,18 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     escaped.panel.receive(deepRows, total: deepRows.count, offset: 0)
     results.append((!escaped.panel.window.isVisible && escaped.confirmations.isEmpty,
                     "a late history result cannot revive an Escape-cancelled presentation"))
+    let preparedCount = escaped.requests.count
     escaped.panel.open()
-    escaped.panel.receive(deepRows, total: deepRows.count, offset: 0)
-    results.append((escaped.panel.selected?.id == 191,
-                    "Escape while reopening history retains the still-pending choice"))
+    results.append((escaped.panel.selected?.id == 191 && escaped.requests.count == preparedCount,
+                    "Escape while reopening retains the choice prepared while closed without a new query"))
 
     let captured = harness()
     captured.panel.move(4)
     escape(captured)
     let hiddenRequests = captured.requests.count
     captured.panel.clipboardDidCapture(id: 1000)
-    results.append((!captured.panel.window.isVisible && captured.requests.count == hiddenRequests,
-                    "an external copy while hidden does not open or query the panel"))
+    results.append((!captured.panel.window.isVisible && captured.requests.count == hiddenRequests + 1,
+                    "an external copy prepares hidden history without opening the panel"))
     captured.panel.open()
     let withNew = [fixture(1000)] + clips
     captured.panel.receive(withNew, total: withNew.count, offset: 0)

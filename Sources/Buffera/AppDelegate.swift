@@ -285,26 +285,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.searchTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 do {
-                    if offset == 0, !filter.query.isEmpty, !isIndexRefresh {
+                    if offset == 0, !filter.query.isEmpty, !isIndexRefresh, !self.panel.isPreparingHiddenHistory {
                         // Wait for a short typing pause before doing inference. Index refreshes
                         // are already coalesced by the panel; literal search stays responsive.
                         let delay: UInt64 = usesSemanticSearch ? 450_000_000 : 120_000_000
                         try await Task.sleep(nanoseconds: delay)
                     }
-                    let response = try await self.searchService.search(databaseURL: databaseURL,
-                        filter: filter, mode: mode, limit: limit, offset: offset)
+                    // The store queue drains prior capture/usage writes before searching its database.
                     let sources: [String]? = refreshSources
                         ? try await self.historySources() : nil
+                    let response = try await self.searchService.search(databaseURL: databaseURL,
+                        filter: filter, mode: mode, limit: limit, offset: offset)
                     try Task.checkCancellation()
-                    guard searchGeneration == self.searchGeneration, self.panel.isPresenting else { return }
+                    guard searchGeneration == self.searchGeneration, self.panel.acceptsHistoryResults else { return }
                     if let sources { self.panel.setSources(sources) }
                     self.panel.updateSearchMode(response.mode, reason: response.fallbackReason)
                     self.panel.receive(response.rows, total: response.total, offset: offset)
                 } catch is CancellationError {
                     return
                 } catch {
-                    guard searchGeneration == self.searchGeneration, self.panel.isPresenting else { return }
-                    self.panel.searchFailed(error); self.showError(error)
+                    guard searchGeneration == self.searchGeneration, self.panel.acceptsHistoryResults else { return }
+                    let reportError = self.panel.isPresenting
+                    self.panel.searchFailed(error)
+                    if reportError { self.showError(error) }
                 }
             }
         }
@@ -607,7 +610,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureSelectionToken += 1
         // Queue usage before closing so an immediate reopen observes the successful copy.
         work.async {
-            do { try self.store.markUsed(id: id) }
+            do {
+                try self.store.markUsed(id: id)
+                DispatchQueue.main.async {
+                    if !self.panel.isPresenting { self.panel.refresh(preservingSelection: true, retainingCards: true) }
+                }
+            }
             catch { DispatchQueue.main.async { self.showError(error) } }
         }
     }
@@ -722,9 +730,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if draft.mcpEnabled != initial.mcpEnabled { try access.setEnabled(draft.mcpEnabled) }
             if draft.language != initial.language { draft.language.save() }
             if draft.theme != initial.theme { draft.theme.save(); draft.theme.apply() }
-            if draft.appearance != initial.appearance {
-                draft.appearance.save(); self.panel.applyAppearance(draft.appearance)
-            }
             if draft.limits != initial.limits { draft.limits.save() }
             if draft.onlyOnExternalPower != initial.onlyOnExternalPower {
                 UserDefaults.standard.set(draft.onlyOnExternalPower, forKey: BackgroundPreparationPolicy.preferenceKey)

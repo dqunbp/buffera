@@ -1,23 +1,67 @@
 import AppKit
 import BufferaLocalization
 
-/// The settings button and menu items share one external destination and action.
+/// Settings and menu actions share external-link handling and browser failure UI.
 final class SupportBuffera: NSObject {
-    static let shared = SupportBuffera()
-    static let url = URL(string: "https://web.tribute.tg/d/SHI")!
-    static var title: String { L10n.text("Поддержать Buffera 💜") }
+    enum Destination {
+        case donation, githubStar
 
-    @objc func openDonationPage(_ sender: Any?) {
-        guard !NSWorkspace.shared.open(Self.url) else { return }
+        var url: URL {
+            switch self {
+            case .donation: URL(string: "https://web.tribute.tg/d/SHI")!
+            case .githubStar: URL(string: "https://github.com/dqunbp/buffera")!
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .donation: L10n.text("Поддержать Buffera 💜")
+            case .githubStar: "☆ " + L10n.text("Поставить звезду на GitHub")
+            }
+        }
+
+        var toolTip: String {
+            switch self {
+            case .donation: L10n.text("Поддержать разработку через Tribute — откроется в браузере")
+            case .githubStar: L10n.text("Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере")
+            }
+        }
+
+        var identifier: String {
+            switch self {
+            case .donation: "settings.support"
+            case .githubStar: "settings.githubStar"
+            }
+        }
+    }
+
+    static let shared = SupportBuffera(destination: .donation)
+    static let githubStar = SupportBuffera(destination: .githubStar)
+    let destination: Destination
+    private let openURL: (URL) -> Bool
+    private let presentAlert: (NSAlert) -> Void
+
+    init(destination: Destination, openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
+         presentAlert: @escaping (NSAlert) -> Void = { alert in
+             NSApp.activate(ignoringOtherApps: true)
+             alert.runModal()
+         }) {
+        self.destination = destination
+        self.openURL = openURL
+        self.presentAlert = presentAlert
+        super.init()
+    }
+
+    @objc func openPage(_ sender: Any?) {
+        guard !openURL(destination.url) else { return }
         let alert = NSAlert()
         alert.messageText = L10n.text("Не удалось открыть браузер")
-        alert.informativeText = L10n.text("Откройте ссылку для поддержки Buffera в браузере: \(Self.url.absoluteString)")
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        alert.informativeText = L10n.text("Откройте ссылку для поддержки Buffera в браузере: \(destination.url.absoluteString)")
+        presentAlert(alert)
     }
 
     static func menuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: #selector(openDonationPage(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: shared.destination.title, action: #selector(openPage(_:)), keyEquivalent: "")
         item.target = shared
         return item
     }
@@ -25,20 +69,22 @@ final class SupportBuffera: NSObject {
 
 /// A quiet secondary action with native button semantics and keyboard focus.
 final class SupportBufferaButton: NSButton {
+    private let support: SupportBuffera
     private var hoverArea: NSTrackingArea?
     private var hovered = false
 
-    init() {
+    init(support: SupportBuffera = .shared) {
+        self.support = support
         super.init(frame: .zero)
-        title = SupportBuffera.title
-        target = SupportBuffera.shared
-        action = #selector(SupportBuffera.openDonationPage(_:))
+        title = support.destination.title
+        target = support
+        action = #selector(SupportBuffera.openPage(_:))
         setButtonType(.momentaryPushIn)
         isBordered = false
         font = .systemFont(ofSize: 11.5, weight: .regular)
         focusRingType = .exterior
-        identifier = NSUserInterfaceItemIdentifier("settings.support")
-        toolTip = L10n.text("Поддержать разработку через Tribute — откроется в браузере")
+        identifier = NSUserInterfaceItemIdentifier(support.destination.identifier)
+        toolTip = support.destination.toolTip
         setAccessibilityLabel(title)
         setContentCompressionResistancePriority(.required, for: .horizontal)
     }

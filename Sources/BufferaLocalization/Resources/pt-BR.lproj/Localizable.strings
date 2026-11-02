@@ -551,6 +551,8 @@
 "Сочетания применяются без перезапуска" = "Os atalhos são aplicados sem reiniciar";
 "Поддержать Buffera 💜" = "Apoiar o Buffera 💜";
 "Поддержать разработку через Tribute — откроется в браузере" = "Apoie o desenvolvimento no Tribute — abre no navegador";
+"Поставить звезду на GitHub" = "Dar uma estrela no GitHub";
+"Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере" = "Gostou do Buffera? Dê uma estrela no GitHub — abre no navegador";
 "Не удалось открыть браузер" = "Não foi possível abrir o navegador";
 "Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Abra este link no navegador para apoiar o Buffera: %1$@";
 "Ключ секретов недоступен. Проверьте доступ Buffera к Связке ключей. Секрет не будет сохранён открытым." = "A chave secreta não está disponível. Verifique o acesso do Buffera às Chaves. O segredo não será armazenado em texto sem criptografia.";
@@ -616,3 +618,8 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "No menu de um item, escolha “Copiar de outra forma” e depois “Como arquivo .txt” ou “Como arquivo .md”. O Buffera cria um arquivo com o texto completo para colar no Finder ou usar como anexo.";
 "Сбрасывать поиск и фильтры" = "Redefinir busca e filtros";
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "Na próxima abertura: busca vazia, todos os itens sem filtros e o primeiro selecionado. Uma janela aberta nunca é redefinida. Os itens salvos não são apagados.";
+
+"Пояснение: %1$@" = "Ajuda: %1$@";
+"Видимых строк: %1$@" = "Linhas visíveis: %1$@";
+"Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "As colunas colocam os cartões lado a lado: uma forma uma lista; várias formam uma grade. Uma janela estreita mostra menos colunas.";
+"Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Menos linhas deixam os cartões mais altos e mostram mais texto. Mais linhas deixam os cartões mais compactos. Em um painel lateral, entradas curtas podem ocupar menos altura.";

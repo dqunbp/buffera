@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buffera — ссылку, конечно</title>
+<script type="importmap">{"imports":{"three":"../wow/node_modules/three/build/three.module.js","three/addons/":"../wow/node_modules/three/examples/jsm/"}}</script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0810}
+body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#film{position:relative;width:1920px;height:1080px;overflow:hidden;color:#fff;background:#0b0810}
+canvas{position:absolute;inset:0;width:1920px;height:1080px;display:block;z-index:0}
+.scene{position:absolute;inset:0;visibility:hidden;pointer-events:none;z-index:1}
+h1,p{margin:0}.title{position:absolute;left:0;top:112px;width:100%;text-align:center;font-size:144px;font-weight:620;line-height:1;letter-spacing:-7px}
+#copy,#result{color:#251d2e}
+.window{position:absolute;background:#fffcff;border:1px solid #dfd4e6;border-radius:24px;overflow:hidden;box-shadow:0 36px 80px -35px #4c2b6055;transform-origin:center}
+#source{left:90px;top:350px;width:610px;height:435px;transform:perspective(1200px) rotateY(6deg) rotateZ(-2deg)}
+.toolbar{height:65px;display:flex;align-items:center;padding:20px 25px;gap:23px;border-bottom:1px solid #ece3f0;background:#f8f3fb}
+.dots{display:flex;gap:8px}.dots i{display:block;width:12px;height:12px;background:#ff695f;border-radius:50%}.dots i:nth-child(2){background:#f6bd39}.dots i:nth-child(3){background:#35c95b}
+.window-label{font-size:24px;color:#9b879f;letter-spacing:-.5px}
+.source-body{padding:37px 32px}.source-body h2{font-size:35px;font-weight:600;letter-spacing:-1.2px;margin:0 0 28px}
+#selection{display:inline-block;font-size:30px;font-weight:500;letter-spacing:-.5px;padding:11px 14px;border-radius:7px;background:#f0e7f8;color:#72458e}
+.lines{margin-top:38px;display:grid;gap:14px}.lines i{height:10px;border-radius:5px;background:#e7deeb;display:block}.lines i:nth-child(2){width:80%}.lines i:nth-child(3){width:64%}
+.key{position:absolute;bottom:98px;left:0;width:100%;text-align:center;font-size:40px;letter-spacing:-1px;color:#b894d0}
+.key span{display:inline-block;border:1px solid #cdb2e63a;border-radius:15px;padding:12px 26px;background:#a678c008}
+#copy .key,#result .key{color:#7d5791}
+#cursor{position:absolute;left:0;top:0;width:48px;height:62px;filter:drop-shadow(0 4px 4px #0004);z-index:3}
+#copy-note{position:absolute;top:840px;left:130px;font-size:29px;letter-spacing:-.5px;color:#9872aa}
+#insert .title{top:35px;font-size:124px}
+#punchline{position:absolute;top:944px;left:0;width:100%;text-align:center;font-size:44px;font-weight:460;letter-spacing:-1.2px;color:#dcc7e9}
+#destination{left:350px;top:375px;width:1220px;height:385px}
+#destination .toolbar{height:94px;gap:32px}
+#address{height:48px;flex:1;background:#eee6f4;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:29px;color:#785583;letter-spacing:-.4px}
+#page-content{height:290px;display:flex;align-items:center;justify-content:center;gap:28px}
+.page-icon{width:80px;height:80px;border-radius:23px;background:#e8d8f3;font-size:52px;text-align:center;line-height:80px;color:#9d65bd}
+.page-title{font-size:53px;font-weight:570;letter-spacing:-2px;color:#33213f}
+#brand .title{top:548px;font-size:158px;letter-spacing:-7px}
+#tagline{position:absolute;top:750px;left:0;width:100%;text-align:center;font-size:45px;letter-spacing:-1.7px;color:#e7cdef}
+#url{position:absolute;top:910px;left:0;width:100%;text-align:center;font-size:44px;letter-spacing:-1px;color:#c58fdb}
+</style>
+<div id="film">
+ <canvas id="stage" width="1920" height="1080"></canvas>
+ <section id="copy" class="scene"><h1 class="title">Скопировал.</h1><div id="source" class="window"><div class="toolbar"><span class="dots"><i></i><i></i><i></i></span><span class="window-label">Браузер</span></div><div class="source-body"><h2>Гайд по интерфейсам</h2><div id="selection">design.example/guide</div><div class="lines"><i></i><i></i><i></i></div></div></div><div class="key"><span>⌘ C</span></div><p id="copy-note">Сохранено.</p></section>
+ <section id="find" class="scene"><h1 class="title">Нашёл.</h1><div class="key"><span>⌘ ⌥ V</span></div></section>
+ <section id="insert" class="scene"><h1 class="title">И вставил.</h1><p id="punchline">Ссылку, конечно.</p></section>
+ <section id="result" class="scene"><h1 class="title">Ссылка на месте.</h1><div id="destination" class="window"><div class="toolbar"><span class="dots"><i></i><i></i><i></i></span><div id="address"></div></div><div id="page-content"><span class="page-icon">↗</span><span class="page-title">Та самая страница.</span></div></div><div class="key"><span>⌘ V</span></div></section>
+ <section id="brand" class="scene"><h1 class="title">Buffera</h1><p id="tagline">Хорошие буфера. Всё помнят.</p><p id="url">buffera.app</p></section>
+ <svg id="cursor" viewBox="0 0 45 58"><path d="M7 3L38 33L23 35L17 50Z" fill="#fff" stroke="#3f2949" stroke-width="2.5" stroke-linejoin="round"/></svg>
+</div>
+<script type="module">
+import {createStage} from './stage.mjs';
+import {DURATION,shotAt} from './timeline.mjs';
+const $=s=>document.querySelector(s),clamp=x=>Math.max(0,Math.min(1,x));
+const ease=x=>1-(1-clamp(x))**3,mix=(a,b,p)=>a+(b-a)*p;
+function show(selector,alpha,transform=''){const el=$(selector);el.style.opacity=clamp(alpha);el.style.transform=transform}
+window.__ready=(async()=>{
+ const stage=await createStage($('#stage'));
+ window.setFrame=t=>{
+  stage.render(t);const shot=shotAt(t),s=shot.local;
+  for(const el of document.querySelectorAll('.scene'))el.style.visibility=el.id===shot.id?'visible':'hidden';
+  show('#cursor',0);
+  show('#'+shot.id+' .title',ease((s+.12)/.32),`translateY(${mix(16,0,ease(s/.38))}px)`);
+  if(shot.id==='copy'){
+   $('#selection').style.background=s>.55?'#dfc5ef':'#f0e7f8';
+   const p=ease((s-.1)/.5);
+   show('#cursor',ease(s/.15)*(1-ease((s-.9)/.35)),`translate(${mix(660,430,p)}px,${mix(790,549,p)}px) scale(${s>.62&&s<.8?.86:1})`);
+   show('#copy-note',ease((s-1.3)/.4));
+  }
+  if(shot.id==='find')$('#find .key span').textContent=s>1.05?'↵':'⌘ ⌥ V';
+  if(shot.id==='insert')show('#punchline',ease((t-9.45)/.42),`translateY(${mix(12,0,ease((t-9.45)/.42))}px)`);
+  if(shot.id==='result'){
+   const p=ease(s/.45);
+   show('#destination',1,`perspective(1600px) translateY(${mix(50,0,p)}px) rotateX(${mix(8,0,p)}deg)`);
+   $('#address').textContent=t>=11.2?'design.example/guide':'';
+   show('#page-content',ease((s-.5)/.35));
+  }
+  if(shot.id==='brand'){show('#tagline',ease((s-.2)/.4));show('#url',ease((s-.5)/.4))}
+ };
+ window.inspectFrame=t=>{window.setFrame(t);return stage.inspect?.()??null};
+ window.setFrame(0);return true;
+})();
+if(new URLSearchParams(location.search).has('play')){
+ await window.__ready;const start=performance.now();
+ const tick=now=>{window.setFrame(((now-start)/1000)%DURATION);requestAnimationFrame(tick)};requestAnimationFrame(tick);
+}
+</script>
+</html>

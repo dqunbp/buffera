@@ -551,6 +551,8 @@
 "Сочетания применяются без перезапуска" = "Kurzbefehle gelten ohne Neustart";
 "Поддержать Buffera 💜" = "Buffera unterstützen 💜";
 "Поддержать разработку через Tribute — откроется в браузере" = "Entwicklung auf Tribute unterstützen — öffnet sich im Browser";
+"Поставить звезду на GitHub" = "Auf GitHub einen Stern geben";
+"Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере" = "Gefällt dir Buffera? Gib dem Projekt einen Stern auf GitHub — öffnet sich im Browser";
 "Не удалось открыть браузер" = "Dein Browser konnte nicht geöffnet werden";
 "Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Öffne diesen Link in deinem Browser, um Buffera zu unterstützen: %1$@";
 "Ключ секретов недоступен. Проверьте доступ Buffera к Связке ключей. Секрет не будет сохранён открытым." = "Der geheime Schlüssel ist nicht verfügbar. Prüfe den Zugriff von Buffera auf den Schlüsselbund. Der vertrauliche Inhalt wird nicht im Klartext gespeichert.";
@@ -616,3 +618,8 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "Wähle im Menü eines Eintrags „Anders kopieren“ und dann „Als .txt-Datei“ oder „Als .md-Datei“. Buffera erstellt eine Datei mit dem vollständigen Text zum Einfügen im Finder oder zur Verwendung als Anhang.";
 "Сбрасывать поиск и фильтры" = "Suche und Filter zurücksetzen";
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "Beim nächsten Öffnen: leere Suche, alle Einträge ohne Filter und der erste Eintrag ausgewählt. Ein geöffnetes Fenster wird nie zurückgesetzt. Gespeicherte Einträge werden nicht gelöscht.";
+
+"Пояснение: %1$@" = "Hilfe: %1$@";
+"Видимых строк: %1$@" = "Sichtbare Zeilen: %1$@";
+"Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Spalten ordnen Karten nebeneinander an: Eine ergibt eine Liste, mehrere ein Raster. In einem schmalen Fenster werden weniger Spalten angezeigt.";
+"Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Weniger Zeilen machen die Karten höher und zeigen mehr Text. Mehr Zeilen machen die Karten kompakter. Kurze Einträge können in einer Seitenleiste weniger Höhe beanspruchen.";

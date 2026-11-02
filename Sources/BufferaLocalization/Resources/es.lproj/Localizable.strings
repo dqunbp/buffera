@@ -551,6 +551,8 @@
 "Сочетания применяются без перезапуска" = "Los atajos se aplican sin reiniciar";
 "Поддержать Buffera 💜" = "Apoyar a Buffera 💜";
 "Поддержать разработку через Tribute — откроется в браузере" = "Apoya el desarrollo en Tribute — se abre en el navegador";
+"Поставить звезду на GitHub" = "Dar una estrella en GitHub";
+"Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере" = "¿Te gusta Buffera? Dale una estrella en GitHub — se abre en el navegador";
 "Не удалось открыть браузер" = "No se pudo abrir el navegador";
 "Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Abre este enlace en el navegador para apoyar a Buffera: %1$@";
 "Ключ секретов недоступен. Проверьте доступ Buffera к Связке ключей. Секрет не будет сохранён открытым." = "La clave secreta no está disponible. Comprueba el acceso de Buffera al Llavero. El secreto no se guardará en texto sin cifrar.";
@@ -616,3 +618,8 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "En el menú de un elemento, elige «Copiar de otra forma» y luego «Como archivo .txt» o «Como archivo .md». Buffera crea un archivo con el texto completo para pegarlo en Finder o usarlo como adjunto.";
 "Сбрасывать поиск и фильтры" = "Restablecer búsqueda y filtros";
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "Al volver a abrir: búsqueda vacía, todos los elementos sin filtros y el primero seleccionado. Una ventana abierta nunca se restablece. Los elementos guardados no se eliminan.";
+
+"Пояснение: %1$@" = "Ayuda: %1$@";
+"Видимых строк: %1$@" = "Filas visibles: %1$@";
+"Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Las columnas colocan las tarjetas una al lado de otra: una forma una lista y varias, una cuadrícula. Si la ventana es estrecha, se mostrarán menos columnas.";
+"Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Con menos filas, las tarjetas son más altas y muestran más texto. Con más filas, son más compactas. En un panel lateral, las entradas cortas pueden ocupar menos altura.";

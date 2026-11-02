@@ -559,6 +559,8 @@
 /* Voluntary support */
 "Поддержать Buffera 💜" = "Support Buffera 💜";
 "Поддержать разработку через Tribute — откроется в браузере" = "Support development on Tribute — opens in your browser";
+"Поставить звезду на GitHub" = "Star on GitHub";
+"Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере" = "Enjoying Buffera? Give it a star on GitHub — opens in your browser";
 "Не удалось открыть браузер" = "Could not open your browser";
 "Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Open this link in your browser to support Buffera: %1$@";
 
@@ -637,3 +639,8 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "In an entry’s menu, choose “Copy Differently”, then “As .txt file” or “As .md file”. Buffera creates a file with the full text to paste into Finder or use as an attachment.";
 "Сбрасывать поиск и фильтры" = "Reset search and filters";
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "On the next opening: an empty search, all entries without filters, and the first entry selected. An open window is never reset. Saved entries are not deleted.";
+
+"Пояснение: %1$@" = "Help: %1$@";
+"Видимых строк: %1$@" = "Visible rows: %1$@";
+"Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Columns place cards side by side: one creates a list, several create a grid. A narrow window will show fewer columns.";
+"Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Fewer rows make cards taller and show more text. More rows make cards more compact. Short entries in a side panel can take up less height.";

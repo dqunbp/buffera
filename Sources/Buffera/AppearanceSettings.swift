@@ -255,10 +255,14 @@ private final class SettingsContentController: NSViewController {
         let name = label(BrandIdentity.name, size: 25, weight: .bold)
         let tagline = label(L10n.text("Держит всё, что ты копируешь."), size: 12, color: .secondaryLabelColor)
         let identity = vertical([name, tagline], spacing: 3)
+        identity.identifier = NSUserInterfaceItemIdentifier("settings.identity")
         let header = NSStackView(views: [icon, identity])
         header.orientation = .horizontal; header.spacing = 14; header.alignment = .centerY
         header.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(header)
+        let githubStar = SupportBufferaButton(support: .githubStar)
+        githubStar.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(githubStar)
 
         tabs.selectedSegment = 0
         tabs.segmentStyle = .rounded
@@ -284,6 +288,9 @@ private final class SettingsContentController: NSViewController {
         NSLayoutConstraint.activate([
             header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
             header.topAnchor.constraint(equalTo: root.topAnchor, constant: 21),
+            githubStar.leadingAnchor.constraint(greaterThanOrEqualTo: header.trailingAnchor, constant: 20),
+            githubStar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
+            githubStar.centerYAnchor.constraint(equalTo: header.centerYAnchor),
             tabs.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             tabs.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 20),
             body.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
@@ -349,15 +356,12 @@ private final class SettingsContentController: NSViewController {
         sidebar.target = self; sidebar.action = #selector(appearanceChanged)
         sidebar.font = .systemFont(ofSize: 12)
         let grid = form([
-            [label(L10n.text("Тема")), theme],
-            [label(L10n.text("Расположение")), mode],
-            [label(L10n.text("Карточки")), columns],
-            [label(L10n.text("Видимых строк")), rows],
-            [label(L10n.text("Язык")), language]
+            [label(L10n.text("Тема")), theme, NSView()],
+            [label(L10n.text("Расположение")), mode, AppearanceHelpButton(topic: .placement)],
+            [label(L10n.text("Карточки")), columns, AppearanceHelpButton(topic: .columns)],
+            [label(L10n.text("Видимых строк")), rows, AppearanceHelpButton(topic: .rows)],
+            [label(L10n.text("Язык")), language, NSView()]
         ])
-        let note = paragraph(L10n.text("Одна колонка — список, несколько — сетка. Число строк задаёт высоту карточек. В боковой панели это максимальная высота: короткие записи занимают меньше места."))
-        let tip = info(symbol: "sidebar.left", title: L10n.text("У каждого вида — своё место"),
-                       text: L10n.text("Обычное окно можно перемещать и менять в размере. Боковая панель появляется сразу у выбранного края экрана."))
         let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» выбирает первый поддерживаемый язык из предпочтений macOS; если подходящего нет, используется английский."))
         let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
         restart.bezelStyle = .rounded
@@ -376,8 +380,8 @@ private final class SettingsContentController: NSViewController {
         setupNote.identifier = NSUserInterfaceItemIdentifier("settings.setupNote")
         let setup = vertical([setupButton, setupNote], spacing: 4)
         setupNote.widthAnchor.constraint(equalTo: setup.widthAnchor).isActive = true
-        let page = vertical([grid, languageNote, restartNotice, sidebar, note, tip, setup], spacing: 12)
-        for child in [grid, languageNote, note, tip, setup] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let page = vertical([grid, languageNote, restartNotice, sidebar, setup], spacing: 12)
+        for child in [grid, languageNote, setup] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
     }
 
@@ -499,31 +503,6 @@ private final class SettingsContentController: NSViewController {
         grid.column(at: 0).xPlacement = .leading
         grid.column(at: 1).xPlacement = .trailing
         return grid
-    }
-
-    private func info(symbol: String, title: String, text: String) -> NSView {
-        let box = NSBox()
-        box.boxType = .custom; box.borderWidth = 0
-        box.fillColor = .controlBackgroundColor
-        box.cornerRadius = 12
-        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
-        icon.contentTintColor = .systemPurple
-        icon.widthAnchor.constraint(equalToConstant: 22).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 22).isActive = true
-        let copy = vertical([label(title, size: 12, weight: .semibold), paragraph(text)], spacing: 5)
-        let row = NSStackView(views: [icon, copy])
-        row.orientation = .horizontal; row.spacing = 12; row.alignment = .top
-        row.translatesAutoresizingMaskIntoConstraints = false
-        box.contentView?.addSubview(row)
-        if let content = box.contentView {
-            NSLayoutConstraint.activate([
-                row.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 14),
-                row.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -14),
-                row.topAnchor.constraint(equalTo: content.topAnchor, constant: 13),
-                row.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -13)
-            ])
-        }
-        return box
     }
 
     private func label(_ text: String, size: CGFloat = 12, weight: NSFont.Weight = .regular,

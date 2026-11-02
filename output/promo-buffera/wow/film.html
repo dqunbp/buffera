@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buffera — скопировал, нашёл, вернул</title>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08070b}
+body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#film{position:relative;width:1920px;height:1080px;overflow:hidden;color:#fff;background:#08070b}
+canvas{position:absolute;inset:0;width:1920px;height:1080px;display:block}
+.shot{position:absolute;inset:0;visibility:hidden;pointer-events:none}
+h1,p{margin:0}.title{position:absolute;left:0;top:100px;width:100%;text-align:center;font-size:110px;font-weight:650;line-height:1;letter-spacing:-5px}
+.key{position:absolute;bottom:90px;left:0;width:100%;text-align:center;font-size:48px;font-weight:500;letter-spacing:-1px;color:#d3b0ff}
+.key span{padding:14px 28px;border:1px solid #ffffff26;border-radius:18px;background:#ffffff0a;backdrop-filter:blur(20px)}
+#copy2 .key{color:#6f45a2}#copy2 .key span{border-color:#2d16472b;background:#fff9}
+#copy2,#paste-link,#extract,#paste-address{color:#151019}
+#paste-link .title,#paste-address .title{top:120px;font-size:135px}
+.browser{position:absolute;left:280px;top:372px;width:1360px;height:390px;background:#fefeff;border:1px solid #d9d3e2;border-radius:30px;box-shadow:0 50px 90px -50px #39205255;overflow:hidden;transform-origin:50% 60%}
+.toolbar{height:108px;display:flex;align-items:center;padding:28px;gap:32px;border-bottom:1px solid #ebe5f0;background:#f9f7fc}
+.dots{display:flex;gap:10px}.dots i{display:block;width:15px;height:15px;background:#ff6259;border-radius:50%}.dots i:nth-child(2){background:#ffbd2e}.dots i:nth-child(3){background:#28c840}
+.address{height:54px;width:980px;background:#eeebf3;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;letter-spacing:-.3px;color:#5d5368}
+.page-preview{position:relative;height:282px;display:flex;align-items:center;justify-content:center;gap:32px}
+.page-symbol{width:82px;height:82px;border-radius:23px;background:#ede1ff;color:#8b4ad1;text-align:center;line-height:82px;font-size:52px}
+.page-name{font-size:56px;font-weight:600;letter-spacing:-2px;color:#272031}
+#paste-link .key,#paste-address .key{bottom:102px;color:#76549b}
+#paste-link .key span,#paste-address .key span{border-color:#2d164724;background:#fff9}
+#extract .title{top:95px}
+#extract-action{position:absolute;bottom:87px;left:0;width:100%;text-align:center;font-size:32px;letter-spacing:-.5px;color:#6b487f}
+#extract-action span{display:inline-block;padding:17px 29px;background:#fff;border:1px solid #dccbe9;border-radius:15px;box-shadow:0 8px 20px #4f226519}
+.route{position:absolute;left:410px;top:360px;width:1100px;height:370px;border-radius:30px;background:#fff;border:1px solid #d8d1df;box-shadow:0 45px 90px -42px #47255944;padding:48px 50px}
+.route-name{font-size:26px;font-weight:530;color:#8c8293;letter-spacing:-.4px;margin-bottom:22px}
+.route-field{height:130px;display:flex;align-items:center;gap:30px;border-radius:19px;background:#f1eaf8;padding:28px;color:#3c244f;font-size:54px;font-weight:550;letter-spacing:-1.8px}
+.pin{width:36px;height:36px;border:9px solid #9760ce;border-radius:50%;position:relative;flex:none}
+.pin:after{content:"";position:absolute;width:12px;height:12px;background:#9760ce;left:3px;top:24px;transform:rotate(45deg)}
+.route-start{font-size:25px;margin-top:23px;color:#81718d}
+#end .title{top:545px;font-size:165px;letter-spacing:-8px}
+#tagline{position:absolute;top:748px;left:0;width:100%;text-align:center;font-size:45px;font-weight:480;letter-spacing:-1.8px;color:#e7ddf0}
+#url{position:absolute;top:910px;left:0;width:100%;text-align:center;font-size:45px;font-weight:530;letter-spacing:-1px;color:#cda0ff}
+</style>
+<div id="film">
+ <canvas id="stage" width="1920" height="1080"></canvas>
+ <section id="copy1" class="shot"><h1 class="title">Скопировал ссылку.</h1><div class="key"><span>⌘ C</span></div></section>
+ <section id="copy2" class="shot"><h1 class="title">Потом ещё кое-что.</h1><div class="key"><span>⌘ C</span></div></section>
+ <section id="history" class="shot"><h1 class="title">Вернул из истории.</h1><div class="key"><span>⌘ ⌥ V</span></div></section>
+ <section id="paste-link" class="shot"><h1 class="title">И вставил.</h1><div class="browser"><div class="toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="address"></div></div><div class="page-preview"><div class="page-symbol">↗</div><div class="page-name">Та самая страница.</div></div></div><div class="key"><span>⌘ V</span></div></section>
+ <section id="screenshot" class="shot"><h1 class="title">Адрес на скриншоте?</h1></section>
+ <section id="extract" class="shot"><h1 class="title">Забрал текст.</h1><div id="extract-action"><span>Текст с картинки</span></div></section>
+ <section id="paste-address" class="shot"><h1 class="title">Вставил в маршрут.</h1><div class="route"><div class="route-name">Куда едем?</div><div class="route-field"><div class="pin"></div><span id="route-value"></span></div><div class="route-start">Моё местоположение →</div></div><div class="key"><span>⌘ V</span></div></section>
+ <section id="end" class="shot"><h1 class="title">Buffera</h1><p id="tagline">Хорошие буфера. Всё помнят.</p><p id="url">buffera.app</p></section>
+</div>
+<script type="module">
+import {createStage} from './stage.mjs';
+import {createContext} from './context.mjs';
+import {DURATION,shotAt} from './timeline.mjs';
+const $=s=>document.querySelector(s),clamp=x=>Math.max(0,Math.min(1,x));
+const ease=x=>1-Math.pow(1-clamp(x),4),mix=(a,b,t)=>a+(b-a)*t;
+const allShots=[...document.querySelectorAll('.shot')];
+function show(selector,alpha,transform=''){const el=$(selector);el.style.opacity=clamp(alpha);el.style.transform=transform}
+window.__ready=(async()=>{
+ const stage=await createStage($('#stage'));
+ const context=createContext($('#film'));
+ window.setFrame=t=>{
+  stage.render(t);
+  const state=shotAt(t),s=state.local,shot=state.id;
+  context.render(state);
+  for(const el of allShots)el.style.visibility=el.id===shot?'visible':'hidden';
+  show('#'+shot+' .title',1,`translateY(${mix(22,0,ease(s/.2))}px)`);
+  if(shot==='history')$('#history .key span').textContent=s>1.18?'↵':'⌘ ⌥ V';
+  if(shot==='paste-link'){
+   const p=ease(s/.28);show('.browser',1,`perspective(1300px) translateY(${mix(180,0,p)}px) rotateX(${mix(20,0,p)}deg) scale(${mix(.85,1,p)})`);
+   $('.address').textContent=s>.22?'design.example/guide':'';
+   show('.page-preview',ease((s-.25)/.16));
+  }
+  if(shot==='paste-address'){
+   const p=ease(s/.28);show('.route',1,`perspective(1200px) translateY(${mix(90,0,p)}px) rotateX(${mix(14,0,p)}deg) scale(${mix(.9,1,p)})`);
+   $('#route-value').textContent=s>.22?'Улица Примеров, 12':'';
+  }
+  if(shot==='end'){show('#tagline',ease((s-.1)/.18));show('#url',ease((s-.2)/.18))}
+ };
+ window.inspectFrame=t=>{window.setFrame(t);return stage.inspect()};
+ window.setFrame(0);return true;
+})();
+if(new URLSearchParams(location.search).has('play')){
+ await window.__ready;const start=performance.now();
+ const tick=now=>{window.setFrame(((now-start)/1000)%DURATION);requestAnimationFrame(tick)};requestAnimationFrame(tick);
+}
+</script>
+</html>

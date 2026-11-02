@@ -31,6 +31,28 @@ func runLocalizationSmokeTest() throws {
     guard let window = controller.window, let content = window.contentView else {
         throw HistoryError.database("Settings window missing")
     }
+    try checkSupportLinks()
+    guard let githubStar = descendants(content).first(where: { $0.identifier?.rawValue == "settings.githubStar" }) as? NSButton,
+          let identity = descendants(content).first(where: { $0.identifier?.rawValue == "settings.identity" }),
+          let donation = descendants(content).first(where: { $0.identifier?.rawValue == "settings.support" }) as? NSButton else {
+        throw HistoryError.database("Settings support actions missing")
+    }
+    try check(githubStar.target === SupportBuffera.githubStar && donation.target === SupportBuffera.shared &&
+              githubStar.action == #selector(SupportBuffera.openPage(_:)) && donation.action == githubStar.action,
+              "Settings support actions must use their respective destinations")
+    func checkStarLayout() throws {
+        content.layoutSubtreeIfNeeded()
+        let frame = content.convert(githubStar.bounds, from: githubStar)
+        let identityFrame = content.convert(identity.bounds, from: identity)
+        try check(!githubStar.isHiddenOrHasHiddenAncestor && content.bounds.contains(frame) &&
+                  frame.minX >= identityFrame.maxX + 19 &&
+                  githubStar.bounds.width >= githubStar.intrinsicContentSize.width - 1,
+                  "GitHub CTA must remain visible without clipping or overlapping the settings identity")
+        for field in descendants(identity).compactMap({ $0 as? NSTextField }) {
+            try check(field.bounds.width >= field.intrinsicContentSize.width - 1,
+                      "GitHub CTA must not compress the app name or tagline")
+        }
+    }
     InterfaceTheme.system.apply()
     content.layoutSubtreeIfNeeded()
     guard let language = descendants(content).first(where: {
@@ -56,6 +78,7 @@ func runLocalizationSmokeTest() throws {
         try check(theme.sendAction(theme.action, to: theme.target), "Theme action disconnected")
         try check(InterfaceTheme.load(from: defaults) == preference, "Theme choice did not persist")
         try check(NSApp.appearance?.name == expectedAppearances[index], "Theme must apply immediately to the application")
+        try checkStarLayout()
         try check(notice.isHidden, "Changing theme must not request a restart")
         let reopened = makeSettings()
         let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "settings.theme" } as? NSPopUpButton
@@ -115,6 +138,7 @@ func runLocalizationSmokeTest() throws {
     let expectedTitle = L10n.text("Настройки \("Buffera")")
     try check(window.title == expectedTitle, "Window title is not translated")
     try check(!window.isVisible, "Smoke check must not open a window")
+    try runAppearanceHelpSmokeTest(content)
     for view in descendants(content) where !view.isHiddenOrHasHiddenAncestor && view is NSControl {
         let frame = content.convert(view.bounds, from: view)
         try check(content.bounds.insetBy(dx: -1, dy: -1).contains(frame), "Settings control lies outside the window")
@@ -135,6 +159,7 @@ func runLocalizationSmokeTest() throws {
         _ = tabs.sendAction(tabs.action, to: tabs.target)
         try check(!descendants(content).contains(where: { $0 === setup }),
                   "Setup action must only appear on the appearance page")
+        try checkStarLayout()
     }
     tabs.selectedSegment = 0
     _ = tabs.sendAction(tabs.action, to: tabs.target)
@@ -308,5 +333,36 @@ func runLocalizationSmokeTest() throws {
         // Native text fields may extend two points beyond their alignment rectangle.
         try check(container.bounds.insetBy(dx: -3, dy: -3).contains(frame), "History control \(view.identifier?.rawValue ?? String(describing: type(of: view))) \(frame) lies outside \(container.bounds)")
     }
-    print("PASS: \(activeLanguage) settings theme and language selection, persistence, restart action, history groups, file naming menu, size slider and layout")
+    print("PASS: \(activeLanguage) settings theme and language selection, appearance help, persistence, restart action, GitHub/support links, history groups, file naming menu, size slider and layout")
+}
+
+/// Exercise native button actions without opening a browser or showing an alert.
+private func checkSupportLinks() throws {
+    for (destination, expectedURL) in [
+        (SupportBuffera.Destination.githubStar, "https://github.com/dqunbp/buffera"),
+        (.donation, "https://web.tribute.tg/d/SHI")
+    ] {
+        var requests: [URL] = []
+        var alerts: [NSAlert] = []
+        var canOpen = true
+        let support = SupportBuffera(destination: destination,
+                                    openURL: { requests.append($0); return canOpen },
+                                    presentAlert: { alerts.append($0) })
+        let button = SupportBufferaButton(support: support)
+        guard button.title == destination.title, button.toolTip == destination.toolTip,
+              button.accessibilityLabel() == button.title, requests.isEmpty else {
+            throw HistoryError.database("Support links must be accessible and open only on click")
+        }
+        button.performClick(nil)
+        guard requests.map(\.absoluteString) == [expectedURL], alerts.isEmpty else {
+            throw HistoryError.database("Support action opened the wrong page or showed an unexpected alert")
+        }
+        canOpen = false
+        button.performClick(nil)
+        guard requests.map(\.absoluteString) == [expectedURL, expectedURL], alerts.count == 1,
+              alerts[0].messageText == L10n.text("Не удалось открыть браузер"),
+              alerts[0].informativeText.contains(expectedURL) else {
+            throw HistoryError.database("Failed browser launch must display the intended support URL")
+        }
+    }
 }

@@ -1,0 +1,71 @@
+{
+  "soundtrack": "soundtrack-contact.wav",
+  "durationSeconds": 16,
+  "composition": {
+    "generator": "audio-contact.mjs",
+    "bpm": 90,
+    "description": "Procedural funk / neo-soul music with short unvoiced air and click contact accents."
+  },
+  "recordedAccent": {
+    "title": "Female Sigh",
+    "creatorMetadata": "Voice Over By MagicalMysticVA",
+    "library": "memefone",
+    "assetId": "sha256:2648a2696090a2c46372cf950205897da5cfd9873c20fd23a51d3d69556d5f95",
+    "originalLocalPath": "/Users/dqunbp/projects/memefone/sources/myinstants/downloads/extra-1000/sounds/female-sigh-46410.mp3",
+    "copiedOriginal": "assets/female-sigh.mp3",
+    "processedFile": "assets/female-sigh-contact.wav",
+    "sourceDurationSeconds": 1.311927,
+    "trimSeconds": {
+      "start": 0.25,
+      "end": 1.05
+    },
+    "timelineStartSeconds": 8.35,
+    "processedDurationSeconds": 0.857,
+    "occurrences": 1,
+    "processing": {
+      "highpassHz": 90,
+      "lowpassHz": 11000,
+      "gainDB": 18,
+      "fadeInSeconds": 0.015,
+      "fadeOutSeconds": 0.08,
+      "room": {
+        "delaysMilliseconds": [
+          35,
+          57
+        ],
+        "gains": [
+          0.055,
+          0.03
+        ]
+      },
+      "pitchShift": false,
+      "timeStretch": false,
+      "musicDuckDB": 2.5,
+      "musicDuckWindowSeconds": [
+        8.36,
+        9.32
+      ]
+    },
+    "processedMeanDBFS": -28.4,
+    "processedPeakDBFS": -12.4
+  },
+  "removed": [
+    "synthesized formant vowel",
+    "synthesized exhale",
+    "pitched spring warble"
+  ],
+  "master": {
+    "channels": 2,
+    "sampleRate": 48000,
+    "bitDepth": 24,
+    "samplesPerChannel": 768000,
+    "integratedLUFS": -16,
+    "truePeakDBTP": -1.7,
+    "loudnessRangeLU": 1.6
+  },
+  "reproducibility": [
+    "node audio-contact.mjs",
+    "node mix-contact-audio.mjs"
+  ],
+  "measurements": "audio-contact-levels.log"
+}

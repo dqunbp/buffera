@@ -14,7 +14,7 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     let access: MCPAccess
     let shortcuts: ShortcutPreferences
     let bundleURL: URL
-    private(set) var step = 0
+    private(set) var step = SetupStep.language
     private let page = NSView()
     private let titleLabel = SetupUI.text("", size: 24, bold: true)
     private let progress = SetupUI.text("", size: 12)
@@ -24,8 +24,6 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     private let skip = NSButton()
     private weak var storageValue: NSTextField?
     private var capturePage: (() -> Void)?
-    private let titles = [L10n.text("Язык и тема"), L10n.text("Окно истории"), L10n.text("Клавиши"),
-                          L10n.text("Хранение"), "MCP", L10n.text("Поиск и ответы")]
 
     init(initial: SetupPreferences, modelsAvailable: Bool, modelError: String? = nil,
          access: MCPAccess, bundleURL: URL = Bundle.main.bundleURL, shortcuts: ShortcutPreferences = .load()) {
@@ -56,6 +54,8 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
         let skipAll = NSButton(title: L10n.text("Настроить позже"), target: self, action: #selector(skipAll))
         skipAll.bezelStyle = .rounded; skipAll.identifier = .init("setup.skipAll")
         progress.textColor = .secondaryLabelColor
+        progress.identifier = .init("setup.progress")
+        titleLabel.identifier = .init("setup.title")
         let top = NSStackView(views: [SetupUI.text("Buffera", size: 17, bold: true), NSView(), skipAll])
         back.title = L10n.text("Назад"); back.target = self; back.action = #selector(goBack)
         next.target = self; next.action = #selector(goNext); next.keyEquivalent = "\r"
@@ -80,21 +80,20 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
 
     private func render() {
         applyDraftTheme()
-        titleLabel.stringValue = titles[step]
-        progress.stringValue = L10n.text("Шаг \(step + 1) из \(titles.count)")
-        back.isEnabled = step > 0
-        next.title = step == titles.count - 1 ? L10n.text("Применить и начать") : L10n.text("Далее")
+        titleLabel.stringValue = step.title
+        progress.stringValue = L10n.text("Шаг \(step.rawValue + 1) из \(SetupStep.allCases.count)")
+        back.isEnabled = step.rawValue > 0
+        next.title = step == SetupStep.allCases.last ? L10n.text("Применить и начать") : L10n.text("Далее")
         errorLabel.isHidden = true
         page.subviews.forEach { $0.removeFromSuperview() }
         capturePage = nil
         let content: NSView
         switch step {
-        case 0: content = languagePage()
-        case 1: content = appearancePage()
-        case 2: content = shortcutsPage()
-        case 3: content = storagePage()
-        case 4: content = mcpPage()
-        default: content = modelsPage()
+        case .language: content = languagePage()
+        case .shortcuts: content = shortcutsPage()
+        case .storage: content = storagePage()
+        case .mcp: content = mcpPage()
+        case .models: content = modelsPage()
         }
         let scroll = SetupUI.scroll(content)
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -108,16 +107,18 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func goBack() {
-        capturePage?(); step = max(0, step - 1); render()
+        capturePage?(); step = SetupStep(rawValue: step.rawValue - 1) ?? step; render()
     }
     @objc private func goNext() {
         capturePage?()
-        if step < titles.count - 1 { step += 1; render() }
-        else { finish() }
+        advance()
     }
     @objc private func skipStep() {
         draft.skip(step, restoring: initial)
-        if step < titles.count - 1 { step += 1; render() }
+        advance()
+    }
+    private func advance() {
+        if let following = SetupStep(rawValue: step.rawValue + 1) { step = following; render() }
         else { finish() }
     }
     @objc private func skipAll() { close(); onSkip?() }
@@ -173,20 +174,6 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
             field(L10n.text("Язык интерфейса"), language), field(L10n.text("Тема"), theme),
             SetupUI.text(L10n.text("Изменения применятся в конце. Для смены языка понадобится перезапуск."), size: 12)
         ])
-    }
-
-    private func appearancePage() -> NSView {
-        let mode = popup(HistoryAppearance.Mode.allCases.map(\.title),
-                         selected: HistoryAppearance.Mode.allCases.firstIndex(of: draft.appearance.mode)!, id: "mode")
-        let columns = popup((1...4).map(String.init), selected: draft.appearance.columns - 1, id: "columns")
-        let rows = popup((3...12).map(String.init), selected: draft.appearance.visibleRows - 3, id: "rows")
-        let sidebar = toggle(L10n.text("Показывать боковую панель с фильтрами"), value: draft.appearance.sidebarVisible, id: "sidebar")
-        capturePage = { [weak self] in
-            self?.draft.appearance = HistoryAppearance(mode: HistoryAppearance.Mode.allCases[mode.indexOfSelectedItem],
-                columns: columns.indexOfSelectedItem + 1, visibleRows: rows.indexOfSelectedItem + 3, sidebarVisible: sidebar.state == .on)
-        }
-        return SetupUI.column([field(L10n.text("Расположение окна"), mode), field(L10n.text("Колонки"), columns),
-                               field(L10n.text("Видимых строк"), rows), sidebar])
     }
 
     private func shortcutsPage() -> NSView {

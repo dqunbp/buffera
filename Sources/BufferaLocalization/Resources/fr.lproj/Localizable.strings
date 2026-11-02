@@ -551,6 +551,8 @@
 "Сочетания применяются без перезапуска" = "Les raccourcis s’appliquent sans redémarrage";
 "Поддержать Buffera 💜" = "Soutenir Buffera 💜";
 "Поддержать разработку через Tribute — откроется в браузере" = "Soutenir le développement sur Tribute — s’ouvre dans votre navigateur";
+"Поставить звезду на GitHub" = "Mettre une étoile sur GitHub";
+"Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере" = "Buffera vous plaît ? Mettez une étoile sur GitHub — s’ouvre dans votre navigateur";
 "Не удалось открыть браузер" = "Impossible d’ouvrir votre navigateur";
 "Откройте ссылку для поддержки Buffera в браузере: %1$@" = "Ouvrez ce lien dans votre navigateur pour soutenir Buffera : %1$@";
 "Ключ секретов недоступен. Проверьте доступ Buffera к Связке ключей. Секрет не будет сохранён открытым." = "La clé secrète est indisponible. Vérifiez l’accès de Buffera au Trousseau. Le secret ne sera pas stocké en clair.";
@@ -616,3 +618,8 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "Dans le menu d’un élément, choisissez « Copier autrement », puis « En fichier .txt » ou « En fichier .md ». Buffera crée un fichier contenant tout le texte, à coller dans le Finder ou à utiliser en pièce jointe.";
 "Сбрасывать поиск и фильтры" = "Réinitialiser la recherche et les filtres";
 "При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "À la prochaine ouverture : recherche vide, tous les éléments sans filtre et premier élément sélectionné. Une fenêtre ouverte n’est jamais réinitialisée. Les éléments enregistrés ne sont pas supprimés.";
+
+"Пояснение: %1$@" = "Aide : %1$@";
+"Видимых строк: %1$@" = "Lignes visibles : %1$@";
+"Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Les colonnes placent les cartes côte à côte : une seule forme une liste, plusieurs forment une grille. Une fenêtre étroite affiche moins de colonnes.";
+"Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Moins de lignes donnent des cartes plus hautes et affichent plus de texte. Plus de lignes rendent les cartes plus compactes. Dans un panneau latéral, les entrées courtes peuvent occuper moins de hauteur.";

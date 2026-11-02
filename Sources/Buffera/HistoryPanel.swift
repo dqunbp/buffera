@@ -48,6 +48,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var changingFrame = false
     private var isClosing = false
     private var presentationPending = false
+    private var preparingHiddenHistory = false
+    private var historyPrepared = false
     private let thumbnails = NSCache<NSNumber, NSImage>()
     private let status = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "")
@@ -144,6 +146,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var searchMode: HistorySearchMode { semanticSearchAvailable && semanticSearch.state == .on ? .automatic : .literal }
     var isInteracting: Bool { window.isVisible && !isClosing && (dragSourceID != nil || window.isKeyWindow || nearbyIntroduction != nil || filters.isPresenting || cardMenuTracking || preview.isShown || window.attachedSheet != nil) }
     var isPresenting: Bool { window.isVisible || presentationPending }
+    var acceptsHistoryResults: Bool { isAvailableForShortcut || preparingHiddenHistory }
+    var isPreparingHiddenHistory: Bool { preparingHiddenHistory }
     var isAvailableForShortcut: Bool { isPresenting && !isClosing && nearbyIntroduction == nil }
 
     init(introductionDefaults: UserDefaults = .standard, monitorsOutsideInteractions: Bool = true,
@@ -168,7 +172,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 }
                 return true
             }
-            guard let self, self.window.isVisible, self.window.attachedSheet == nil,
+            guard let self, self.isPresenting, self.window.attachedSheet == nil,
                   !self.isClosing, self.nearbyIntroduction == nil, !self.filters.isPresenting, !self.cardMenuTracking else { return false }
             return self.handle(event) == nil
         }
@@ -233,6 +237,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
         rememberPreviousApp()
+        let wasClosed = !window.isVisible || isClosing
+        if isClosing { window.orderOut(nil) }
         presentationToken += 1; isClosing = false
         window.permitsOffscreenFrame = false
         let token = presentationToken
@@ -245,12 +251,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
         else { positionDockedWindow() }
-        // On a cold opening there is no snapshot to display. Prepare the first
-        // result before ordering the window front, including its card layout.
-        presentationPending = !window.isVisible && rows.isEmpty
+        // Completed hidden preparation is ready to display and interact with immediately.
+        // Only a cold/invalidated snapshot needs to finish loading on opening.
+        presentationPending = wasClosed && (!historyPrepared || reset)
         if !presentationPending { focusHistoryWindow(token: token) }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
-        refresh(preservingSelection: !reset, retainingCards: true)
+        if reset || !wasClosed || (!historyPrepared && !preparingHiddenHistory) {
+            refresh(preservingSelection: !reset, retainingCards: true)
+        }
         if fromShortcut { recordShortcutPress() }
         return reset
     }
@@ -349,7 +357,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func receive(_ result: [ClipSummary], total: Int, offset: Int) {
         if dragSourceID != nil { dragHistoryDirty = true; return }
         if isConfirmingCopyTransform { copyTransformHistoryDirty = true; return }
-        guard isAvailableForShortcut, !isShowingNearby else { return }
+        guard acceptsHistoryResults, !isShowingNearby else { return }
         if offset == 0, silentSearchRefresh {
             receiveSearchIndexResult(result, total: total)
             return
@@ -362,6 +370,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             request(filter(), 0, min(total, max(result.count + 150, result.count * 2)))
             return
         }
+        preparingHiddenHistory = false; historyPrepared = true
         loading = false; awaitingSearchResult = false; self.total = total
         if offset == 0 { rows = result } else { rows += result }
         let capturedIndex = recentCaptureID.flatMap { id in rows.firstIndex(where: { $0.id == id }) }
@@ -381,6 +390,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         updateSelection()
         updateCount()
+        window.contentView?.layoutSubtreeIfNeeded()
+        cards.layoutSubtreeIfNeeded()
         presentLoadedHistory()
         if commitWhenLoaded { commitWhenLoaded = false; confirm() }
     }
@@ -396,11 +407,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         if isShowingNearby { nearbyState?.needsReload = true; return }
         recentCaptureID = id
-        // A recaptured row can have become concealed during deduplication.
-        if !isAvailableForShortcut, rows.contains(where: { $0.id == id }) {
+        // Prepare new order/content while hidden, including newly concealed recaptures.
+        if !isAvailableForShortcut {
             refresh(preservingSelection: true)
+            return
         }
-        guard isAvailableForShortcut, !confirming, !commitWhenLoaded else { return }
+        guard !confirming, !commitWhenLoaded else { return }
         let moves = pendingMoveDelta
         refresh(preservingSelection: true)
         pendingMoveDelta = moves
@@ -628,6 +640,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func failed(_ error: Error) {
+        preparingHiddenHistory = false; historyPrepared = false
         cancelShortcutGesture()
         loading = false; commitWhenLoaded = false; confirming = false
         if awaitingSearchResult {
@@ -645,6 +658,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func refresh(preservingSelection: Bool = false, retainingCards: Bool = false) {
+        historyPrepared = false
         guard !isClosing, !confirming, !commitWhenLoaded else {
             if !retainingCards {
                 // A hide/delete may finish during closing or confirmation.
@@ -669,8 +683,9 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let limit = preservingSelection ? max(150, rows.count, retainedRowCount) : 150
         dismissPreview()
         invalidateReveal()
-        loading = window.isVisible || presentationPending
-        awaitingSearchResult = loading
+        preparingHiddenHistory = !window.isVisible && !presentationPending
+        loading = true
+        awaitingSearchResult = true
         actualSearchMode = .literal; searchFallbackReason = nil
         pendingMoveDelta = 0
         if !retainingCards {
@@ -701,6 +716,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard !isClosing else { return }
         if window.isVisible || presentationPending { closedAt = currentDate() }
         presentationPending = false
+        preparingHiddenHistory = false; historyPrepared = false
         cancelCopyTransform(refreshHistory: false)
         copyOptionsToken += 1; copyOptionsID = nil; copyOptions = nil
         restoreSearchFromNearby(reloadIfNeeded: false, render: false)
@@ -716,6 +732,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let finish = { [weak self] in
             guard let self, self.presentationToken == token else { return }
             self.window.orderOut(nil); self.window.permitsOffscreenFrame = false; self.isClosing = false
+            self.refresh(preservingSelection: true, retainingCards: true)
             if restoreFocus, self.previousApp?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                 self.previousApp?.activate(options: [])
             }
@@ -837,7 +854,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func closeIfUnfocused() {
-        guard dragSourceID == nil, nearbyIntroduction == nil else { return }
+        guard dragSourceID == nil, nearbyIntroduction == nil, !cardMenuTracking else { return }
         // Filter menus, calendar popovers and save sheets can own keyboard input.
         if !window.isKeyWindow, window.attachedSheet == nil, !filters.isPresenting,
            !cardMenuTracking, !preview.isShown {
@@ -846,8 +863,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             if isPinned { remaskConcealedText() }
         }
         let token = presentationToken
+        let interactionToken = outsideInteractionToken
         RunLoop.main.perform(inModes: [.default]) { [weak self] in
-            guard let self, token == self.presentationToken, self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
+            guard let self, token == self.presentationToken, interactionToken == self.outsideInteractionToken,
+                  self.window.isVisible, !self.isClosing, !self.window.isKeyWindow,
                   self.window.attachedSheet == nil, !self.filters.isPresenting,
                   self.dragSourceID == nil, self.nearbyIntroduction == nil, !self.cardMenuTracking, !self.preview.isShown else { return }
             guard !self.isPinned else { return }
@@ -1246,7 +1265,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private var canRefreshSearchIndex: Bool {
-        window.isVisible && !isClosing && !isShowingNearby && !search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isClosing && !isShowingNearby && !search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var searchIndexInteractionIsIdle: Bool {
@@ -1276,6 +1295,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         guard canRefreshSearchIndex else { cancelSearchIndexRefresh(); return }
         guard searchIndexInteractionIsIdle, !loading, !silentSearchRefresh else {
             scheduleSearchIndexRefresh(after: 0.8)
+            return
+        }
+        if !isPresenting {
+            refresh(preservingSelection: true, retainingCards: true)
             return
         }
         guard let request else { return }
@@ -1359,8 +1382,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             DispatchQueue.main.async { self?.copyTransformed(operation, id: clip.id) }
         }
         card.onMenuTracking = { [weak self] tracking in
-            self?.cardMenuTracking = tracking
-            if !tracking { self?.closeIfUnfocused() }
+            guard let self else { return }
+            self.cardMenuTracking = tracking
+            self.outsideInteractionToken += 1
+            // Menus temporarily own focus, including when a hotkey-opened panel
+            // has not become key yet. Ending tracking is not an outside action:
+            // a queued blur must not beat the asynchronously dispatched choice.
+            // Genuine subsequent clicks/activation/blur still use their normal paths.
+            if !tracking, NSApp.isActive, self.window.isVisible, !self.isClosing {
+                self.window.makeKeyAndOrderFront(nil)
+            }
         }
         card.requestDrag = { [weak self, weak card] completion in
             guard let self, let card, self.isAvailableForShortcut, !self.confirming,

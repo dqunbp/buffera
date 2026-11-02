@@ -1,0 +1,101 @@
+{
+  "soundtrack": "soundtrack-jazz.wav",
+  "durationSeconds": 16,
+  "music": {
+    "title": "Pink Panther",
+    "workAttributionFromLibrary": "Henry Mancini — The Pink Panther Theme",
+    "library": "memefone",
+    "assetId": "sha256:1b3119b17331d69ba24139d23fe35c1a0794b390b06df2494628d57abfc81fb8",
+    "originalLocalPath": "/Users/dqunbp/projects/memefone/sources/myinstants/downloads/armenia/Pink Panther -- pink-panther-74369.mp3",
+    "copiedOriginal": "assets/pink-panther.mp3",
+    "originalDurationSeconds": 45.284354,
+    "originalSampleRate": 22050,
+    "originalChannels": 2,
+    "libraryAnalysis": "Instrumental jazz theme with bass, drums and saxophone; no intelligible words or speech segments.",
+    "excerptSeconds": {
+      "start": 10,
+      "end": 26
+    },
+    "fadeInSeconds": 0.035,
+    "fadeOutSeconds": 0.85,
+    "bedNormalization": {
+      "integratedTargetLUFS": -17,
+      "truePeakCeilingDBTP": -3
+    },
+    "tempoChanged": false,
+    "pitchChanged": false
+  },
+  "recordedAccent": {
+    "title": "Female Sigh",
+    "creatorMetadata": "Voice Over By MagicalMysticVA",
+    "library": "memefone",
+    "assetId": "sha256:2648a2696090a2c46372cf950205897da5cfd9873c20fd23a51d3d69556d5f95",
+    "originalLocalPath": "/Users/dqunbp/projects/memefone/sources/myinstants/downloads/extra-1000/sounds/female-sigh-46410.mp3",
+    "copiedOriginal": "assets/female-sigh.mp3",
+    "processedFile": "assets/female-sigh-jazz.wav",
+    "sourceDurationSeconds": 1.311927,
+    "trimSeconds": {
+      "start": 0.25,
+      "end": 1.05
+    },
+    "processedDurationSeconds": 0.857,
+    "timelineStartSeconds": 8.45,
+    "primaryAudibleEventApproximateSeconds": [
+      8.59,
+      9.04
+    ],
+    "occurrences": 1,
+    "processing": {
+      "highpassHz": 90,
+      "lowpassHz": 11000,
+      "gainDB": 23.5,
+      "fadeInSeconds": 0.015,
+      "fadeOutSeconds": 0.08,
+      "room": {
+        "delaysMilliseconds": [
+          35,
+          57
+        ],
+        "gains": [
+          0.055,
+          0.03
+        ]
+      },
+      "pitchShift": false,
+      "timeStretch": false
+    },
+    "processedMeanDBFS": -22.9,
+    "processedPeakDBFS": -6.9,
+    "sourceGainIncreaseFromPreviousCutDB": 5.5,
+    "estimatedIncreaseInFinishedMixDB": 6
+  },
+  "musicDucking": {
+    "maximumDB": 5,
+    "windowSeconds": [
+      8.4,
+      9.45
+    ],
+    "attackSeconds": 0.1,
+    "releaseSeconds": 0.22
+  },
+  "contactFoley": {
+    "file": "assets/copy-tick.wav",
+    "timelineStartSeconds": 0.65,
+    "durationSeconds": 0.045,
+    "type": "quiet filtered noise tick"
+  },
+  "master": {
+    "channels": 2,
+    "sampleRate": 48000,
+    "bitDepth": 24,
+    "samplesPerChannel": 768000,
+    "integratedLUFS": -16,
+    "truePeakDBTP": -2,
+    "loudnessRangeLU": 1.4,
+    "linearGainDB": 1.01
+  },
+  "reproducibility": [
+    "node audio-jazz.mjs"
+  ],
+  "measurements": "audio-jazz-levels.log"
+}

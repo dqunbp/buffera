@@ -83,6 +83,7 @@ swift run --disable-sandbox --cache-path "$PWD/.build/cache" BufferaLocalization
 swift build --disable-sandbox --product Buffera
 for language in ru en es de fr pt-BR zh-Hans ja; do
   .build/debug/Buffera --localization-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
+  .build/debug/Buffera --setup-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
   .build/debug/Buffera --updates-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
 done
 zsh scripts/check-history-panel.sh
@@ -96,6 +97,10 @@ touch the user's history or clipboard. It checks History settings groups,
 file-name selection in “Copy Differently”, reset mode and interval persistence,
 key-preparation error handling and control layout in all supported languages.
 A separate script checks existing panel interactions in Russian and English.
+
+The “?” help in Appearance is checked with real buttons and diagrams in every locale, in light and dark themes. The setup smoke check walks through five steps without history window settings and checks navigation, skipping, cancellation and retry after a save failure.
+
+The “Star on GitHub” button is checked on every tab for the correct destination, browser-opening failure handling and translated layout. A fake browser-opening function keeps these checks from launching a real browser.
 
 The update check uses a fixture release and isolated preferences. It checks
 colored dots on the icon, the full menu-item mark in light/dark appearances and

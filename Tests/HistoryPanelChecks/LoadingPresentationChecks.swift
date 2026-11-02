@@ -54,13 +54,70 @@ func loadingPresentationChecks() {
     check(empty.panel.selected?.id == 2, "search can recover after a failed replacement")
 
     empty.panel.close(restoreFocus: false)
-    empty.panel.open(fromShortcut: true)
-    check(empty.panel.window.isVisible && count(empty) == 1,
-          "hotkey reopening keeps the previous cards visible during its fresh query")
     empty.panel.receive([fixture(3)], total: 1, offset: 0)
+    let preparedRequests = empty.requests.count
+    empty.panel.open(fromShortcut: true)
+    check(empty.panel.window.isVisible && count(empty) == 1 && empty.requests.count == preparedRequests,
+          "hotkey reopening immediately uses prepared cards without another query")
     empty.panel.window.onFlagsChanged?([])
     check(empty.panel.selected?.id == 3 && empty.confirmations.isEmpty,
           "one hotkey tap still leaves the refreshed panel open")
+
+    let reordered = PanelHarness(rows: [fixture(1), fixture(2), fixture(3)])
+    defer { reordered.panel.close(restoreFocus: false); reordered.finish() }
+    reordered.panel.move(2)
+    reordered.panel.close(restoreFocus: false)
+    check(reordered.panel.isPreparingHiddenHistory && !reordered.panel.window.isVisible,
+          "closing prepares the retained selection without showing the window")
+    reordered.panel.receive([fixture(3), fixture(1), fixture(2)], total: 3, offset: 0)
+    check(!reordered.panel.window.isVisible && reordered.cards.selectedIndex == 0,
+          "used record moves to its new first position while the panel is closed")
+    let reorderedRequests = reordered.requests.count
+    reordered.panel.open(fromShortcut: true)
+    check(reordered.requests.count == reorderedRequests, "prepared reopening does not restart search")
+    check(reordered.panel.window.isVisible && reordered.panel.selected?.id == 3 && reordered.cards.selectedIndex == 0
+          && reordered.cards.card(at: 0) != nil,
+          "reopening presents the retained choice already laid out in its new first position")
+    reordered.panel.close(restoreFocus: false)
+    reordered.panel.open()
+    reordered.panel.close(restoreFocus: false)
+    reordered.panel.receive([fixture(2)], total: 1, offset: 0)
+    check(!reordered.panel.window.isVisible, "cancelled warm opening rejects a late result")
+
+    reordered.panel.clipboardDidCapture(id: 9)
+    check(!reordered.panel.window.isVisible && reordered.panel.isPreparingHiddenHistory,
+          "capture prepares the closed panel without taking focus")
+    reordered.panel.receive([fixture(9), fixture(2)], total: 2, offset: 0)
+    reordered.panel.open()
+    check(reordered.panel.window.isVisible && reordered.panel.selected?.id == 9,
+          "a captured record is already selected when the prepared panel opens")
+    reordered.panel.close(restoreFocus: false)
+    reordered.panel.receive([], total: 0, offset: 0)
+    let emptyRequests = reordered.requests.count
+    reordered.panel.open()
+    check(reordered.panel.window.isVisible && count(reordered) == 0 && reordered.requests.count == emptyRequests,
+          "prepared empty history opens immediately without another query")
+    reordered.panel.close(restoreFocus: false)
+    reordered.panel.searchFailed(HistoryError.database("Fixture background failure"))
+    check(!reordered.panel.window.isVisible && !reordered.panel.isPreparingHiddenHistory,
+          "background failure never presents a window")
+    let failedRequests = reordered.requests.count
+    reordered.panel.open()
+    check(reordered.requests.count == failedRequests + 1, "opening retries a failed background preparation")
+    reordered.panel.receive([fixture(1)], total: 1, offset: 0)
+
+    reordered.panel.close(restoreFocus: false)
+    reordered.panel.receive([fixture(1)], total: 1, offset: 0)
+    let indexRequests = reordered.requests.count
+    reordered.panel.searchIndexDidChange()
+    waitUntil("hidden index preparation") { reordered.requests.count > indexRequests }
+    check(!reordered.panel.window.isVisible && reordered.panel.isPreparingHiddenHistory,
+          "search-index updates prepare hidden matches without presenting the panel")
+    reordered.panel.receive([fixture(1), fixture(2)], total: 2, offset: 0)
+    let preparedIndexRequests = reordered.requests.count
+    reordered.panel.open()
+    check(reordered.panel.window.isVisible && count(reordered) == 2 && reordered.requests.count == preparedIndexRequests,
+          "reopening uses search matches already prepared after an index update")
 
     let cold = PanelHarness()
     defer { cold.panel.close(restoreFocus: false); cold.finish() }
@@ -123,8 +180,8 @@ func loadingPresentationChecks() {
     invalidated.panel.close(restoreFocus: false)
     let requests = invalidated.requests.count
     invalidated.panel.refresh(preservingSelection: true)
-    check(count(invalidated) == 0 && invalidated.requests.count == requests,
-          "content invalidation while hidden discards the snapshot without launching a query")
+    check(count(invalidated) == 0 && invalidated.requests.count == requests + 1,
+          "content invalidation while hidden discards the snapshot and prepares fresh content")
     invalidated.panel.open(fromShortcut: true)
     check(!invalidated.panel.window.isVisible,
           "reopening after content invalidation never flashes the discarded snapshot")
