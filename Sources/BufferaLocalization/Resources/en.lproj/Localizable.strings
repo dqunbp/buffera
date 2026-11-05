@@ -637,8 +637,8 @@
 "При открытии окна" = "When opening history";
 "Копирование текста как файла" = "Copy text as a file";
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "In an entry’s menu, choose “Copy Differently”, then “As .txt file” or “As .md file”. Buffera creates a file with the full text to paste into Finder or use as an attachment.";
-"Сбрасывать поиск и фильтры" = "Reset search and filters";
-"При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "On the next opening: an empty search, all entries without filters, and the first entry selected. An open window is never reset. Saved entries are not deleted.";
+"Сбрасывать состояние окна" = "Reset window state";
+"Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)." = "Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).";
 
 "Пояснение: %1$@" = "Help: %1$@";
 "Видимых строк: %1$@" = "Visible rows: %1$@";
@@ -686,3 +686,4 @@
 "Сбросить сочетания" = "Reset shortcuts";
 
 "Для работы помощника скачайте модель в настройках «ИИ»." = "To use the assistant, download a model in AI settings.";
+"Сразу после закрытия" = "Immediately after closing";

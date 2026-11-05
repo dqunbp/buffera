@@ -616,8 +616,8 @@
 "При открытии окна" = "Beim Öffnen des Verlaufs";
 "Копирование текста как файла" = "Text als Datei kopieren";
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "Wähle im Menü eines Eintrags „Anders kopieren“ und dann „Als .txt-Datei“ oder „Als .md-Datei“. Buffera erstellt eine Datei mit dem vollständigen Text zum Einfügen im Finder oder zur Verwendung als Anhang.";
-"Сбрасывать поиск и фильтры" = "Suche und Filter zurücksetzen";
-"При следующем открытии — пустой поиск, все записи без фильтров и выбор первой записи. Открытое окно не сбрасывается. Сохранённые записи не удаляются." = "Beim nächsten Öffnen: leere Suche, alle Einträge ohne Filter und der erste Eintrag ausgewählt. Ein geöffnetes Fenster wird nie zurückgesetzt. Gespeicherte Einträge werden nicht gelöscht.";
+"Сбрасывать состояние окна" = "Fensterzustand zurücksetzen";
+"Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)." = "Die Oberfläche beim nächsten Öffnen automatisch auf den Standardzustand zurücksetzen (Suche und Filter löschen, die Favoritenansicht verlassen).";
 
 "Пояснение: %1$@" = "Hilfe: %1$@";
 "Видимых строк: %1$@" = "Sichtbare Zeilen: %1$@";
@@ -665,3 +665,4 @@
 "Сбросить сочетания" = "Kurzbefehle zurücksetzen";
 
 "Для работы помощника скачайте модель в настройках «ИИ»." = "Lade für den Assistenten ein Modell in den KI-Einstellungen herunter.";
+"Сразу после закрытия" = "Sofort nach dem Schließen";

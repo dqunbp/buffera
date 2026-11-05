@@ -95,6 +95,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private let resetDefaults: UserDefaults
     private let currentDate: () -> Date
     private var closedAt: Date?
+    private var resetAppliedWhileClosed = false
     private var recentCaptureID: Int64?
     private var pendingFavorites: Set<Int64> = []
     private var revealed: (id: Int64, text: String)?
@@ -243,9 +244,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.permitsOffscreenFrame = false
         let token = presentationToken
         commitWhenLoaded = false; pendingMoveDelta = 0; confirming = false
-        let reset = HistoryResetPreferences.load(from: resetDefaults).shouldReset(closedAt: closedAt, now: currentDate())
+        let resetOnOpening = !resetAppliedWhileClosed &&
+            HistoryResetPreferences.load(from: resetDefaults).shouldReset(closedAt: closedAt, now: currentDate())
+        let reset = resetAppliedWhileClosed || resetOnOpening
         closedAt = nil
-        if reset { resetNavigationState() }
+        resetAppliedWhileClosed = false
+        if resetOnOpening { resetNavigationState() }
         invalidateReveal()
         updateNavigationControls()
         commandHeld = false
@@ -253,10 +257,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         else { positionDockedWindow() }
         // Completed hidden preparation is ready to display and interact with immediately.
         // Only a cold/invalidated snapshot needs to finish loading on opening.
-        presentationPending = wasClosed && (!historyPrepared || reset)
+        presentationPending = wasClosed && (!historyPrepared || resetOnOpening)
         if !presentationPending { focusHistoryWindow(token: token) }
         logger.notice("Panel opened: persistent=true, visible=\(self.window.isVisible), key=\(self.window.isKeyWindow)")
-        if reset || !wasClosed || (!historyPrepared && !preparingHiddenHistory) {
+        if resetOnOpening || !wasClosed || (!historyPrepared && !preparingHiddenHistory) {
             refresh(preservingSelection: !reset, retainingCards: true)
         }
         if fromShortcut { recordShortcutPress() }
@@ -714,7 +718,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         cancelShortcutGesture()
         guard !isClosing else { return }
-        if window.isVisible || presentationPending { closedAt = currentDate() }
+        if window.isVisible || presentationPending {
+            closedAt = currentDate()
+            resetAppliedWhileClosed = false
+        }
         presentationPending = false
         preparingHiddenHistory = false; historyPrepared = false
         cancelCopyTransform(refreshHistory: false)
@@ -732,7 +739,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let finish = { [weak self] in
             guard let self, self.presentationToken == token else { return }
             self.window.orderOut(nil); self.window.permitsOffscreenFrame = false; self.isClosing = false
-            self.refresh(preservingSelection: true, retainingCards: true)
+            let resetImmediately = self.closedAt != nil && !self.resetAppliedWhileClosed &&
+                HistoryResetPreferences.load(from: self.resetDefaults).resetsImmediately
+            if resetImmediately {
+                // Prepare the default view while hidden, so opening it need not
+                // discard ready cards and repeat the same first-page query.
+                self.resetNavigationState()
+                self.resetAppliedWhileClosed = true
+            }
+            self.refresh(preservingSelection: !resetImmediately, retainingCards: true)
             if restoreFocus, self.previousApp?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                 self.previousApp?.activate(options: [])
             }

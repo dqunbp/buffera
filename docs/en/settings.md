@@ -12,6 +12,10 @@ General includes:
 - **Version and build** come from `Sources/BufferaCore/AppVersion.swift`; the text can be selected and copied.
 - **Report an issue** opens `https://github.com/dqunbp/buffera/issues/new` in the browser. The draft contains fields for the problem, expected behavior, and reproduction steps, plus the Buffera version/build, macOS version, and executable architecture. It opens only on click; the user edits and submits the issue. History, logs, paths, user names, and device identifiers are not collected.
 
+History offers limits of 10, 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000 ordinary clips. The default remains 50,000; favorites do not count toward the limit. The setup wizard uses the same choices. A reduced limit takes effect after the next copy.
+
+The **Reset window state** checkbox enables two modes: **Immediately after closing** and **After the specified number of minutes** (1–1,440). In the first mode, the minute field is disabled; the selected delay is retained when returning to the second mode. Reset after one minute remains enabled by default. The interface explains: “Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).” Reset does not delete saved clips or favorites. Immediate mode resets state before background preparation so the next opening can reuse prepared history; an open window is not reset.
+
 In Shortcuts, **Reset shortcuts** restores `⌘⌥V` / `⌘⌥C`; its behavior is unchanged.
 
 Implementation: `AppearanceSettings.swift`, `SettingsNavigation.swift`, `GeneralSettingsView.swift`, `AppPreferences.swift`, `IssueReport.swift`, `SupportBuffera.swift`, with wiring in `AppDelegate.swift`.

@@ -194,10 +194,11 @@ func runLocalizationSmokeTest() throws {
     }
     tabs.selectedSegment = 1
     _ = tabs.sendAction(tabs.action, to: tabs.target)
-    func snapshot(_ name: String) throws {
+    func snapshot(_ name: String, view: NSView? = nil) throws {
         content.layoutSubtreeIfNeeded()
-        if let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
-            content.cacheDisplay(in: content.bounds, to: bitmap)
+        let captured = view ?? content
+        if let bitmap = captured.bitmapImageRepForCachingDisplay(in: captured.bounds) {
+            captured.cacheDisplay(in: captured.bounds, to: bitmap)
             try bitmap.representation(using: .png, properties: [:])?.write(
                 to: URL(fileURLWithPath: "/tmp/buffera-settings-\(name)-\(activeLanguage).png"))
         }
@@ -209,7 +210,7 @@ func runLocalizationSmokeTest() throws {
     for (section, controls) in [
         ("storage", ["countLimit", "byteLimit", "revealData"]),
         ("secrets", ["secretHistoryMode"]),
-        ("reopening", ["historyReset.enabled", "historyReset.minutes"])
+        ("reopening", ["historyReset.enabled", "historyReset.immediately", "historyReset.afterDelay", "historyReset.minutes"])
     ] {
         guard let group = descendants(content).first(where: { $0.identifier?.rawValue == "settings.history.\(section)" }) else {
             throw HistoryError.database("History settings group missing: \(section)")
@@ -225,12 +226,18 @@ func runLocalizationSmokeTest() throws {
     try check(revealRequests == 1, "Data folder action must stay connected after regrouping")
     try snapshot("history")
     guard let resetEnabled = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.enabled" }) as? NSButton,
+          let resetImmediately = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.immediately" }) as? NSButton,
+          let resetAfterDelay = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.afterDelay" }) as? NSButton,
           let resetMinutes = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.minutes" }) as? NSTextField,
           let resetStepper = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.stepper" }) as? NSStepper else {
         throw HistoryError.database("History reset controls missing")
     }
-    try check(resetEnabled.state == .on && resetMinutes.integerValue == 1 && resetMinutes.isEnabled,
+    try check(resetEnabled.state == .on && resetMinutes.integerValue == 1 && resetMinutes.isEnabled &&
+              resetAfterDelay.state == .on && resetImmediately.state == .off,
               "History reset defaults must be visible in settings")
+    try check(resetImmediately.superview === resetAfterDelay.superview && resetImmediately.action == resetAfterDelay.action,
+              "Timing choices must form a native radio group for keyboard navigation")
+    try snapshot("history-reset-delay", view: resetEnabled.superview)
     resetStepper.integerValue = 7
     _ = resetStepper.sendAction(resetStepper.action, to: resetStepper.target)
     try check(HistoryResetPreferences.load(from: defaults).minutes == 7 && resetMinutes.integerValue == 7,
@@ -239,9 +246,17 @@ func runLocalizationSmokeTest() throws {
     resetMinutes.delegate?.controlTextDidEndEditing?(Notification(name: NSControl.textDidEndEditingNotification, object: resetMinutes))
     try check(HistoryResetPreferences.load(from: defaults).minutes == 12 && resetStepper.integerValue == 12,
               "Typed reset duration must save and synchronize its stepper")
+    resetImmediately.performClick(nil)
+    try check(HistoryResetPreferences.load(from: defaults).resetsImmediately &&
+              resetImmediately.state == .on && resetAfterDelay.state == .off &&
+              !resetMinutes.isEnabled && !resetStepper.isEnabled && resetMinutes.integerValue == 12,
+              "Immediate reset must preserve the custom delay and disable its controls")
+    try snapshot("history-immediate")
+    try snapshot("history-reset-immediate", view: resetEnabled.superview)
     resetEnabled.performClick(nil)
-    try check(!HistoryResetPreferences.load(from: defaults).isEnabled && !resetMinutes.isEnabled && !resetStepper.isEnabled,
-              "Disabling reset must persist and disable the duration controls")
+    try check(!HistoryResetPreferences.load(from: defaults).isEnabled && !resetMinutes.isEnabled && !resetStepper.isEnabled &&
+              !resetImmediately.isEnabled && !resetAfterDelay.isEnabled,
+              "Disabling reset must persist and disable the mode and duration controls")
     let resetReopened = makeSettings()
     let resetRoot = resetReopened.window!.contentView!
     let resetTabs = descendants(resetRoot).compactMap { $0 as? SettingsNavigation }.first!
@@ -249,11 +264,19 @@ func runLocalizationSmokeTest() throws {
     _ = resetTabs.sendAction(resetTabs.action, to: resetTabs.target)
     let restoredReset = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.enabled" } as? NSButton
     let restoredMinutes = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.minutes" } as? NSTextField
-    try check(restoredReset?.state == .off && restoredMinutes?.integerValue == 12 && restoredMinutes?.isEnabled == false,
-              "Reopened settings must retain both reset preferences")
+    let restoredImmediate = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.immediately" } as? NSButton
+    try check(restoredReset?.state == .off && restoredMinutes?.integerValue == 12 && restoredMinutes?.isEnabled == false &&
+              restoredImmediate?.state == .on && restoredImmediate?.isEnabled == false,
+              "Reopened settings must retain enabled state, timing mode and custom delay")
     resetEnabled.performClick(nil)
+    try check(HistoryResetPreferences.load(from: defaults).resetsImmediately && resetImmediately.isEnabled && !resetMinutes.isEnabled,
+              "Re-enabling reset must preserve immediate mode")
+    resetAfterDelay.performClick(nil)
     try check(resetMinutes.isEnabled && HistoryResetPreferences.load(from: defaults).minutes == 12,
-              "Re-enabling reset must preserve the custom duration")
+              "Returning to timed reset must restore the custom duration")
+    try check(resetImmediately.state == .off && resetAfterDelay.state == .on &&
+              HistoryResetPreferences.load(from: defaults).timing == .afterDelay,
+              "Timed reset must deselect immediate mode and persist")
     var copyRequests = 0
     func namingMenu() throws -> NSMenu {
         let menu = CopyTransformMenu(operations: [.textFile(.txt), .textFile(.md)], defaults: defaults) { _ in copyRequests += 1 }
@@ -320,6 +343,20 @@ func runLocalizationSmokeTest() throws {
         throw HistoryError.database("History size controls missing")
     }
     try check(HistoryLimits.load(from: defaults) == customLimits, "Opening settings changed custom limits")
+    for limit in [10, 100, 500, 1_000, 5_000] {
+        let title = limit.formatted(.number.locale(L10n.locale))
+        // AppKit normalizes nonbreaking grouping spaces in popup titles.
+        guard let index = count.itemTitles.firstIndex(where: {
+            $0.filter { !$0.isWhitespace } == title.filter { !$0.isWhitespace }
+        }) else {
+            throw HistoryError.database("Small history limit missing from settings: \(limit)")
+        }
+        count.selectItem(at: index)
+        _ = count.sendAction(count.action, to: count.target)
+        try check(HistoryLimits.load(from: defaults).maxCount == limit &&
+                  HistoryLimits.load(from: defaults).maxBytes == customLimits.maxBytes,
+                  "Selecting a small count must persist it without changing the byte limit")
+    }
     count.selectItem(at: count.numberOfItems - 1)
     _ = count.sendAction(count.action, to: count.target)
     try check(HistoryLimits.load(from: defaults).maxBytes == customLimits.maxBytes,

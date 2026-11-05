@@ -142,7 +142,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Beim erneuten Öffnen vor Ablauf des Rücksetzintervalls bleiben Suchanfrage, Filter, Favoritenansicht und ausgewählter Eintrag erhalten. Standardmäßig öffnet sich der Verlauf nach einer Minute mit geschlossenem Fenster ohne Suche und Filter; der erste Eintrag ist ausgewählt. Unter „Einstellungen → Verlauf“ kannst du das Intervall ändern oder das Zurücksetzen deaktivieren. Ein geöffnetes Fenster wird nie zurückgesetzt."
+              "text": "Unter „Einstellungen → Verlauf“ kannst du mit „Fensterzustand zurücksetzen“ zwischen sofortigem Zurücksetzen nach dem Schließen und einer Verzögerung von 1–1440 Minuten wählen. Standardmäßig gilt eine Minute: Beim erneuten Öffnen vor Ablauf bleiben Suchanfrage, Filter, Favoritenansicht und ausgewählter Eintrag erhalten. Nach dem Zurücksetzen zeigt das nächste Öffnen den gesamten Verlauf ohne Suche und Filter; der erste Eintrag ist ausgewählt. Du kannst das Zurücksetzen deaktivieren. Ein geöffnetes Fenster wird nie zurückgesetzt; gespeicherte Einträge und Favoriten werden nicht gelöscht."
             },
             {
               "type": "paragraph",
@@ -359,7 +359,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Lege die Limits unter „Einstellungen → Verlauf“ fest. Standard sind 50.000 normale Einträge und 5 GB für ihre Inhalte. Die Bereinigung erfolgt nach einer neuen Kopie. Favoriten zählen nicht zu diesen Limits und werden nicht automatisch entfernt."
+              "text": "Lege die Limits unter „Einstellungen → Verlauf“ fest. Zur Auswahl stehen 10, 100, 500, 1.000, 5.000, 10.000, 50.000 oder 100.000 normale Einträge. Standard sind 50.000 Einträge und 5 GB für ihre Inhalte. Die Bereinigung gemäß den gewählten Limits erfolgt nach einer neuen Kopie. Favoriten zählen nicht zu diesen Limits und werden nicht automatisch entfernt."
             },
             {
               "type": "note",

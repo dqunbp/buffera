@@ -142,7 +142,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Reabrir antes de terminar o intervalo de redefinição preserva a consulta, os filtros, a visualização de Favoritos e o item selecionado. Por padrão, após um minuto com a janela fechada, o histórico abre sem busca nem filtros e com o primeiro item selecionado. Altere o intervalo ou desative a redefinição em Ajustes → Histórico. Uma janela aberta nunca é redefinida."
+              "text": "Em Ajustes → Histórico, «Redefinir o estado da janela» permite escolher a redefinição imediatamente após fechar ou após um intervalo de 1–1440 minutos. O padrão é um minuto: reabrir antes do fim do intervalo preserva a consulta, os filtros, a visualização de Favoritos e o item selecionado. Após a redefinição, a próxima abertura mostra todo o histórico sem busca nem filtros, com o primeiro item selecionado. Você pode desativar a redefinição. Uma janela aberta nunca é redefinida; os itens salvos e os favoritos não são apagados."
             },
             {
               "type": "paragraph",
@@ -359,7 +359,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Defina os limites em Ajustes → Histórico. Os padrões são 50.000 itens comuns e 5 GB de conteúdo. A limpeza ocorre após uma nova cópia. Os favoritos não entram nesses limites e não são removidos automaticamente."
+              "text": "Defina os limites em Ajustes → Histórico. Você pode escolher 10, 100, 500, 1.000, 5.000, 10.000, 50.000 ou 100.000 itens comuns. Os padrões são 50.000 itens e 5 GB de conteúdo. A limpeza conforme os limites escolhidos ocorre após uma nova cópia. Os favoritos não entram nesses limites e não são removidos automaticamente."
             },
             {
               "type": "note",

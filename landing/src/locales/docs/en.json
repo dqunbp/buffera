@@ -142,7 +142,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Reopening before the reset interval expires preserves the query, filters, Favorites view and selected clip. By default, after the window has been closed for one minute, history opens with no search or filters and the first clip selected. Change the interval or disable the reset in Settings → History. An open window is never reset."
+              "text": "In Settings → History, Reset window state lets you choose an immediate reset after closing or a delay of 1–1440 minutes. The default is one minute: reopening before the delay expires preserves the query, filters, Favorites view and selected clip. After a reset, the next opening shows all history without search or filters, with the first clip selected. You can turn resetting off. An open window is never reset; saved clips and favorites are not deleted."
             },
             {
               "type": "paragraph",
@@ -359,7 +359,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Set limits in Settings → History. The defaults are 50,000 ordinary clips and 5 GB of their content. Cleanup runs after a new copy. Favorites do not count toward these limits and are not automatically removed."
+              "text": "Set limits in Settings → History. Available counts are 10, 100, 500, 1,000, 5,000, 10,000, 50,000, or 100,000 ordinary clips. The defaults are 50,000 clips and 5 GB of their content. Cleanup according to the selected limits runs after a new copy. Favorites do not count toward these limits and are not automatically removed."
             },
             {
               "type": "note",

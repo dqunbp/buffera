@@ -142,7 +142,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Si vuelves a abrir el historial antes de que termine el intervalo de restablecimiento, se conservan la consulta, los filtros, la vista Favoritos y el elemento seleccionado. Por defecto, tras un minuto con la ventana cerrada, el historial se abre sin búsqueda ni filtros y con el primer elemento seleccionado. Puedes cambiar el intervalo o desactivar el restablecimiento en Ajustes → Historial. La ventana nunca se restablece mientras está abierta."
+              "text": "En Ajustes → Historial, «Restablecer el estado de la ventana» permite elegir entre restablecer justo después de cerrar o tras una espera de 1–1440 minutos. El valor predeterminado es un minuto: si vuelves a abrir antes de que termine, se conservan la consulta, los filtros, la vista Favoritos y el elemento seleccionado. Después del restablecimiento, la próxima apertura muestra todo el historial sin búsqueda ni filtros, con el primer elemento seleccionado. Puedes desactivar el restablecimiento. La ventana nunca se restablece mientras está abierta; los elementos guardados y los favoritos no se eliminan."
             },
             {
               "type": "paragraph",
@@ -359,7 +359,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Establece los límites en Ajustes → Historial. Los valores predeterminados son 50 000 elementos normales y 5 GB de contenido. La limpieza se ejecuta tras una nueva copia. Los favoritos no cuentan para estos límites y no se eliminan automáticamente."
+              "text": "Establece los límites en Ajustes → Historial. Puedes elegir 10, 100, 500, 1 000, 5 000, 10 000, 50 000 o 100 000 elementos normales. Los valores predeterminados son 50 000 elementos y 5 GB de contenido. La limpieza según los límites elegidos se ejecuta tras una nueva copia. Los favoritos no cuentan para estos límites y no se eliminan automáticamente."
             },
             {
               "type": "note",

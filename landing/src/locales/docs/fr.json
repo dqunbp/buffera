@@ -142,7 +142,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Une réouverture avant la fin du délai de réinitialisation conserve la requête, les filtres, la vue Favoris et l’élément sélectionné. Par défaut, après une minute avec la fenêtre fermée, l’historique s’ouvre sans recherche ni filtres, avec le premier élément sélectionné. Modifiez le délai ou désactivez la réinitialisation dans Réglages → Historique. Une fenêtre ouverte n’est jamais réinitialisée."
+              "text": "Dans Réglages → Historique, « Réinitialiser l’état de la fenêtre » permet de choisir une réinitialisation dès la fermeture ou après un délai de 1 à 1440 minutes. Le délai par défaut est d’une minute : une réouverture avant son expiration conserve la requête, les filtres, la vue Favoris et l’élément sélectionné. Après la réinitialisation, la prochaine ouverture affiche tout l’historique sans recherche ni filtres, avec le premier élément sélectionné. Vous pouvez désactiver la réinitialisation. Une fenêtre ouverte n’est jamais réinitialisée ; les éléments enregistrés et les favoris ne sont pas supprimés."
             },
             {
               "type": "paragraph",
@@ -359,7 +359,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Définissez les limites dans Réglages → Historique. Les valeurs par défaut sont de 50 000 éléments ordinaires et 5 Go de contenu. Le nettoyage s’effectue après une nouvelle copie. Les favoris ne comptent pas dans ces limites et ne sont pas supprimés automatiquement."
+              "text": "Définissez les limites dans Réglages → Historique. Vous pouvez choisir 10, 100, 500, 1 000, 5 000, 10 000, 50 000 ou 100 000 éléments ordinaires. Les valeurs par défaut sont de 50 000 éléments et 5 Go de contenu. Le nettoyage selon les limites choisies s’effectue après une nouvelle copie. Les favoris ne comptent pas dans ces limites et ne sont pas supprimés automatiquement."
             },
             {
               "type": "note",

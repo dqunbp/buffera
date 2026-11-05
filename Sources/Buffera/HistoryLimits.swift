@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// The same limits used by capture and the settings window. Favorites are exempt.
 struct HistoryLimits: Equatable {
-    static let countChoices = [10_000, 50_000, 100_000]
+    static let countChoices = [10, 100, 500, 1_000, 5_000, 10_000, 50_000, 100_000]
     static let bytesPerGigabyte = 1_000_000_000
     static let byteRange = bytesPerGigabyte...(20 * bytesPerGigabyte)
 
@@ -25,7 +25,7 @@ struct HistoryLimits: Equatable {
         defaults.set(maxBytes, forKey: "maxBytes")
     }
 
-    private static func clampedCount(_ value: Int) -> Int { min(100_000, max(10_000, value)) }
+    private static func clampedCount(_ value: Int) -> Int { min(100_000, max(10, value)) }
     private static func clampedBytes(_ value: Int) -> Int { min(byteRange.upperBound, max(byteRange.lowerBound, value)) }
 
     private static func integer(from defaults: UserDefaults, key: String) -> Int? {

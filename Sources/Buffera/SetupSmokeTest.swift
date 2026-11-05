@@ -27,6 +27,25 @@ func runSetupSmokeTest() throws {
         }
         return found
     }
+    let limitsSuite = suite + ".limits"
+    let limitsDefaults = UserDefaults(suiteName: limitsSuite)!
+    limitsDefaults.setVolatileDomain([:], forName: UserDefaults.argumentDomain)
+    defer { limitsDefaults.removePersistentDomain(forName: limitsSuite) }
+    try check(HistoryLimits.load(from: limitsDefaults).maxCount == 50_000,
+              "Adding small limits must preserve the default history size")
+    for count in [10, 100, 500, 1_000, 5_000, 1_234, 100_000] {
+        let value = HistoryLimits(maxCount: count, maxBytes: initial.limits.maxBytes)
+        value.save(to: limitsDefaults)
+        let restored = HistoryLimits.load(from: limitsDefaults)
+        try check(restored.maxCount == count && restored.maxBytes == initial.limits.maxBytes,
+                  "Small and custom history limits must survive saving without altering the byte limit")
+    }
+    var bounded = HistoryLimits(maxCount: 0)
+    try check(bounded.maxCount == 10, "History count must be bounded to at least ten records")
+    bounded.maxCount = 100_001
+    try check(bounded.maxCount == 100_000, "The history count upper bound must remain unchanged")
+    bounded.maxCount = -1
+    try check(bounded.maxCount == 10, "Mutating the count must enforce the same lower bound")
     let controller = SetupWindow(initial: initial, modelsAvailable: true, access: access,
                                  bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults)
     let root = controller.window!.contentView!
@@ -91,12 +110,20 @@ func runSetupSmokeTest() throws {
     try click("setup.next")
     try check(controller.draft.limits == initial.limits, "An untouched storage page must preserve fractional and custom limits")
     try click("setup.back")
-    try control(root, "setup.count", NSPopUpButton.self).selectItem(at: 0)
+    let count = try control(root, "setup.count", NSPopUpButton.self)
+    let expectedCounts = [10, 100, 500, 1_000, 5_000, 10_000, 42_000, 50_000, 100_000]
+    // AppKit normalizes nonbreaking grouping spaces in popup titles.
+    try check(count.itemTitles.map { $0.filter { !$0.isWhitespace } } == expectedCounts.map {
+        $0.formatted(.number.locale(L10n.locale)).filter { !$0.isWhitespace }
+    },
+              "Setup must offer small history limits and retain the current custom value")
+    count.selectItem(at: 0)
     let bytes = try control(root, "setup.bytes", NSSlider.self)
     bytes.doubleValue = 8
     _ = bytes.sendAction(bytes.action, to: bytes.target)
     try click("setup.next")
-    try check(controller.draft.limits != initial.limits, "Storage edits must be retained in the draft")
+    try check(controller.draft.limits == HistoryLimits(maxCount: 10, maxBytes: 8_000_000_000),
+              "The smallest history count must reach the setup draft with the selected byte limit")
     try click("setup.back")
     try click("setup.skip")
     try check(controller.draft.limits == initial.limits, "Skipping storage preserves custom limits")
