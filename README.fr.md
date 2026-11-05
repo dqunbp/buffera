@@ -50,7 +50,7 @@ Thèmes clair, sombre et système. Vues en liste et en grille. Raccourcis person
 2. Ouvrez l’app et suivez la courte configuration. Les étapes facultatives peuvent être ignorées.
 3. Copiez quelque chose et appuyez sur <kbd>⌘⌥V</kbd>.
 
-> Buffera 1.0.0 est signée avec Developer ID et notariée par Apple. Au premier lancement, confirmez l’ouverture de l’app téléchargée si macOS le demande. [Détails d’installation →](docs/INSTALL.txt)
+> La version officielle de Buffera est signée avec Developer ID et notariée par Apple. Au premier lancement, confirmez l’ouverture de l’app téléchargée si macOS le demande. [Détails d’installation →](docs/INSTALL.txt)
 
 La recherche sémantique et le chat sont facultatifs : activez-les dans Réglages pour télécharger les modèles locaux. L’historique fonctionne sans eux. [Configurer la recherche et les modèles →](https://buffera.app/fr/docs/search/)
 

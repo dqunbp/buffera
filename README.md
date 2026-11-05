@@ -50,7 +50,7 @@ Light, dark and system themes. List and grid layouts. Custom shortcuts and a his
 2. Open the app and go through the short setup — optional steps can be skipped.
 3. Copy something and press <kbd>⌘⌥V</kbd>.
 
-> Buffera 1.0.0 is signed with Developer ID and notarized by Apple. On first launch, confirm opening the downloaded app if macOS asks. [Installation details →](docs/INSTALL.txt)
+> The official Buffera release is signed with Developer ID and notarized by Apple. On first launch, confirm opening the downloaded app if macOS asks. [Installation details →](docs/INSTALL.txt)
 
 Semantic search and chat are optional: enable them in Settings to download the local models. Clipboard history works without them. [Search and model setup →](https://buffera.app/en/docs/search/)
 

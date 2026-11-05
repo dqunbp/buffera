@@ -50,7 +50,7 @@ Temas claro, escuro e do sistema. Visualização em lista ou grade. Atalhos pers
 2. Abra o app e siga a configuração rápida. Você pode pular as etapas opcionais.
 3. Copie algo e pressione <kbd>⌘⌥V</kbd>.
 
-> O Buffera 1.0.0 é assinado com Developer ID e notarizado pela Apple. Na primeira abertura, confirme a execução do app baixado se o macOS solicitar. [Detalhes da instalação →](docs/INSTALL.txt)
+> A versão oficial do Buffera é assinada com Developer ID e notarizada pela Apple. Na primeira abertura, confirme a execução do app baixado se o macOS solicitar. [Detalhes da instalação →](docs/INSTALL.txt)
 
 A busca semântica e o chat são opcionais: ative-os nos Ajustes para baixar os modelos locais. O histórico funciona sem eles. [Configurar a busca e os modelos →](https://buffera.app/pt-BR/docs/search/)
 

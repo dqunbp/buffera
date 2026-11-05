@@ -61,7 +61,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera 1.0.0 ist mit Developer ID signiert und von Apple notarisiert. Bestätige beim ersten Start das Öffnen der heruntergeladenen App, wenn macOS danach fragt."
+              "text": "Die offizielle Buffera-Version ist mit Developer ID signiert und von Apple notarisiert. Bestätige beim ersten Start das Öffnen der heruntergeladenen App, wenn macOS danach fragt."
             }
           ]
         },
@@ -485,7 +485,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Wähle unter „Kurzbefehle“ gemeinsame Sondertasten und zwei unterschiedliche Buchstaben: einen zum Öffnen / Vorwärtsgehen und einen zum Zurückgehen. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Standard wiederherstellen“ stellt ⌘⌥V / ⌘⌥C wieder her."
+              "text": "Wähle unter „Kurzbefehle“ gemeinsame Sondertasten und zwei unterschiedliche Buchstaben: einen zum Öffnen / Vorwärtsgehen und einen zum Zurückgehen. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Kurzbefehle zurücksetzen“ stellt ⌘⌥V / ⌘⌥C wieder her."
             },
             {
               "type": "paragraph",

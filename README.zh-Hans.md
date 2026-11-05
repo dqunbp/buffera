@@ -50,7 +50,7 @@ Buffera 将剪贴板历史保存在你的 Mac 上。按下 <kbd>⌘⌥V</kbd>，
 2. 打开应用，完成简短设置；可选步骤可以跳过。
 3. 复制一些内容，然后按下 <kbd>⌘⌥V</kbd>。
 
-> Buffera 1.0.0 已使用 Developer ID 签名，并通过 Apple 公证。首次启动时，如果 macOS 询问，请确认打开下载的应用。[安装详情 →](docs/INSTALL.txt)
+> Buffera 的官方版本已使用 Developer ID 签名，并通过 Apple 公证。首次启动时，如果 macOS 询问，请确认打开下载的应用。[安装详情 →](docs/INSTALL.txt)
 
 语义搜索和聊天是可选功能：在设置中启用后即可下载本地模型。不启用也能正常使用剪贴板历史。[设置搜索与模型 →](https://buffera.app/zh-Hans/docs/search/)
 

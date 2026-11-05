@@ -50,7 +50,7 @@ Helles, dunkles und systemabhängiges Design. Listen- und Rasteransicht. Anpassb
 2. Öffne die App und durchlaufe die kurze Einrichtung. Optionale Schritte kannst du überspringen.
 3. Kopiere etwas und drücke <kbd>⌘⌥V</kbd>.
 
-> Buffera 1.0.0 ist mit Developer ID signiert und von Apple notarisiert. Bestätige beim ersten Start das Öffnen der heruntergeladenen App, falls macOS danach fragt. [Details zur Installation →](docs/INSTALL.txt)
+> Die offizielle Buffera-Version ist mit Developer ID signiert und von Apple notarisiert. Bestätige beim ersten Start das Öffnen der heruntergeladenen App, falls macOS danach fragt. [Details zur Installation →](docs/INSTALL.txt)
 
 Semantische Suche und Chat sind optional: Aktiviere sie in den Einstellungen, um die lokalen Modelle herunterzuladen. Der Verlauf funktioniert auch ohne sie. [Suche und Modelle einrichten →](https://buffera.app/de/docs/search/)
 

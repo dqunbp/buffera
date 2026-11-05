@@ -61,7 +61,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera 1.0.0 est signée avec Developer ID et notariée par Apple. Au premier lancement, confirmez l’ouverture de l’app téléchargée si macOS le demande."
+              "text": "La version officielle de Buffera est signée avec Developer ID et notariée par Apple. Au premier lancement, confirmez l’ouverture de l’app téléchargée si macOS le demande."
             }
           ]
         },
@@ -485,7 +485,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Dans Raccourcis, choisissez des touches de modification communes et deux lettres différentes : une pour ouvrir / avancer, une pour reculer. Cliquez sur Appliquer ; aucun redémarrage n’est nécessaire. Rétablir les valeurs par défaut restaure ⌘⌥V / ⌘⌥C."
+              "text": "Dans Raccourcis, choisissez des touches de modification communes et deux lettres différentes : une pour ouvrir / avancer, une pour reculer. Cliquez sur Appliquer ; aucun redémarrage n’est nécessaire. Réinitialiser les raccourcis restaure ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",

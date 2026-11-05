@@ -61,7 +61,7 @@
             },
             {
               "type": "note",
-              "text": "O Buffera 1.0.0 é assinado com Developer ID e notarizado pela Apple. Na primeira abertura, confirme que deseja abrir o app baixado se o macOS solicitar."
+              "text": "A versão oficial do Buffera é assinada com Developer ID e notarizada pela Apple. Na primeira abertura, confirme que deseja abrir o app baixado se o macOS solicitar."
             }
           ]
         },
@@ -485,7 +485,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Atalhos, escolha teclas modificadoras compartilhadas e duas letras diferentes: uma para abrir ou avançar e outra para voltar. Clique em Aplicar; não é necessário reiniciar. Restaurar padrões recupera ⌘⌥V / ⌘⌥C."
+              "text": "Em Atalhos, escolha teclas modificadoras compartilhadas e duas letras diferentes: uma para abrir ou avançar e outra para voltar. Clique em Aplicar; não é necessário reiniciar. Redefinir atalhos recupera ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",

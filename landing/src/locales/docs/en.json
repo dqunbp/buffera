@@ -61,7 +61,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera 1.0.0 is signed with Developer ID and notarized by Apple. On first launch, confirm opening the downloaded app if macOS asks."
+              "text": "The official Buffera release is signed with Developer ID and notarized by Apple. On first launch, confirm opening the downloaded app if macOS asks."
             }
           ]
         },
@@ -485,7 +485,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Shortcuts, choose shared modifier keys and two different letters: one for opening / moving forward and one for moving backward. Click Apply; no restart is needed. Default restores ⌘⌥V / ⌘⌥C."
+              "text": "In Shortcuts, choose shared modifier keys and two different letters: one for opening / moving forward and one for moving backward. Click Apply; no restart is needed. Reset shortcuts restores ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
