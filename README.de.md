@@ -23,6 +23,12 @@
   <a href="https://github.com/dqunbp/buffera/releases">Neuigkeiten</a>
 </p>
 
+## App-Einstellungen
+
+Die Einstellungen verwenden eine Seitennavigation und gruppierte Karten. Allgemein enthält den Start bei der Anmeldung, die Sichtbarkeit des Menüleistensymbols, die aktuelle Version samt Build und einen GitHub-Issue-Entwurf mit macOS-Version und Architektur. Zwischenablage und Protokolle werden nicht beigefügt; du prüfst und sendest den Entwurf selbst.
+
+Die kompakte Seitenleiste beginnt mit Allgemein und KI. Die Oberflächensprache wählst du unter Allgemein, das Design unter Darstellung; „Kurzbefehle zurücksetzen“ stellt die Standard-Tastenkombinationen wieder her.
+
 ## Kopieren. Finden. Wiederverwenden.
 
 Buffera speichert den Verlauf deiner Zwischenablage auf deinem Mac. Drücke <kbd>⌘⌥V</kbd>, suche einen Eintrag und drücke <kbd>Enter</kbd> — schon liegt er wieder in der Zwischenablage, bereit zum Einfügen mit <kbd>⌘V</kbd>. Du kannst Einträge auch direkt in andere Apps ziehen.

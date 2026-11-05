@@ -48,6 +48,7 @@ func runFeatureSettingsSmokeTest() throws {
     fresh.view.updateBackgroundPreparation(onlyOnExternalPower: true)
     try featureCheck(powerPreference.state == .on, "Saved power preference is not reflected in settings")
     try fresh.checkLayout()
+    try fresh.checkPresentation()
 
     let installed = try FeatureSettingsFixture(state: .downloaded)
     defer { installed.cleanup() }
@@ -258,6 +259,47 @@ private final class FeatureSettingsFixture {
                                  "Feature control overflows its card: \(child.identifier?.rawValue ?? "label")")
             }
         }
+    }
+
+    func checkPresentation() throws {
+        let introduction = try control("models.introduction", as: NSStackView.self)
+        let privacy = try control("models.privacy", as: NSTextField.self)
+        let firstCard = try control("models.embedding", as: NSBox.self)
+        let document = introduction.enclosingScrollView!.documentView!
+        try featureCheck(!privacy.stringValue.isEmpty && !privacy.isHiddenOrHasHiddenAncestor,
+                         "AI settings must explain local processing before offering model actions")
+        let introFrame = document.convert(introduction.bounds, from: introduction)
+        let cardFrame = document.convert(firstCard.bounds, from: firstCard)
+        try featureCheck(introFrame.maxY < cardFrame.minY,
+                         "The local-processing explanation must appear before the feature cards")
+        for role in ModelRole.allCases {
+            let prefix = "models.\(role.rawValue)"
+            let mark = try control("\(prefix).mark", as: NSView.self)
+            let heading = try control("\(prefix).heading", as: NSStackView.self)
+            let toggle = try control("\(prefix).enabled", as: NSButton.self)
+            let title = try control("\(prefix).title", as: NSTextField.self)
+            let markFrame = heading.convert(mark.bounds, from: mark)
+            let titleFrame = heading.convert(title.bounds, from: title)
+            let toggleFrame = heading.convert(toggle.bounds, from: toggle)
+            try featureCheck(markFrame.width >= 44 && titleFrame.minX >= markFrame.maxX + 10,
+                             "Feature mark must not crowd the title")
+            try featureCheck(title.bounds.width >= title.intrinsicContentSize.width - 1 &&
+                             toggleFrame.minX >= titleFrame.maxX + 8,
+                             "The translated title must fit before the trailing enable control")
+            try featureCheck(title.textColor == .labelColor && toggle.accessibilityLabel() == title.stringValue,
+                             "Unavailable features need readable titles and labeled enable controls")
+        }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            view.appearance = NSAppearance(named: appearance)
+            layout()
+            try checkLayout()
+            if let bitmap = document.bitmapImageRepForCachingDisplay(in: document.bounds) {
+                document.cacheDisplay(in: document.bounds, to: bitmap)
+                try bitmap.representation(using: .png, properties: [:])?.write(to:
+                    URL(fileURLWithPath: "/tmp/buffera-ai-settings-\(L10n.language)-\(appearance.rawValue).png"))
+            }
+        }
+        view.appearance = nil
     }
 
     func cleanup() {

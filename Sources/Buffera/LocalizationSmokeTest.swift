@@ -18,10 +18,12 @@ func runLocalizationSmokeTest() throws {
     }
     let customLimits = HistoryLimits(maxCount: 42_000, maxBytes: 3_500_000_000)
     customLimits.save(to: defaults)
-    func makeSettings() -> SettingsWindow {
-        SettingsWindow(mcpAccess: MCPAccess(directory: directory), languageDefaults: defaults, limitsDefaults: defaults,
+    func makeSettings(_ section: Int = 0) -> SettingsWindow {
+        let controller = SettingsWindow(mcpAccess: MCPAccess(directory: directory), languageDefaults: defaults, limitsDefaults: defaults,
                        themeDefaults: defaults,
                        launchLanguage: .system, frameAutosaveName: nil)
+        controller.selectSection(section)
+        return controller
     }
     func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
     func check(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -32,6 +34,7 @@ func runLocalizationSmokeTest() throws {
         throw HistoryError.database("Settings window missing")
     }
     try checkSupportLinks()
+    try runGeneralSettingsChecks()
     guard let githubStar = descendants(content).first(where: { $0.identifier?.rawValue == "settings.githubStar" }) as? NSButton,
           let identity = descendants(content).first(where: { $0.identifier?.rawValue == "settings.identity" }),
           let donation = descendants(content).first(where: { $0.identifier?.rawValue == "settings.support" }) as? NSButton else {
@@ -55,6 +58,7 @@ func runLocalizationSmokeTest() throws {
     }
     InterfaceTheme.system.apply()
     content.layoutSubtreeIfNeeded()
+    controller.selectSection(6)
     guard let language = descendants(content).first(where: {
         $0.identifier?.rawValue == "settings.language"
     }) as? NSPopUpButton else { throw HistoryError.database("Language selector missing") }
@@ -62,6 +66,8 @@ func runLocalizationSmokeTest() throws {
           let restart = descendants(content).first(where: { $0.identifier?.rawValue == "settings.restart" }) as? NSButton else {
         throw HistoryError.database("Restart controls missing")
     }
+    controller.selectSection(0)
+    try check(!descendants(content).contains { $0.identifier?.rawValue == "settings.language" }, "Language must be in General, not Appearance")
     guard let theme = descendants(content).first(where: {
         $0.identifier?.rawValue == "settings.theme"
     }) as? NSPopUpButton else { throw HistoryError.database("Theme selector missing") }
@@ -76,6 +82,7 @@ func runLocalizationSmokeTest() throws {
     for (index, preference) in InterfaceTheme.allCases.enumerated() {
         theme.selectItem(at: index)
         try check(theme.sendAction(theme.action, to: theme.target), "Theme action disconnected")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         try check(InterfaceTheme.load(from: defaults) == preference, "Theme choice did not persist")
         try check(NSApp.appearance?.name == expectedAppearances[index], "Theme must apply immediately to the application")
         try checkStarLayout()
@@ -86,7 +93,7 @@ func runLocalizationSmokeTest() throws {
         if let expected = expectedAppearances[index] {
             try check(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == expected &&
                       reopened.window!.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == expected,
-                      "Existing and new windows must inherit the selected application theme")
+                      "Existing and new windows must inherit the selected application theme: expected \(expected), old \(window.effectiveAppearance.name), new \(reopened.window!.effectiveAppearance.name)")
         }
         NSApp.appearance = nil
         InterfaceTheme.load(from: defaults).apply()
@@ -98,6 +105,7 @@ func runLocalizationSmokeTest() throws {
               "System theme must remove the app override")
     try check(HistoryLimits.load(from: defaults) == customLimits,
               "Changing theme must preserve unrelated history settings")
+    controller.selectSection(6)
     var restartRequests = 0
     controller.onRestart = { restartRequests += 1 }
     try check(notice.isHidden, "Unchanged language must not request restart")
@@ -120,7 +128,7 @@ func runLocalizationSmokeTest() throws {
             let frame = content.convert(view.bounds, from: view)
             try check(content.bounds.insetBy(dx: -1, dy: -1).contains(frame), "Pending restart control lies outside the window")
         }
-        let reopened = makeSettings()
+        let reopened = makeSettings(6)
         guard let root = reopened.window?.contentView,
               let selected = descendants(root).first(where: {
                   $0.identifier?.rawValue == "settings.language"
@@ -138,15 +146,27 @@ func runLocalizationSmokeTest() throws {
     let expectedTitle = L10n.text("Настройки \("Buffera")")
     try check(window.title == expectedTitle, "Window title is not translated")
     try check(!window.isVisible, "Smoke check must not open a window")
+    controller.selectSection(0)
     try runAppearanceHelpSmokeTest(content)
     for view in descendants(content) where !view.isHiddenOrHasHiddenAncestor && view is NSControl {
         let frame = content.convert(view.bounds, from: view)
         try check(content.bounds.insetBy(dx: -1, dy: -1).contains(frame), "Settings control lies outside the window")
     }
-    guard let tabs = descendants(content).compactMap({ $0 as? NSSegmentedControl }).first else {
+    guard let tabs = descendants(content).compactMap({ $0 as? SettingsNavigation }).first else {
         throw HistoryError.database("Settings tabs missing")
     }
     try check(content.bounds.contains(content.convert(tabs.bounds, from: tabs)), "Settings tabs exceed the window width")
+    let navFrame = content.convert(tabs.bounds, from: tabs)
+    try check(abs(content.bounds.maxY - navFrame.maxY - 20) < 1 && navFrame.width == 160,
+              "Sidebar must be compact and anchored to the top")
+    let accessibleButtons = tabs.accessibilityChildren() as? [NSButton] ?? []
+    try check(accessibleButtons.map(\.tag) == [6, 4, 0, 1, 2, 3, 5], "AI must follow General in visual and accessible navigation")
+    for button in accessibleButtons {
+        button.performClick(nil)
+        try check(tabs.selectedSegment == button.tag, "Sidebar button failed to select its page")
+    }
+    controller.selectSection(0)
+
     guard let setup = descendants(content).first(where: { $0.identifier?.rawValue == "settings.showSetup" }) as? NSButton else {
         throw HistoryError.database("Appearance page is missing the setup action")
     }
@@ -182,7 +202,7 @@ func runLocalizationSmokeTest() throws {
                 to: URL(fileURLWithPath: "/tmp/buffera-settings-\(name)-\(activeLanguage).png"))
         }
     }
-    try check(tabs.segmentCount == 6 && !(0..<tabs.segmentCount).contains { tabs.label(forSegment: $0) == L10n.text("Копирование") },
+    try check(tabs.segmentCount == 7 && !(0..<tabs.segmentCount).contains { tabs.label(forSegment: $0) == L10n.text("Копирование") },
               "File naming must not have a separate settings tab")
     try check(!descendants(content).contains { $0.identifier?.rawValue == "settings.textFileNaming" },
               "File export must not appear among history settings")
@@ -224,7 +244,7 @@ func runLocalizationSmokeTest() throws {
               "Disabling reset must persist and disable the duration controls")
     let resetReopened = makeSettings()
     let resetRoot = resetReopened.window!.contentView!
-    let resetTabs = descendants(resetRoot).compactMap { $0 as? NSSegmentedControl }.first!
+    let resetTabs = descendants(resetRoot).compactMap { $0 as? SettingsNavigation }.first!
     resetTabs.selectedSegment = 1
     _ = resetTabs.sendAction(resetTabs.action, to: resetTabs.target)
     let restoredReset = descendants(resetRoot).first { $0.identifier?.rawValue == "settings.historyReset.enabled" } as? NSButton
@@ -283,7 +303,7 @@ func runLocalizationSmokeTest() throws {
               "Successful secret setting did not persist")
     try check(secretStatus.isHidden, "Successful secret change must remove the empty status row")
     let secretReopened = makeSettings()
-    let secretTabs = descendants(secretReopened.window!.contentView!).compactMap { $0 as? NSSegmentedControl }.first!
+    let secretTabs = descendants(secretReopened.window!.contentView!).compactMap { $0 as? SettingsNavigation }.first!
     secretTabs.selectedSegment = 1
     _ = secretTabs.sendAction(secretTabs.action, to: secretTabs.target)
     let restoredSecrets = descendants(secretReopened.window!.contentView!).first { $0.identifier?.rawValue == "settings.secretHistoryMode" } as? NSPopUpButton
@@ -319,7 +339,7 @@ func runLocalizationSmokeTest() throws {
     try check(changes.count == numberOfChanges, "Unchanged slider notified twice")
     let reopened = makeSettings()
     let reopenedContent = reopened.window!.contentView!
-    let reopenedTabs = descendants(reopenedContent).compactMap { $0 as? NSSegmentedControl }.first!
+    let reopenedTabs = descendants(reopenedContent).compactMap { $0 as? SettingsNavigation }.first!
     reopenedTabs.selectedSegment = 1
     _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
     let reopenedSlider = descendants(reopenedContent).first { $0.identifier?.rawValue == "settings.byteLimit" } as? NSSlider
@@ -340,7 +360,8 @@ func runLocalizationSmokeTest() throws {
 private func checkSupportLinks() throws {
     for (destination, expectedURL) in [
         (SupportBuffera.Destination.githubStar, "https://github.com/dqunbp/buffera"),
-        (.donation, "https://web.tribute.tg/d/SHI")
+        (.donation, "https://web.tribute.tg/d/SHI"),
+        (.reportIssue, IssueReport.url().absoluteString)
     ] {
         var requests: [URL] = []
         var alerts: [NSAlert] = []

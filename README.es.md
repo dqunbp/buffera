@@ -23,6 +23,12 @@
   <a href="https://github.com/dqunbp/buffera/releases">Novedades</a>
 </p>
 
+## Ajustes de la aplicación
+
+Los ajustes usan navegación lateral y tarjetas agrupadas. General incluye inicio automático al iniciar sesión, visibilidad del icono en la barra de menús, versión y compilación actuales, y un botón para redactar un issue de GitHub con la versión de macOS y la arquitectura. El borrador no incluye el contenido del portapapeles ni registros; tú lo revisas y envías.
+
+La barra lateral compacta comienza con General e IA. El idioma de la interfaz se elige en General y el tema en Apariencia; «Restablecer atajos» recupera las combinaciones predeterminadas.
+
 ## Copia. Encuentra. Reutiliza.
 
 Buffera guarda el historial del portapapeles en tu Mac. Pulsa <kbd>⌘⌥V</kbd>, busca una entrada y pulsa <kbd>Enter</kbd>: vuelve al portapapeles, lista para pegarla con <kbd>⌘V</kbd>. También puedes arrastrar las entradas directamente a otras aplicaciones.

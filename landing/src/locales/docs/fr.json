@@ -112,11 +112,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Ouvrez les réglages avec le bouton d’engrenage ou ⌘,. Dans Apparence, choisissez le thème, la langue, le nombre de colonnes et la position de la fenêtre. Le thème change immédiatement ; la langue nécessite un redémarrage."
+              "text": "Ouvrez les réglages avec le bouton d’engrenage ou ⌘,. Choisissez la langue dans Général, et le thème, le nombre de colonnes et la position de la fenêtre dans Apparence. Le thème change immédiatement ; la langue nécessite un redémarrage."
             },
             {
               "type": "paragraph",
-              "text": "Pour lancer Buffera avec votre Mac, ajoutez-le dans Réglages Système → Général → Ouverture. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
+              "text": "Pour lancer Buffera avec votre Mac, activez « Lancer à l’ouverture de session » dans Réglages → Général. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
             }
           ]
         }
@@ -225,7 +225,7 @@
             {
               "type": "steps",
               "items": [
-                "Ouvrez Réglages → Recherche et réponses.",
+                "Ouvrez Réglages → IA.",
                 "Dans Recherche sémantique, choisissez Télécharger et activer. EmbeddingGemma 2 utilise environ 310 Mo.",
                 "Attendez l’indexation de la partie pertinente de votre historique. Les réglages affichent la progression.",
                 "Activez Inclure la recherche sémantique dans la fenêtre de l’historique."
@@ -265,7 +265,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Dans Réglages → Recherche et réponses, trouvez Demander à Buffera et choisissez Télécharger et activer. Gemma 4 E2B utilise environ 2,84 Go et fonctionne sur les puces Apple."
+              "text": "Dans Réglages → IA, trouvez Demander à Buffera et choisissez Télécharger et activer. Gemma 4 E2B utilise environ 2,84 Go et fonctionne sur les puces Apple."
             },
             {
               "type": "paragraph",
@@ -631,7 +631,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Ouvrez Recherche et réponses. Vérifiez le téléchargement du modèle et l’activation de la fonction concernée. La recherche sémantique nécessite aussi l’indexation de l’historique. Sur batterie, choisissez Reprendre maintenant ou branchez le Mac."
+              "text": "Ouvrez IA. Vérifiez le téléchargement du modèle et l’activation de la fonction concernée. La recherche sémantique nécessite aussi l’indexation de l’historique. Sur batterie, choisissez Reprendre maintenant ou branchez le Mac."
             },
             {
               "type": "paragraph",

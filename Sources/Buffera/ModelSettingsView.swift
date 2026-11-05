@@ -21,7 +21,23 @@ final class ModelSettingsView: NSView {
         let content = NSStackView()
         content.orientation = .vertical
         content.alignment = .leading
-        content.spacing = 12
+        content.spacing = 14
+        let privacyIcon = NSImageView(image: NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil)!)
+        privacyIcon.contentTintColor = .systemGreen
+        privacyIcon.symbolConfiguration = .init(pointSize: 32, weight: .medium)
+        privacyIcon.imageScaling = .scaleProportionallyUpOrDown
+        privacyIcon.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        privacyIcon.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        let privacyNote = modelParagraph(
+            L10n.text("Все модели работают локально. История буфера обмена никогда и никуда не отправляется.")
+        )
+        privacyNote.font = .systemFont(ofSize: 12)
+        privacyNote.identifier = NSUserInterfaceItemIdentifier("models.privacy")
+        let privacy = NSStackView(views: [privacyIcon, privacyNote])
+        privacy.orientation = .horizontal; privacy.alignment = .centerY; privacy.spacing = 14
+        privacy.identifier = NSUserInterfaceItemIdentifier("models.introduction")
+        content.addArrangedSubview(privacy)
+        privacy.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         if manager == nil {
             let unavailable = modelParagraph(unavailableMessage ?? L10n.text("Не удалось открыть скачанные файлы."))
             unavailable.textColor = .systemRed
@@ -60,12 +76,6 @@ final class ModelSettingsView: NSView {
             content.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
-        let note = modelParagraph(
-            L10n.text("Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются.")
-        )
-        content.addArrangedSubview(note)
-        note.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
@@ -160,7 +170,7 @@ private final class ModelCardView: NSBox {
         self.snapshot = snapshot
         super.init(frame: .zero)
         boxType = .custom
-        borderWidth = 0
+        borderWidth = 0.75
         cornerRadius = 12
         fillColor = .controlBackgroundColor
         contentViewMargins = .zero
@@ -168,14 +178,35 @@ private final class ModelCardView: NSBox {
         let prefix = "models.\(snapshot.descriptor.role.rawValue)"
         identifier = NSUserInterfaceItemIdentifier(prefix)
         let isSearch = snapshot.descriptor.role == .embedding
-        enabled.title = isSearch ? L10n.text("Поиск по смыслу") : L10n.text("Спросить Buffera")
-        enabled.font = .systemFont(ofSize: 13, weight: .semibold)
+        let accent: NSColor = isSearch ? .systemTeal : BrandIdentity.accentColor
+        borderColor = accent.withAlphaComponent(0.24)
+        let mark = ModelFeatureMark(symbol: isSearch ? "sparkle.magnifyingglass" : "bubble.left.and.bubble.right", accent: accent)
+        mark.identifier = NSUserInterfaceItemIdentifier("\(prefix).mark")
+        let title = isSearch ? L10n.text("Поиск по смыслу") : L10n.text("Спросить Buffera")
+        let featureTitle = NSTextField(labelWithString: title)
+        featureTitle.font = .systemFont(ofSize: 15, weight: .semibold)
+        featureTitle.textColor = .labelColor
+        featureTitle.identifier = NSUserInterfaceItemIdentifier("\(prefix).title")
+        featureTitle.setContentCompressionResistancePriority(.required, for: .horizontal)
+        enabled.setAccessibilityLabel(title)
+        enabled.setContentHuggingPriority(.required, for: .horizontal)
         enabled.target = self
         enabled.action = #selector(changeEnabled)
         enabled.identifier = NSUserInterfaceItemIdentifier("\(prefix).enabled")
         let description = modelParagraph(isSearch
             ? L10n.text("Находите записи, даже если не помните точные слова. Для поиска по смыслу используется отдельная модель на вашем Mac.")
             : L10n.text("Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы."))
+        description.font = .systemFont(ofSize: 12)
+        description.textColor = .labelColor
+        let titleRow = NSStackView(views: [featureTitle, NSView(), enabled])
+        titleRow.orientation = .horizontal; titleRow.alignment = .centerY; titleRow.spacing = 8
+        let headingText = NSStackView(views: [titleRow, description])
+        headingText.orientation = .vertical; headingText.alignment = .leading; headingText.spacing = 6
+        titleRow.widthAnchor.constraint(equalTo: headingText.widthAnchor).isActive = true
+        description.widthAnchor.constraint(equalTo: headingText.widthAnchor).isActive = true
+        let heading = NSStackView(views: [mark, headingText])
+        heading.orientation = .horizontal; heading.alignment = .top; heading.spacing = 12
+        heading.identifier = NSUserInterfaceItemIdentifier("\(prefix).heading")
         let energyNote = modelParagraph(isSearch
             ? L10n.text("Подготовка истории расходует заряд. Поиск по уже подготовленным записям доступен и от аккумулятора.")
             : L10n.text("Локальные ответы расходуют заряд и могут нагревать Mac. Обработка начинается после вашего вопроса."))
@@ -249,7 +280,7 @@ private final class ModelCardView: NSBox {
         details.spacing = 8
         for view in [technicalActions, checkStatus] { details.addArrangedSubview(view) }
         details.isHidden = true
-        let stack = NSStackView(views: [enabled, description, modelName, energyNote, status, progress,
+        let stack = NSStackView(views: [heading, modelName, energyNote, status, progress,
                                       onlyOnExternalPower, indexStatus, indexProgress, continuePreparation,
                                       retryIndex, actions, details])
         stack.orientation = .vertical
@@ -264,7 +295,7 @@ private final class ModelCardView: NSBox {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
-        for view in [description, modelName, energyNote, status, progress, onlyOnExternalPower,
+        for view in [heading, modelName, energyNote, status, progress, onlyOnExternalPower,
                      indexStatus, indexProgress, details] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
@@ -414,6 +445,40 @@ private final class ModelCardView: NSBox {
         else { onCheck?() }
     }
     @objc private func showLicense() { NSWorkspace.shared.open(snapshot.descriptor.licenseURL) }
+}
+
+/// Role marks make search and answers recognizable without changing their native controls.
+private final class ModelFeatureMark: NSView {
+    private let accent: NSColor
+
+    init(symbol: String, accent: NSColor) {
+        self.accent = accent
+        super.init(frame: .zero)
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
+        icon.symbolConfiguration = .init(pointSize: 21, weight: .medium)
+        icon.contentTintColor = accent
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(icon)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 44), heightAnchor.constraint(equalToConstant: 44),
+            icon.centerXAnchor.constraint(equalTo: centerXAnchor), icon.centerYAnchor.constraint(equalTo: centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 26), icon.heightAnchor.constraint(equalToConstant: 26)
+        ])
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func draw(_ dirtyRect: NSRect) {
+        accent.withAlphaComponent(0.12).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 11, yRadius: 11).fill()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
 }
 
 private func modelParagraph(_ text: String) -> NSTextField {

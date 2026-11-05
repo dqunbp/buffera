@@ -23,6 +23,12 @@
   <a href="https://github.com/dqunbp/buffera/releases">Novidades</a>
 </p>
 
+## Ajustes do aplicativo
+
+Os ajustes usam navegação lateral e cartões agrupados. Geral inclui início ao entrar no sistema, visibilidade do ícone na barra de menus, versão e compilação atuais e um rascunho de issue do GitHub com a versão do macOS e a arquitetura. O conteúdo da área de transferência e os logs não são incluídos; você revisa e envia o rascunho.
+
+A barra lateral compacta começa com Geral e IA. Escolha o idioma da interface em Geral e o tema em Aparência; «Redefinir atalhos» restaura as combinações padrão.
+
 ## Copie. Encontre. Reutilize.
 
 O Buffera mantém o histórico da área de transferência no seu Mac. Pressione <kbd>⌘⌥V</kbd>, encontre um item e pressione <kbd>Enter</kbd>: ele volta à área de transferência, pronto para colar com <kbd>⌘V</kbd>. Você também pode arrastar os itens diretamente para outros apps.

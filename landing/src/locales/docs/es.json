@@ -112,11 +112,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Abre los ajustes con el botón del engranaje o ⌘,. En Aspecto, elige el tema, el idioma, el número de columnas y la posición de la ventana. Los cambios de tema se aplican inmediatamente; los de idioma requieren reiniciar."
+              "text": "Abre los ajustes con el botón del engranaje o ⌘,. Elige el idioma en General, y el tema, el número de columnas y la posición de la ventana en Aspecto. Los cambios de tema se aplican inmediatamente; los de idioma requieren reiniciar."
             },
             {
               "type": "paragraph",
-              "text": "Para iniciar Buffera con tu Mac, añádelo en Ajustes del Sistema → General → Ítems de inicio. Puedes descargar los modelos de búsqueda y del asistente más tarde; el historial normal del portapapeles funciona sin ellos."
+              "text": "Para iniciar Buffera con tu Mac, activa «Iniciar al iniciar sesión» en Ajustes → General. Puedes descargar los modelos de búsqueda y del asistente más tarde; el historial normal del portapapeles funciona sin ellos."
             }
           ]
         }
@@ -225,7 +225,7 @@
             {
               "type": "steps",
               "items": [
-                "Abre Ajustes → Búsqueda y respuestas.",
+                "Abre Ajustes → IA.",
                 "En Búsqueda semántica, elige Descargar y activar. EmbeddingGemma 2 ocupa unos 310 MB.",
                 "Espera a que se indexe la parte pertinente del historial. Los ajustes muestran el progreso.",
                 "Activa Incluir búsqueda semántica en la ventana del historial."
@@ -265,7 +265,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "En Ajustes → Búsqueda y respuestas, busca Preguntar a Buffera y elige Descargar y activar. Gemma 4 E2B ocupa unos 2,84 GB y se ejecuta en Apple Silicon."
+              "text": "En Ajustes → IA, busca Preguntar a Buffera y elige Descargar y activar. Gemma 4 E2B ocupa unos 2,84 GB y se ejecuta en Apple Silicon."
             },
             {
               "type": "paragraph",
@@ -631,7 +631,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Abre Búsqueda y respuestas. Comprueba la descarga del modelo y que la función correspondiente esté activada. La búsqueda semántica también requiere indexar el historial. Con batería, elige Continuar ahora o conecta la alimentación."
+              "text": "Abre IA. Comprueba la descarga del modelo y que la función correspondiente esté activada. La búsqueda semántica también requiere indexar el historial. Con batería, elige Continuar ahora o conecta la alimentación."
             },
             {
               "type": "paragraph",

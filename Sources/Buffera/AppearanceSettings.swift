@@ -23,16 +23,16 @@ final class SettingsWindow: NSWindowController {
     private let settings: SettingsContentController
     private let limitsDefaults: UserDefaults
 
-    init(modelManager: LocalModelManager? = nil, modelError: String? = nil,
+    init(modelManager: LocalModelManager? = nil, modelError: String? = nil, appPreferences: AppPreferences = AppPreferences(),
          mcpAccess: MCPAccess = MCPAccess(), updateSettings: NSView = UpdateSettingsView(), bundleURL: URL = Bundle.main.bundleURL,
          languageDefaults: UserDefaults = .standard, limitsDefaults: UserDefaults = .standard,
          themeDefaults: UserDefaults = .standard, shortcutDefaults: UserDefaults = .standard,
          launchLanguage: LanguagePreference = L10n.preference, frameAutosaveName: String? = "BufferaSettingsWindow") {
         self.limitsDefaults = limitsDefaults
-        settings = SettingsContentController(modelManager: modelManager, modelError: modelError,
+        settings = SettingsContentController(modelManager: modelManager, modelError: modelError, appPreferences: appPreferences,
                                              mcpAccess: mcpAccess, updateSettings: updateSettings, bundleURL: bundleURL, languageDefaults: languageDefaults,
                                              limitsDefaults: limitsDefaults, themeDefaults: themeDefaults, shortcutDefaults: shortcutDefaults, launchLanguage: launchLanguage)
-        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 720, height: 680),
+        let window = SettingsPanel(contentRect: NSRect(x: 0, y: 0, width: 920, height: 740),
                                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("Настройки \(BrandIdentity.name)")
         window.isReleasedWhenClosed = false
@@ -48,9 +48,9 @@ final class SettingsWindow: NSWindowController {
             window.center()
         }
         // Preserve room for translated labels and the grouped history settings.
-        if window.contentLayoutRect.width < 720 || window.contentLayoutRect.height < 680 {
+        if window.contentLayoutRect.width < 920 || window.contentLayoutRect.height < 740 {
             let top = window.frame.maxY
-            window.setContentSize(NSSize(width: 720, height: 680))
+            window.setContentSize(NSSize(width: 920, height: 740))
             let bottom = window.screen?.visibleFrame.minY ?? 0
             window.setFrameOrigin(NSPoint(x: window.frame.minX, y: max(bottom, top - window.frame.height)))
         }
@@ -95,6 +95,7 @@ final class SettingsWindow: NSWindowController {
         settings.refreshSecrets()
         settings.refreshHistoryReset()
         settings.refreshModels()
+        settings.refreshGeneral()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -106,6 +107,7 @@ final class SettingsWindow: NSWindowController {
     }
 
     func selectUpdates() { settings.selectUpdates() }
+    func selectSection(_ index: Int) { settings.selectSection(index) }
 
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
@@ -174,14 +176,16 @@ private final class SettingsContentController: NSViewController {
     private let bytes = NSSlider()
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
-    private let tabs = NSSegmentedControl(labels: [L10n.text("Вид"), L10n.text("История"), L10n.text("Клавиши"), "MCP", L10n.text("Поиск и ответы"), L10n.text("Обновления")], trackingMode: .selectOne,
-                                          target: nil, action: nil)
+    private let tabs = SettingsNavigation(frame: .zero)
+    private let pageTitle = NSTextField(labelWithString: "")
+    private let general: GeneralSettingsView
     private let saveNotice = NSTextField(labelWithString: "")
     private let body = NSView()
     private var pages: [NSView] = []
 
-    init(modelManager: LocalModelManager?, modelError: String?, mcpAccess: MCPAccess, updateSettings: NSView, bundleURL: URL,
+    init(modelManager: LocalModelManager?, modelError: String?, appPreferences: AppPreferences, mcpAccess: MCPAccess, updateSettings: NSView, bundleURL: URL,
          languageDefaults: UserDefaults, limitsDefaults: UserDefaults, themeDefaults: UserDefaults, shortcutDefaults: UserDefaults, launchLanguage: LanguagePreference) {
+        general = GeneralSettingsView(preferences: appPreferences)
         self.shortcutDefaults = shortcutDefaults
         self.updateSettings = updateSettings
         shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
@@ -220,6 +224,12 @@ private final class SettingsContentController: NSViewController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func refreshGeneral() { general.refresh() }
+    func selectSection(_ index: Int) {
+        _ = view
+        tabs.selectedSegment = index
+        presentPage(index)
+    }
     func refreshShortcuts() { shortcutSettings.refresh(.load(from: shortcutDefaults)) }
     func refreshMCPAccess() { mcp.refresh() }
     func refreshModels() { models.refresh() }
@@ -246,7 +256,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 720, height: 680))
+        let root = SettingsBackground(frame: NSRect(x: 0, y: 0, width: 920, height: 740))
         let icon = NSImageView(image: BrandIdentity.appIcon(size: 64))
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.setAccessibilityLabel(BrandIdentity.name)
@@ -264,18 +274,16 @@ private final class SettingsContentController: NSViewController {
         githubStar.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(githubStar)
 
-        tabs.selectedSegment = 0
-        tabs.segmentStyle = .rounded
-        tabs.controlSize = .regular
         tabs.target = self; tabs.action = #selector(changeTab)
-        tabs.setAccessibilityLabel(L10n.text("Раздел настроек"))
-        for index in 0..<tabs.segmentCount {
-            let title = (tabs.label(forSegment: index) ?? "") as NSString
-            let width = title.size(withAttributes: [.font: tabs.font ?? NSFont.systemFont(ofSize: 13)]).width
-            tabs.setWidth(ceil(width) + 24, forSegment: index)
-        }
+        let rail = NSVisualEffectView()
+        rail.material = .sidebar; rail.blendingMode = .withinWindow
+        rail.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(rail, positioned: .below, relativeTo: header)
         tabs.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(tabs)
+        rail.addSubview(tabs)
+        pageTitle.font = .systemFont(ofSize: 22, weight: .semibold)
+        pageTitle.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(pageTitle)
         body.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(body)
 
@@ -286,26 +294,33 @@ private final class SettingsContentController: NSViewController {
         footer.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(footer)
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
-            header.topAnchor.constraint(equalTo: root.topAnchor, constant: 21),
+            rail.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            rail.topAnchor.constraint(equalTo: root.topAnchor), rail.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            rail.widthAnchor.constraint(equalToConstant: 180),
+            tabs.leadingAnchor.constraint(equalTo: rail.leadingAnchor, constant: 10),
+            tabs.trailingAnchor.constraint(equalTo: rail.trailingAnchor, constant: -10),
+            tabs.topAnchor.constraint(equalTo: rail.topAnchor, constant: 20),
+            header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 204),
+            header.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
             githubStar.leadingAnchor.constraint(greaterThanOrEqualTo: header.trailingAnchor, constant: 20),
-            githubStar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
+            githubStar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24),
             githubStar.centerYAnchor.constraint(equalTo: header.centerYAnchor),
-            tabs.centerXAnchor.constraint(equalTo: root.centerXAnchor),
-            tabs.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 20),
-            body.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
-            body.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
-            body.topAnchor.constraint(equalTo: tabs.bottomAnchor, constant: 22),
+            pageTitle.leadingAnchor.constraint(equalTo: body.leadingAnchor),
+            pageTitle.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 28),
+            body.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 204),
+            body.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24),
+            body.topAnchor.constraint(equalTo: pageTitle.bottomAnchor, constant: 18),
             body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -14),
-            footer.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
-            footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
+            footer.leadingAnchor.constraint(equalTo: body.leadingAnchor),
+            footer.trailingAnchor.constraint(equalTo: body.trailingAnchor),
             footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
-        pages = [appearancePage(), SetupUI.scroll(historyPage()), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models, SetupUI.scroll(updateSettings)]
+        general.insertLanguageCard(languageCard())
+        pages = [SetupUI.scroll(appearancePage()), SetupUI.scroll(historyPage()), SetupUI.scroll(keyboardPage()), SetupUI.scroll(mcp), models, SetupUI.scroll(updateSettings), SetupUI.scroll(general)]
         view = root
         updateAppearance(appearance)
         updateLimits(limits)
-        presentPage(0)
+        presentPage(6)
     }
 
     func updateAppearance(_ value: HistoryAppearance) {
@@ -338,15 +353,30 @@ private final class SettingsContentController: NSViewController {
         theme.selectItem(at: InterfaceTheme.allCases.firstIndex(of: .load(from: themeDefaults)) ?? 0)
     }
 
+    private func languageCard() -> NSView {
+        language.addItems(withTitles: LanguagePreference.allCases.map(\.title))
+        language.selectItem(at: LanguagePreference.allCases.firstIndex(of: .load(from: languageDefaults)) ?? 0)
+        language.identifier = NSUserInterfaceItemIdentifier("settings.language")
+        configure(language, label: L10n.text("Язык интерфейса"), action: #selector(languageChanged))
+        let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» выбирает первый поддерживаемый язык из предпочтений macOS; если подходящего нет, используется английский."))
+        let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
+        restart.bezelStyle = .rounded
+        restart.identifier = NSUserInterfaceItemIdentifier("settings.restart")
+        restartNotice.identifier = NSUserInterfaceItemIdentifier("settings.restartNotice")
+        restartNotice.orientation = .horizontal
+        restartNotice.alignment = .centerY
+        restartNotice.spacing = 10
+        restartNotice.addArrangedSubview(paragraph(L10n.text("Язык изменится после перезапуска")))
+        restartNotice.addArrangedSubview(restart)
+        refreshLanguage()
+        return SetupUI.card([form([[label(L10n.text("Язык интерфейса")), language]]), languageNote, restartNotice])
+    }
+
     private func appearancePage() -> NSView {
         theme.addItems(withTitles: InterfaceTheme.allCases.map(\.title))
         theme.identifier = NSUserInterfaceItemIdentifier("settings.theme")
         configure(theme, label: L10n.text("Тема"), action: #selector(themeChanged))
         refreshTheme()
-        language.addItems(withTitles: LanguagePreference.allCases.map(\.title))
-        language.selectItem(at: LanguagePreference.allCases.firstIndex(of: .load(from: languageDefaults)) ?? 0)
-        language.identifier = NSUserInterfaceItemIdentifier("settings.language")
-        configure(language, label: L10n.text("Язык интерфейса"), action: #selector(languageChanged))
         mode.addItems(withTitles: HistoryAppearance.Mode.allCases.map(\.title))
         columns.addItems(withTitles: [L10n.text("1 — список"), L10n.text("2 — сетка"), L10n.text("3 — сетка"), L10n.text("4 — сетка")])
         rows.addItems(withTitles: (3...12).map(String.init))
@@ -359,20 +389,8 @@ private final class SettingsContentController: NSViewController {
             [label(L10n.text("Тема")), theme, NSView()],
             [label(L10n.text("Расположение")), mode, AppearanceHelpButton(topic: .placement)],
             [label(L10n.text("Карточки")), columns, AppearanceHelpButton(topic: .columns)],
-            [label(L10n.text("Видимых строк")), rows, AppearanceHelpButton(topic: .rows)],
-            [label(L10n.text("Язык")), language, NSView()]
+            [label(L10n.text("Видимых строк")), rows, AppearanceHelpButton(topic: .rows)]
         ])
-        let languageNote = paragraph(L10n.text("Язык применяется после перезапуска Buffera. «Системный» выбирает первый поддерживаемый язык из предпочтений macOS; если подходящего нет, используется английский."))
-        let restart = NSButton(title: L10n.text("Перезапустить Buffera"), target: self, action: #selector(restartApp))
-        restart.bezelStyle = .rounded
-        restart.identifier = NSUserInterfaceItemIdentifier("settings.restart")
-        restartNotice.identifier = NSUserInterfaceItemIdentifier("settings.restartNotice")
-        restartNotice.orientation = .horizontal
-        restartNotice.alignment = .centerY
-        restartNotice.spacing = 10
-        restartNotice.addArrangedSubview(paragraph(L10n.text("Язык изменится после перезапуска")))
-        restartNotice.addArrangedSubview(restart)
-        refreshLanguage()
         let setupButton = NSButton(title: L10n.text("Пройти настройку заново…"), target: self, action: #selector(showSetup))
         setupButton.bezelStyle = .inline
         setupButton.identifier = NSUserInterfaceItemIdentifier("settings.showSetup")
@@ -380,8 +398,11 @@ private final class SettingsContentController: NSViewController {
         setupNote.identifier = NSUserInterfaceItemIdentifier("settings.setupNote")
         let setup = vertical([setupButton, setupNote], spacing: 4)
         setupNote.widthAnchor.constraint(equalTo: setup.widthAnchor).isActive = true
-        let page = vertical([grid, languageNote, restartNotice, sidebar, setup], spacing: 12)
-        for child in [grid, languageNote, setup] { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+        let appearanceCard = SetupUI.card([grid, sidebar])
+        let setupCard = SetupUI.card([setup])
+        let page = vertical([appearanceCard, setupCard], spacing: 16)
+        for card in [appearanceCard, setupCard] { card.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
+
         return page
     }
 
@@ -426,15 +447,9 @@ private final class SettingsContentController: NSViewController {
         let reopening = vertical([label(L10n.text("При открытии окна"), size: 13, weight: .semibold), historyReset], spacing: 10)
         reopening.identifier = NSUserInterfaceItemIdentifier("settings.history.reopening")
         historyReset.widthAnchor.constraint(equalTo: reopening.widthAnchor).isActive = true
-        let page = vertical([retention, separator(), privacy, separator(), reopening], spacing: 14)
+        let page = vertical([SetupUI.card([retention]), SetupUI.card([privacy]), SetupUI.card([reopening])], spacing: 16)
         for child in page.arrangedSubviews { child.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true }
         return page
-    }
-
-    private func separator() -> NSView {
-        let line = NSBox()
-        line.boxType = .separator
-        return line
     }
 
     private func keyboardPage() -> NSView {
@@ -527,6 +542,7 @@ private final class SettingsContentController: NSViewController {
 
     private func presentPage(_ index: Int) {
         guard pages.indices.contains(index) else { return }
+        pageTitle.stringValue = tabs.label(forSegment: index) ?? ""
         saveNotice.stringValue = index == 2 ? L10n.text("Сочетания применяются без перезапуска") : L10n.text("Изменения сохраняются сразу")
         for view in body.subviews { view.removeFromSuperview() }
         let page = pages[index]
@@ -592,4 +608,11 @@ private final class SettingsContentController: NSViewController {
     }
 
     @objc private func revealData() { onRevealData?() }
+}
+
+private final class SettingsBackground: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        dirtyRect.fill()
+    }
 }

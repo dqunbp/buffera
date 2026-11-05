@@ -4,12 +4,13 @@ import BufferaLocalization
 /// Settings and menu actions share external-link handling and browser failure UI.
 final class SupportBuffera: NSObject {
     enum Destination {
-        case donation, githubStar
+        case donation, githubStar, reportIssue
 
         var url: URL {
             switch self {
             case .donation: URL(string: "https://web.tribute.tg/d/SHI")!
             case .githubStar: URL(string: "https://github.com/dqunbp/buffera")!
+            case .reportIssue: IssueReport.url()
             }
         }
 
@@ -17,6 +18,7 @@ final class SupportBuffera: NSObject {
             switch self {
             case .donation: L10n.text("Поддержать Buffera 💜")
             case .githubStar: "☆ " + L10n.text("Поставить звезду на GitHub")
+            case .reportIssue: L10n.text("Сообщить о проблеме…")
             }
         }
 
@@ -24,6 +26,7 @@ final class SupportBuffera: NSObject {
             switch self {
             case .donation: L10n.text("Поддержать разработку через Tribute — откроется в браузере")
             case .githubStar: L10n.text("Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере")
+            case .reportIssue: L10n.text("Открыть черновик GitHub Issue в браузере")
             }
         }
 
@@ -31,11 +34,13 @@ final class SupportBuffera: NSObject {
             switch self {
             case .donation: "settings.support"
             case .githubStar: "settings.githubStar"
+            case .reportIssue: "settings.reportIssue"
             }
         }
     }
 
     static let shared = SupportBuffera(destination: .donation)
+    static let reportIssue = SupportBuffera(destination: .reportIssue)
     static let githubStar = SupportBuffera(destination: .githubStar)
     let destination: Destination
     private let openURL: (URL) -> Bool
@@ -56,7 +61,7 @@ final class SupportBuffera: NSObject {
         guard !openURL(destination.url) else { return }
         let alert = NSAlert()
         alert.messageText = L10n.text("Не удалось открыть браузер")
-        alert.informativeText = L10n.text("Откройте ссылку для поддержки Buffera в браузере: \(destination.url.absoluteString)")
+        alert.informativeText = L10n.text("Откройте ссылку в браузере: \(destination.url.absoluteString)")
         presentAlert(alert)
     }
 

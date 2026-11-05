@@ -20,7 +20,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
     private let welcome = NSStackView()
     private var currentResponse: ChatMessageView?
     private var enabled = false
-    private var unavailableMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
+    private var unavailableMessage = L10n.text("Для работы помощника скачайте модель в настройках «ИИ».")
     private var statusMessage = ""
     private var busy = false
     private var stopping = false
@@ -67,7 +67,7 @@ final class HistoryChatWindow: NSWindowController, NSWindowDelegate, NSTextViewD
 
     func setAvailability(enabled: Bool, message: String? = nil) {
         self.enabled = enabled
-        unavailableMessage = message ?? L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
+        unavailableMessage = message ?? L10n.text("Для работы помощника скачайте модель в настройках «ИИ».")
         updateControls()
     }
 

@@ -23,6 +23,12 @@
   <a href="https://github.com/dqunbp/buffera/releases">What's new</a>
 </p>
 
+## Application settings
+
+Settings now use sidebar navigation and grouped cards. General includes launch at login, menu bar icon visibility, the current version/build, and a button to draft a GitHub issue with the macOS version and architecture. The draft does not include clipboard content or logs; you review and submit it yourself.
+
+The compact sidebar starts with General and AI. Choose the interface language in General and the theme in Appearance; Reset shortcuts restores the default key combinations.
+
 ## Copy. Find. Reuse.
 
 Buffera keeps your clipboard history on your Mac. Press <kbd>⌘⌥V</kbd>, find a clip and hit <kbd>Enter</kbd> — it's back on your clipboard, ready to paste with <kbd>⌘V</kbd>. You can also drag clips straight into other apps.

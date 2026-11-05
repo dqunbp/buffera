@@ -245,7 +245,7 @@
 "Проверка остановлена. Модель выгружена." = "Check stopped. The model was unloaded.";
 "Не удалось открыть скачанные файлы." = "Could not open the downloaded files.";
 "Эти функции пока доступны только на Mac с Apple Silicon." = "These features are currently available only on Macs with Apple Silicon.";
-"Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются." = "Both features run on this Mac. Internet is needed only for downloading. Concealed items are excluded.";
+"Все модели работают локально. История буфера обмена никогда и никуда не отправляется." = "All models run locally. Your clipboard history is never sent anywhere.";
 "Готовить историю для поиска по смыслу только при питании от сети" = "Prepare history for semantic search only on external power";
 "Подробнее" = "Details";
 "Поиск по смыслу" = "Semantic Search";
@@ -644,3 +644,45 @@
 "Видимых строк: %1$@" = "Visible rows: %1$@";
 "Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Columns place cards side by side: one creates a list, several create a grid. A narrow window will show fewer columns.";
 "Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Fewer rows make cards taller and show more text. More rows make cards more compact. Short entries in a side panel can take up less height.";
+
+"Основные" = "General";
+
+"Запускать при входе в систему" = "Launch at login";
+
+"Показывать значок в строке меню" = "Show menu bar icon";
+
+"Открыть настройки входа macOS" = "Open macOS Login Items";
+
+"Без значка откройте историю сочетанием клавиш или запустите Buffera снова, чтобы открыть настройки." = "With the icon hidden, use your shortcut to open history, or open Buffera again to access settings.";
+
+"Запуск и доступ" = "Startup and access";
+
+"Версия %1$@ · сборка %2$@" = "Version %1$@ · build %2$@";
+
+"О приложении" = "About";
+
+"Сообщить о проблеме…" = "Report an issue…";
+
+"Открыть черновик GitHub Issue в браузере" = "Open a GitHub issue draft in your browser";
+
+"Откроется черновик GitHub Issue с версией Buffera, сборкой, версией macOS и архитектурой. Содержимое буфера и логи не добавляются." = "Opens a GitHub issue draft with the Buffera version, build, macOS version and architecture. Clipboard content and logs are not included.";
+
+"Разрешите автозапуск Buffera в настройках входа macOS." = "Allow Buffera to launch at login in macOS Login Items.";
+
+"Не удалось определить состояние автозапуска." = "Could not determine launch-at-login status.";
+
+"Не удалось изменить автозапуск: %1$@" = "Could not change launch at login: %1$@";
+
+"Откройте ссылку в браузере: %1$@" = "Open this link in your browser: %1$@";
+
+"Что произошло?" = "What happened?";
+
+"Что ожидалось?" = "What did you expect?";
+
+"Как повторить?" = "How can we reproduce it?";
+
+"ИИ" = "AI";
+
+"Сбросить сочетания" = "Reset shortcuts";
+
+"Для работы помощника скачайте модель в настройках «ИИ»." = "To use the assistant, download a model in AI settings.";

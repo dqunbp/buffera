@@ -21,7 +21,7 @@ final class HistoryChatCoordinator {
     private var answer = ""
     private var sourceIDs = Set<Int64>()
     private var enabled = false
-    private var availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
+    private var availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «ИИ».")
 
     init(databaseURL: URL, modelRootURL: URL, embeddingRuntime: EmbeddingRuntime? = nil) {
         session = ChatSession(databaseURL: databaseURL, modelRootURL: modelRootURL,
@@ -46,7 +46,7 @@ final class HistoryChatCoordinator {
         let assistant = snapshots.first { $0.descriptor.role == .assistant }
         let wasEnabled = enabled
         enabled = assistant?.isReadyForUse == true
-        availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «Поиск и ответы».")
+        availabilityMessage = L10n.text("Для работы помощника скачайте модель в настройках «ИИ».")
         if let assistant {
             switch assistant.state {
             case .downloading:

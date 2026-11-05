@@ -245,7 +245,7 @@
 "Проверка остановлена. Модель выгружена." = "Comprobación detenida. El modelo se ha descargado de la memoria.";
 "Не удалось открыть скачанные файлы." = "No se pudieron abrir los archivos descargados.";
 "Эти функции пока доступны только на Mac с Apple Silicon." = "Estas funciones solo están disponibles actualmente en Mac con Apple Silicon.";
-"Обе функции работают на этом Mac. Интернет нужен только для скачивания. Скрытые записи не используются." = "Ambas funciones se ejecutan en este Mac. Solo se necesita internet para la descarga. Se excluyen los elementos ocultos.";
+"Все модели работают локально. История буфера обмена никогда и никуда не отправляется." = "Todos los modelos se ejecutan localmente. El historial del portapapeles nunca se envía a ningún sitio.";
 "Готовить историю для поиска по смыслу только при питании от сети" = "Preparar el historial para la búsqueda semántica solo con alimentación externa";
 "Подробнее" = "Detalles";
 "Поиск по смыслу" = "Búsqueda semántica";
@@ -623,3 +623,45 @@
 "Видимых строк: %1$@" = "Filas visibles: %1$@";
 "Колонки — это карточки рядом друг с другом: одна даёт список, несколько — сетку. Если окно узкое, колонок будет меньше." = "Las columnas colocan las tarjetas una al lado de otra: una forma una lista y varias, una cuadrícula. Si la ventana es estrecha, se mostrarán menos columnas.";
 "Меньше строк — выше карточки и больше текста. Больше строк — компактнее карточки. В боковой панели короткие записи могут быть ниже." = "Con menos filas, las tarjetas son más altas y muestran más texto. Con más filas, son más compactas. En un panel lateral, las entradas cortas pueden ocupar menos altura.";
+
+"Основные" = "General";
+
+"Запускать при входе в систему" = "Iniciar al iniciar sesión";
+
+"Показывать значок в строке меню" = "Mostrar icono en la barra de menús";
+
+"Открыть настройки входа macOS" = "Abrir ítems de inicio de macOS";
+
+"Без значка откройте историю сочетанием клавиш или запустите Buffera снова, чтобы открыть настройки." = "Con el icono oculto, usa el atajo para abrir el historial o abre Buffera de nuevo para acceder a los ajustes.";
+
+"Запуск и доступ" = "Inicio y acceso";
+
+"Версия %1$@ · сборка %2$@" = "Versión %1$@ · compilación %2$@";
+
+"О приложении" = "Acerca de";
+
+"Сообщить о проблеме…" = "Informar de un problema…";
+
+"Открыть черновик GitHub Issue в браузере" = "Abrir un borrador de issue de GitHub en el navegador";
+
+"Откроется черновик GitHub Issue с версией Buffera, сборкой, версией macOS и архитектурой. Содержимое буфера и логи не добавляются." = "Abre un borrador de issue de GitHub con la versión y compilación de Buffera, la versión de macOS y la arquitectura. No se incluye el contenido del portapapeles ni los registros.";
+
+"Разрешите автозапуск Buffera в настройках входа macOS." = "Permite que Buffera se inicie al iniciar sesión en los ítems de inicio de macOS.";
+
+"Не удалось определить состояние автозапуска." = "No se pudo determinar el estado del inicio automático.";
+
+"Не удалось изменить автозапуск: %1$@" = "No se pudo cambiar el inicio automático: %1$@";
+
+"Откройте ссылку в браузере: %1$@" = "Abre este enlace en el navegador: %1$@";
+
+"Что произошло?" = "¿Qué ocurrió?";
+
+"Что ожидалось?" = "¿Qué esperabas?";
+
+"Как повторить?" = "¿Cómo se reproduce?";
+
+"ИИ" = "IA";
+
+"Сбросить сочетания" = "Restablecer atajos";
+
+"Для работы помощника скачайте модель в настройках «ИИ»." = "Para usar el asistente, descarga un modelo en los ajustes de IA.";

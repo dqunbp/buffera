@@ -112,11 +112,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Open settings with the gear button or ⌘,. In Appearance, choose a theme, language, column count and window position. Theme changes apply immediately; language changes require a restart."
+              "text": "Open settings with the gear button or ⌘,. Choose the language in General, and the theme, column count and window position in Appearance. Theme changes apply immediately; language changes require a restart."
             },
             {
               "type": "paragraph",
-              "text": "To launch Buffera with your Mac, add it in System Settings → General → Login Items. You can download search and assistant models later; ordinary clipboard history works without them."
+              "text": "To launch Buffera with your Mac, turn on Launch at login in Settings → General. You can download search and assistant models later; ordinary clipboard history works without them."
             }
           ]
         }
@@ -225,7 +225,7 @@
             {
               "type": "steps",
               "items": [
-                "Open Settings → Search & answers.",
+                "Open Settings → AI.",
                 "In Semantic search, choose Download model and enable. EmbeddingGemma 2 uses about 310 MB.",
                 "Wait for the relevant part of your history to be indexed. Settings show the progress.",
                 "Enable Also search by meaning in the history window."
@@ -265,7 +265,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Settings → Search & answers, find Ask Buffera and choose Download model and enable. Gemma 4 E2B uses about 2.84 GB and runs on Apple Silicon."
+              "text": "In Settings → AI, find Ask Buffera and choose Download model and enable. Gemma 4 E2B uses about 2.84 GB and runs on Apple Silicon."
             },
             {
               "type": "paragraph",
@@ -631,7 +631,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Open Search & answers. Check the model download and that the relevant feature is enabled. Semantic search also requires history indexing. On battery, choose Continue now or connect power."
+              "text": "Open AI. Check the model download and that the relevant feature is enabled. Semantic search also requires history indexing. On battery, choose Continue now or connect power."
             },
             {
               "type": "paragraph",

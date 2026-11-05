@@ -95,7 +95,7 @@ func runShortcutSmokeTest() throws {
     controller.onShortcutsChange = { try hotKeys.apply($0) }
     let window = controller.window!
     let root = window.contentView!
-    let tabs = descendants(root).compactMap { $0 as? NSSegmentedControl }.first!
+    let tabs = descendants(root).compactMap { $0 as? SettingsNavigation }.first!
     tabs.selectedSegment = 2; _ = tabs.sendAction(tabs.action, to: tabs.target)
     root.layoutSubtreeIfNeeded()
     func control<T: NSView>(_ id: String, as type: T.Type) -> T {
@@ -107,6 +107,7 @@ func runShortcutSmokeTest() throws {
     let apply = control("apply", as: NSButton.self)
     let reset = control("reset", as: NSButton.self)
     let status = control("status", as: NSTextField.self)
+    try check(reset.title == L10n.text("Сбросить сочетания"), "Reset action must name the shortcuts it restores")
     try check(base.numberOfItems == 5 && next.numberOfItems == 26 && previous.numberOfItems == 26, "Five bases and alphabet choices")
     base.selectItem(at: 1); next.selectItem(withTitle: "J"); previous.selectItem(withTitle: "K")
     apply.performClick(nil)
@@ -123,7 +124,7 @@ func runShortcutSmokeTest() throws {
     try check(hotKeys.preferences == .defaults && ShortcutPreferences.load(from: defaults) == .defaults, "Reset applies defaults")
     try check(base.indexOfSelectedItem == 0 && next.titleOfSelectedItem == "V" && previous.titleOfSelectedItem == "C", "Reset refreshes controls")
     let reopened = settingsWindow()
-    let reopenedTabs = descendants(reopened.window!.contentView!).compactMap { $0 as? NSSegmentedControl }.first!
+    let reopenedTabs = descendants(reopened.window!.contentView!).compactMap { $0 as? SettingsNavigation }.first!
     reopenedTabs.selectedSegment = 2; _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
     let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "shortcuts.next" } as? NSPopUpButton
     try check(selected?.titleOfSelectedItem == "V", "Reopened settings reflect saved value")

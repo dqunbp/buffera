@@ -2,7 +2,7 @@
 
 [Documentation](../README.md) · [Русский](../models.md) · English
 
-Settings → Search and Answers provides two independent features: Semantic Search and [Ask Buffera](chat.md). The model name and size are shown before downloading. Start with Download and Enable; once the model is downloaded, use the feature switch to enable it. Literal search, OCR, and MCP work without downloading models.
+Settings → AI provides two independent features: Semantic Search and [Ask Buffera](chat.md). The model name and size are shown before downloading. Start with Download and Enable; once the model is downloaded, use the feature switch to enable it. Literal search, OCR, and MCP work without downloading models.
 
 | Purpose | Model and format | File size |
 | --- | --- | --- |

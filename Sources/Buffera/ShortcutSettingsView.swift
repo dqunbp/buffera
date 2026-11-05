@@ -29,7 +29,7 @@ final class ShortcutSettingsView: NSStackView {
         grid.rowSpacing = 8; grid.columnSpacing = 18
         let apply = NSButton(title: L10n.text("Применить"), target: self, action: #selector(applyDraft))
         apply.identifier = .init("shortcuts.apply"); apply.bezelStyle = .rounded
-        let reset = NSButton(title: L10n.text("По умолчанию"), target: self, action: #selector(reset))
+        let reset = NSButton(title: L10n.text("Сбросить сочетания"), target: self, action: #selector(reset))
         reset.identifier = .init("shortcuts.reset"); reset.bezelStyle = .rounded
         let buttons = NSStackView(views: [apply, reset]); buttons.spacing = 10
         let lettersNote = NSTextField(wrappingLabelWithString: L10n.text("Буквы A–Z обозначают клавиши латинской раскладки; сочетания работают и в других раскладках."))

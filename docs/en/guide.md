@@ -8,7 +8,9 @@ The name combines the English word `buffer` and the Russian word «буфера�
 
 Buffera is a local clipboard history manager for macOS 14+, built with Swift, AppKit, system SQLite and on-device text recognition through Apple Vision. External agents connect through MCP over stdio, using the official Swift SDK. Apple Silicon also supports semantic search through EmbeddingGemma 2 and built-in history chat through Gemma 4.
 
-The interface is available in Russian, English, Spanish, German, French, Portuguese (Brazil), Simplified Chinese and Japanese. In the Appearance settings tab, choose System (the default) or one of these languages. The choice is saved immediately and takes effect after restarting Buffera. System mode selects the first supported language in your macOS preferences, falling back to English if none match. The interface language does not change history content, OCR languages or the assistant's response language. Resource organization and rules for adding strings are documented in [localization.md](localization.md).
+The interface is available in Russian, English, Spanish, German, French, Portuguese (Brazil), Simplified Chinese and Japanese. In General settings, choose System (the default) or one of these languages. The choice is saved immediately and takes effect after restarting Buffera. System mode selects the first supported language in your macOS preferences, falling back to English if none match. The interface language does not change history content, OCR languages or the assistant's response language. Resource organization and rules for adding strings are documented in [localization.md](localization.md).
+
+Settings use sidebar sections. General provides launch at login, menu bar icon visibility, version/build, and a GitHub issue draft with system details. See [Application settings](settings.md).
 
 ## Download
 
@@ -24,7 +26,7 @@ The official Buffera 1.0.0 release is signed with Developer ID and notarized by 
 
 In Settings → Appearance, choose the system, light or dark theme. It applies immediately to all Buffera windows and persists after restart. System mode follows the macOS appearance.
 
-In Settings → Shortcuts, choose shared modifiers (`⌘⌥`, `⌃⌥`, `⌃⇧`, `⌘⇧` or `⌃⌘⌥`) and two different letters A–Z: open / next clip, and previous clip. Apply saves the pair without a restart; Default restores `⌘⌥V` / `⌘⌥C`. The letters refer to physical Latin-layout keys and continue working when you change the input language. If the combination conflicts with a Buffera command or registration fails, the previous pair is retained. The reverse shortcut is intercepted only while history is open. The shortcuts below are the defaults.
+In Settings → Shortcuts, choose shared modifiers (`⌘⌥`, `⌃⌥`, `⌃⇧`, `⌘⇧` or `⌃⌘⌥`) and two different letters A–Z: open / next clip, and previous clip. Apply saves the pair without a restart; Reset shortcuts restores `⌘⌥V` / `⌘⌥C`. The letters refer to physical Latin-layout keys and continue working when you change the input language. If the combination conflicts with a Buffera command or registration fails, the previous pair is retained. The reverse shortcut is intercepted only while history is open. The shortcuts below are the defaults.
 
 ## Updates
 
@@ -61,7 +63,7 @@ Before launching, quit Pasta if it occupies `⌘⌥V`. Buffera does not paste au
 
 ## Search and answers
 
-Settings → Search and Answers independently enables Semantic Search and Ask Buffera. Each feature card shows its purpose, model name and size: EmbeddingGemma 2 is about 310 MB for search; Gemma 4 E2B is 2.84 GB for the assistant. Start explicitly with Download and Enable. Once the download and validation finish, the feature enables automatically; an already prepared model can be reused with the ordinary toggle. Downloads can be paused and resumed, including after restart. Disabling a feature retains its model; Remove Model frees the space. Details contains the license and checks using built-in examples.
+Settings → AI independently enables Semantic Search and Ask Buffera. Each feature card shows its purpose, model name and size: EmbeddingGemma 2 is about 310 MB for search; Gemma 4 E2B is 2.84 GB for the assistant. Start explicitly with Download and Enable. Once the download and validation finish, the feature enables automatically; an already prepared model can be reused with the ordinary toggle. Downloads can be paused and resumed, including after restart. Disabling a feature retains its model; Remove Model frees the space. Details contains the license and checks using built-in examples.
 
 Enabling semantic search starts gradual preparation of history text and OCR. The feature card shows progress, partially processed long clips and an option to retry after an error. Disabling it stops processing and frees memory; files and the index remain for later resumption.
 
@@ -73,7 +75,7 @@ Background preparation for semantic search pauses on battery by default. The car
 
 ## Ask Buffera
 
-Ask beside the semantic-search checkbox and the Ask Buffera… menu item open a local language model (LLM) with access to clipboard history. In Settings → Search and Answers, choose Download and Enable, or enable the feature if its model is already downloaded. Semantic search is enabled independently; without it, the assistant searches by words.
+Ask beside the semantic-search checkbox and the Ask Buffera… menu item open a local language model (LLM) with access to clipboard history. In Settings → AI, choose Download and Enable, or enable the feature if its model is already downloaded. Semantic search is enabled independently; without it, the assistant searches by words.
 
 For example, ask “What connection error did I copy yesterday?” or “What was next to this clip?” The assistant searches, reads the results and retrieves nearby copies when needed. Its answer appears gradually. Source buttons below the answer show the app and copy time; clicking one opens the clip among its neighbors without changing the clipboard.
 
@@ -108,7 +110,7 @@ The pin icon to the right of search pins the window above other apps when you sw
 | Focus search | `⌘F` |
 | Switch focus between search and cards | `Tab` |
 | Show / hide the filter sidebar | `⌘⌥S` |
-| Open Appearance settings | `⌘,` |
+| Open settings | `⌘,` |
 | Clear query and filters and return to all history | `⌘0` |
 | Cancel without changing the clipboard | `Esc` |
 | Delete the selected clip | `⌘⌫` |
@@ -145,7 +147,7 @@ What I Copied Before and After opens from the clock button on a card, its contex
 
 Back to History or `Esc` restores the original query, filters, selection and scroll position. If preview is open, the first `Esc` closes it and the next returns to results. New copies do not reorder neighbors while you view them; results refresh if necessary when you return. Closing the window ends the temporary mode, and the next opening restores the original search. Neighbors are ordered by the last external copy, not by selecting a clip in Buffera. Recapturing identical content replaces its previous date and source; there is no complete log of every repetition. This feature also works on old history without models or a database migration.
 
-The gear to the right of search, `⌘,` and Settings… in the system menu open a separate settings window. Appearance, History, Shortcuts, MCP, Search and Answers, and Updates group settings by purpose. History has three sections: storage (limits and data folder), secrets and window-opening behavior. Resetting search and filters does not delete saved clips. The text-export filename setting is in Copy Differently → Text File Name on a clip's menu. The choice is saved for future exports and does not itself copy anything. Opening settings again raises the same window; closing it does not quit the app. Appearance and limit changes apply immediately; language changes require a restart. Shortcuts are saved with Apply; other settings save immediately. History can use a regular window or a panel at the left or right screen edge. Drag the regular window by an empty area and resize it at its edges; its position and size are saved separately from side-panel width. A panel fills the available screen height, can be resized horizontally and appears at the selected edge without an opening animation; the list refreshes in the background while closed, and a prepared panel opens immediately. On closing it slides offscreen; the system's Reduce Motion setting disables this animation. Standard close, minimize and zoom controls are hidden. Escape closes an unpinned window, while confirming a clip closes even a pinned window.
+The gear to the right of search, `⌘,` and Settings… in the system menu open a separate settings window. General, AI, Appearance, History, Shortcuts, MCP, and Updates are aligned at the top of a compact sidebar. Interface language is in General; theme is in Appearance. History has three sections: storage (limits and data folder), secrets and window-opening behavior. Resetting search and filters does not delete saved clips. The text-export filename setting is in Copy Differently → Text File Name on a clip's menu. The choice is saved for future exports and does not itself copy anything. Opening settings again raises the same window; closing it does not quit the app. Appearance and limit changes apply immediately; language changes require a restart. Shortcuts are saved with Apply; other settings save immediately. History can use a regular window or a panel at the left or right screen edge. Drag the regular window by an empty area and resize it at its edges; its position and size are saved separately from side-panel width. A panel fills the available screen height, can be resized horizontally and appears at the selected edge without an opening animation; the list refreshes in the background while closed, and a prepared panel opens immediately. On closing it slides offscreen; the system's Reduce Motion setting disables this animation. Standard close, minimize and zoom controls are hidden. Escape closes an unpinned window, while confirming a clip closes even a pinned window.
 
 In Settings → Appearance, the “?” buttons beside placement, cards and visible rows open short explanations with diagrams. They compare the floating window with side panels, a list with a grid, and taller cards with compact cards. Opening help does not change settings.
 

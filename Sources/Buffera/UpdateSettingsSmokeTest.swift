@@ -77,8 +77,8 @@ import BufferaUpdates
         while !predicate(), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
         try check(predicate(), "Update controller did not finish the fixture request")
     }
-    let tabs = descendants(root).compactMap { $0 as? NSSegmentedControl }.first!
-    try check(tabs.segmentCount == 6 && tabs.label(forSegment: 5) == L10n.text("Обновления"),
+    let tabs = descendants(root).compactMap { $0 as? SettingsNavigation }.first!
+    try check(tabs.segmentCount == 7 && tabs.label(forSegment: 5) == L10n.text("Обновления"),
               "Updates settings tab is missing or untranslated: language=\(L10n.language), labels=\((0..<tabs.segmentCount).map { tabs.label(forSegment: $0) ?? "" })")
     tabs.selectedSegment = 5
     _ = tabs.sendAction(tabs.action, to: tabs.target)

@@ -2,7 +2,7 @@
 
 [Documentation](../README.md) · [Русский](../chat.md) · English
 
-Settings → Search and Answers shows the language model's name and size. Download and Enable starts preparation; the feature switch enables a model that is already downloaded. Ask, beside semantic search, opens a local LLM that can search and read clipboard history.
+Settings → AI shows the language model's name and size. Download and Enable starts preparation; the feature switch enables a model that is already downloaded. Ask, beside semantic search, opens a local LLM that can search and read clipboard history.
 
 The built-in chat uses the existing history, search, and downloaded Gemma 4 E2B. It introduces no new network services or SQLite migration.
 

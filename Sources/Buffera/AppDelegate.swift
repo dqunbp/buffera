@@ -8,6 +8,7 @@ import os
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private let appPreferences = AppPreferences()
     private var store: HistoryStore!
     private let secretKeys = KeychainSecretKeyProvider()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
@@ -217,12 +218,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if CommandLine.arguments.contains("--show-setup") || !UserDefaults.standard.bool(forKey: SetupPreferences.completionKey) { showSetup() }
         else if CommandLine.arguments.contains("--show-settings") { showSettings() }
-        else { open() }
+        else if !LoginLaunch.isLoginItem(NSAppleEventManager.shared().currentAppleEvent) { open() }
         imageTextIndexer?.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        open(); return true
+        if appPreferences.showsMenuBarIcon { open() } else { showSettings() }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -784,7 +786,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if settings == nil {
-            let controller = SettingsWindow(modelManager: modelManager, modelError: modelStorageError,
+            let controller = SettingsWindow(modelManager: modelManager, modelError: modelStorageError, appPreferences: appPreferences,
                                             mcpAccess: MCPAccess(directory: folder), updateSettings: updates.settingsView)
             controller.onCheckModel = { [weak self] role in
                 guard let self, let manager = self.modelManager else { return }
@@ -945,7 +947,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "BufferaClipboard"
-        statusItem.isVisible = true
+        statusItem.isVisible = appPreferences.showsMenuBarIcon
+        appPreferences.onMenuBarChange = { [weak self] visible in self?.statusItem.isVisible = visible }
         statusItem.button?.image = BrandIdentity.menuBarIcon()
         statusItem.button?.setAccessibilityLabel(L10n.text("\(BrandIdentity.name) — буфер обмена"))
         statusItem.button?.toolTip = L10n.text("\(BrandIdentity.name) — история буфера обмена")

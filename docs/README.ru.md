@@ -25,6 +25,7 @@
 
 | Тема | Русский | English |
 | --- | --- | --- |
+| Настройки, автозапуск и отчёты о проблемах | [Настройки](settings.md) | [Settings](en/settings.md) |
 | Подробное управление, сборка и проверки | [Руководство](guide.md) | [Guide](en/guide.md) |
 | Архитектура, хранение и контракты интеграций | [Архитектура](architecture.md) | [Architecture](en/architecture.md) |
 | Локальные модели, поиск и расход заряда | [Модели](models.md) | [Models](en/models.md) |

@@ -112,11 +112,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Öffne die Einstellungen über das Zahnrad oder ⌘,. Wähle unter „Darstellung“ Erscheinungsbild, Sprache, Spaltenanzahl und Fensterposition. Das Erscheinungsbild ändert sich sofort; Sprachänderungen erfordern einen Neustart."
+              "text": "Öffne die Einstellungen über das Zahnrad oder ⌘,. Wähle die Sprache unter „Allgemein“ und Erscheinungsbild, Spaltenanzahl und Fensterposition unter „Darstellung“. Das Erscheinungsbild ändert sich sofort; Sprachänderungen erfordern einen Neustart."
             },
             {
               "type": "paragraph",
-              "text": "Füge Buffera unter „Systemeinstellungen → Allgemein → Anmeldeobjekte“ hinzu, damit es mit deinem Mac startet. Such- und Assistentenmodelle kannst du später herunterladen; der normale Zwischenablageverlauf funktioniert auch ohne sie."
+              "text": "Aktiviere „Bei der Anmeldung starten“ unter „Einstellungen → Allgemein“, damit Buffera mit deinem Mac startet. Such- und Assistentenmodelle kannst du später herunterladen; der normale Zwischenablageverlauf funktioniert auch ohne sie."
             }
           ]
         }
@@ -225,7 +225,7 @@
             {
               "type": "steps",
               "items": [
-                "Öffne „Einstellungen → Suche und Antworten“.",
+                "Öffne „Einstellungen → KI“.",
                 "Wähle unter „Semantische Suche“ die Option „Laden und aktivieren“. EmbeddingGemma 2 benötigt etwa 310 MB.",
                 "Warte, bis der relevante Teil deines Verlaufs indexiert ist. Der Fortschritt wird in den Einstellungen angezeigt.",
                 "Aktiviere „Semantische Suche einbeziehen“ im Verlaufsfenster."
@@ -265,7 +265,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Suche unter „Einstellungen → Suche und Antworten“ nach „Buffera fragen“ und wähle „Laden und aktivieren“. Gemma 4 E2B benötigt etwa 2,84 GB und läuft auf Apple Silicon."
+              "text": "Suche unter „Einstellungen → KI“ nach „Buffera fragen“ und wähle „Laden und aktivieren“. Gemma 4 E2B benötigt etwa 2,84 GB und läuft auf Apple Silicon."
             },
             {
               "type": "paragraph",
@@ -631,7 +631,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Öffne „Suche und Antworten“. Prüfe den Modelldownload und ob die entsprechende Funktion aktiviert ist. Die semantische Suche benötigt außerdem die Indexierung des Verlaufs. Wähle im Batteriebetrieb „Jetzt fortsetzen“ oder schließe eine Stromquelle an."
+              "text": "Öffne „KI“. Prüfe den Modelldownload und ob die entsprechende Funktion aktiviert ist. Die semantische Suche benötigt außerdem die Indexierung des Verlaufs. Wähle im Batteriebetrieb „Jetzt fortsetzen“ oder schließe eine Stromquelle an."
             },
             {
               "type": "paragraph",

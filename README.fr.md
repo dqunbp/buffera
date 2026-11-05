@@ -23,6 +23,12 @@
   <a href="https://github.com/dqunbp/buffera/releases">Nouveautés</a>
 </p>
 
+## Réglages de l’application
+
+Les réglages utilisent une navigation latérale et des cartes regroupées. Général propose le lancement à l’ouverture de session, la visibilité de l’icône dans la barre des menus, la version et le build, ainsi qu’un brouillon de ticket GitHub avec la version de macOS et l’architecture. Le presse-papiers et les journaux ne sont pas inclus ; vous vérifiez et envoyez le ticket vous-même.
+
+La barre latérale compacte commence par Général et IA. La langue de l’interface se choisit dans Général et le thème dans Apparence ; «Réinitialiser les raccourcis» rétablit les combinaisons par défaut.
+
 ## Copiez. Retrouvez. Réutilisez.
 
 Buffera conserve l’historique de votre presse-papiers sur votre Mac. Appuyez sur <kbd>⌘⌥V</kbd>, trouvez un élément et appuyez sur <kbd>Entrée</kbd> : il revient dans le presse-papiers, prêt à être collé avec <kbd>⌘V</kbd>. Vous pouvez aussi faire glisser les éléments directement dans d’autres apps.

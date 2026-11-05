@@ -73,6 +73,9 @@ Swift tests are executable harnesses, not `swift test`; register regression meth
 
 Use focused imperative commits. PRs should explain behavior, validation, limitations, and include relevant issues/screenshots. Inspect existing changes before staging; exclude local history, models, support archives, and signing material.
 
+## Application Settings
+- Settings use a compact top-aligned `SettingsNavigation` sidebar with AI directly after General. Language selection lives in General; theme stays in Appearance. Preserve stable section indices; preserve deep links to models and updates. `AppPreferences` owns `showMenuBarIcon` (default on), while `SMAppService.mainApp` owns actual login registration status. Hidden icons must leave settings reachable by reopening the app. `IssueReport` only includes version/build, macOS version and executable architecture; never attach clipboard content, logs, paths or device identifiers automatically. See `docs/settings.md`, `docs/en/settings.md`, `GeneralSettingsSmokeTest.swift` and the localization/shortcut/update UI checks.
+
 ## Versioning & Releases
 Change version/build metadata only in `Sources/BufferaCore/AppVersion.swift`: PATCH for fixes, MINOR for features, MAJOR for incompatible changes; reset lower components when increasing MINOR/MAJOR and increase `build` every release without resetting it. Preserve the string-constant layout parsed by `scripts/version.sh`.
 

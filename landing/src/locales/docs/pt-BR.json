@@ -112,11 +112,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Abra os ajustes com o botão de engrenagem ou ⌘,. Em Aparência, escolha o tema, o idioma, o número de colunas e a posição da janela. Mudanças de tema são aplicadas imediatamente; mudanças de idioma exigem reiniciar."
+              "text": "Abra os ajustes com o botão de engrenagem ou ⌘,. Escolha o idioma em Geral, e o tema, o número de colunas e a posição da janela em Aparência. Mudanças de tema são aplicadas imediatamente; mudanças de idioma exigem reiniciar."
             },
             {
               "type": "paragraph",
-              "text": "Para iniciar o Buffera com seu Mac, adicione-o em Ajustes do Sistema → Geral → Itens de Início. Você pode baixar os modelos de busca e do assistente depois; o histórico comum da área de transferência funciona sem eles."
+              "text": "Para iniciar o Buffera com seu Mac, ative «Iniciar ao entrar no sistema» em Ajustes → Geral. Você pode baixar os modelos de busca e do assistente depois; o histórico comum da área de transferência funciona sem eles."
             }
           ]
         }
@@ -225,7 +225,7 @@
             {
               "type": "steps",
               "items": [
-                "Abra Ajustes → Busca e respostas.",
+                "Abra Ajustes → IA.",
                 "Em Busca semântica, escolha Baixar e ativar. O EmbeddingGemma 2 usa cerca de 310 MB.",
                 "Aguarde a indexação da parte relevante do histórico. Os ajustes mostram o progresso.",
                 "Ative Incluir busca semântica na janela do histórico."
@@ -265,7 +265,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Ajustes → Busca e respostas, encontre Perguntar ao Buffera e escolha Baixar e ativar. O Gemma 4 E2B usa cerca de 2,84 GB e funciona em Apple Silicon."
+              "text": "Em Ajustes → IA, encontre Perguntar ao Buffera e escolha Baixar e ativar. O Gemma 4 E2B usa cerca de 2,84 GB e funciona em Apple Silicon."
             },
             {
               "type": "paragraph",
@@ -631,7 +631,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Abra Busca e respostas. Confira o download do modelo e se o recurso correspondente está ativado. A busca semântica também exige a indexação do histórico. Na bateria, escolha Continuar agora ou conecte à tomada."
+              "text": "Abra IA. Confira o download do modelo e se o recurso correspondente está ativado. A busca semântica também exige a indexação do histórico. Na bateria, escolha Continuar agora ou conecte à tomada."
             },
             {
               "type": "paragraph",
