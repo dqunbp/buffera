@@ -359,11 +359,11 @@
             },
             {
               "type": "paragraph",
-              "text": "„Verbergen“ verschlüsselt einen gespeicherten Texteintrag oder Link mit AES-256-GCM und entfernt den Inhalt aus den Suchindizes. Der Schlüssel bleibt im macOS-Schlüsselbund. Datum, App und andere Metadaten bleiben unverschlüsselt."
+              "text": "Inhalt verbergen verschlüsselt einen gespeicherten Eintrag mit AES-256-GCM und entfernt seinen Inhalt aus den Suchindizes. Der Schlüssel bleibt im macOS-Schlüsselbund. Datum, App und andere Metadaten bleiben unverschlüsselt."
             },
             {
               "type": "paragraph",
-              "text": "Verborgene Inhalte sind für Suche, OCR, integrierten Assistenten und MCP nicht verfügbar. Du kannst sie innerhalb von Buffera vorübergehend anzeigen oder kopieren."
+              "text": "Solange ein Eintrag verborgen ist, steht sein Inhalt weder Suche, OCR, integriertem Assistenten noch MCP zur Verfügung; du kannst ihn in Buffera ausdrücklich kopieren. Das Öffnen seines Schlosses stellt den Eintrag im normalen Verlauf wieder her, wo diese Funktionen ihn nutzen können. Er bleibt nach dem Schließen des Fensters und nach Neustarts sichtbar, bis du ihn wieder manuell verbirgst. Benachbarte Schlösser ändern sich nicht."
             }
           ]
         },
@@ -471,7 +471,7 @@
                 ],
                 [
                   "⇧⌘H",
-                  "Verbergen / vorübergehend anzeigen"
+                  "Verbergen / im normalen Verlauf wiederherstellen"
                 ],
                 [
                   "⇧⌘R",

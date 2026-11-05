@@ -26,7 +26,7 @@ enum ClipCardAction: Int, CaseIterable {
         case .copy: return "doc.on.clipboard"
         case .preview: return "arrow.up.left.and.arrow.down.right"
         case .favorite: return "star"
-        case .reveal: return "eye"
+        case .reveal: return "lock.open"
         case .finder: return "folder"
         case .save: return "square.and.arrow.down"
         case .delete: return "trash"
@@ -75,7 +75,7 @@ enum ClipCardAction: Int, CaseIterable {
     func isAvailable(for clip: ClipSummary) -> Bool {
         switch self {
         case .label: return clip.isFavorite
-        case .reveal: return clip.isConcealed || clip.kind == .text || clip.kind == .link
+        case .reveal: return true
         case .finder, .save: return clip.kind == .image && !clip.isConcealed
         case .copyDifferently: return !clip.isConcealed && [.text, .link, .image].contains(clip.kind)
         case .copy, .preview, .favorite, .delete, .nearby: return true
@@ -94,7 +94,7 @@ enum ClipCardAction: Int, CaseIterable {
     func symbol(for clip: ClipSummary, isRevealed: Bool) -> String {
         switch self {
         case .favorite: return clip.isFavorite ? "star.fill" : symbol
-        case .reveal: return !clip.isConcealed || isRevealed ? "eye.slash" : symbol
+        case .reveal: return !clip.isConcealed || isRevealed ? "lock" : symbol
         default: return symbol
         }
     }
@@ -242,6 +242,14 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     func setSelected(_ selected: Bool) {
         self.selected = selected
         updateAppearance()
+    }
+
+    /// Scrub an outgoing ordinary card before replacing it with concealed metadata.
+    func prepareForConcealment() {
+        contentText.stringValue = "••••••••"
+        contentText.setAccessibilityLabel(L10n.text("Скрытая запись"))
+        thumbnailView.image = nil
+        setActionsEnabled(false)
     }
 
     func hideConcealedContent() {
@@ -447,8 +455,11 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         footer.spacing = 3
         // Keep the most frequent final action at the right edge across all kinds.
         let footerActions: [ClipCardAction] = [.favorite, .nearby, .reveal, .finder, .save, .preview, .copyDifferently, .copy]
-        for action in footerActions where action.isAvailable(for: clip) {
-            let button = makeButton(action)
+        let availableActions = footerActions.filter { $0.isAvailable(for: clip) }
+        // Images have eight actions including the lock; retain a 230 pt minimum card width.
+        let actionWidth: CGFloat = availableActions.count > 7 ? 23 : 26
+        for action in availableActions {
+            let button = makeButton(action, width: actionWidth)
             buttons[action] = button
             footer.addArrangedSubview(button)
         }
@@ -574,14 +585,14 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         return max(1, ceil(font.ascender - font.descender + font.leading))
     }
 
-    private func makeButton(_ action: ClipCardAction) -> NSButton {
+    private func makeButton(_ action: ClipCardAction, width: CGFloat) -> NSButton {
         let button = ClipCardButton(title: "", target: self, action: #selector(buttonAction(_:)))
         button.tag = action.rawValue
         button.bezelStyle = .inline
         button.isBordered = false
         button.imagePosition = .imageOnly
         configureButton(button, for: action)
-        button.widthAnchor.constraint(equalToConstant: 26).isActive = true
+        button.widthAnchor.constraint(equalToConstant: width).isActive = true
         button.heightAnchor.constraint(equalToConstant: 26).isActive = true
         return button
     }

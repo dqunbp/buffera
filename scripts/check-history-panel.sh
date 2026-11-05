@@ -18,7 +18,7 @@ swiftc -emit-library "$BIN_DIR"/BufferaLocalization.build/*.swift.o -o "$CHECK_D
 swiftc -emit-library -emit-module -module-name BufferaCore \
   -I "$BIN_DIR/Modules" -L "$CHECK_DIR" -lBufferaLocalization \
   -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
-  Sources/BufferaCore/Clip.swift Sources/BufferaCore/ClipboardText.swift \
+  Sources/BufferaCore/Clip.swift Sources/BufferaCore/ClipboardText.swift Sources/BufferaCore/ClipboardMetadata.swift \
   Sources/BufferaCore/TextTransformation.swift Sources/BufferaCore/SearchMode.swift \
   -emit-module-path "$CHECK_DIR/BufferaCore.swiftmodule" -o "$CHECK_DIR/libBufferaCore.dylib"
 targets=("$@")

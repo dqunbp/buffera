@@ -166,7 +166,13 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         guard (0..<itemCount).contains(index) else { return }
         let origin = scrollView.contentView.bounds.origin
         measuredHeights.removeValue(forKey: index)
-        withoutAnimation { collectionView.reloadItems(at: [indexPath(index)]) }
+        // reloadItems can retain an outgoing view alongside its replacement,
+        // even with animations disabled. Replace the card inside the existing
+        // item so a masked/revealed ghost cannot overlap neighboring records.
+        if let item = collectionView.item(at: indexPath(index)) as? HistoryCardItem,
+           let card = makeCard?(index) {
+            install(card, in: item, at: index)
+        }
         flow.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()
         restoreViewport(origin)
@@ -252,8 +258,13 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt path: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: Self.itemIdentifier, for: path) as! HistoryCardItem
         guard let card = makeCard?(path.item) else { item.clear(); return item }
+        install(card, in: item, at: path.item)
+        return item
+    }
+
+    private func install(_ card: ClipCardView, in item: HistoryCardItem, at index: Int) {
         item.install(card)
-        card.setSelected(path.item == selectedIndex)
+        card.setSelected(index == selectedIndex)
         card.onSelect = { [weak self, weak item] in
             guard let self, let item, let path = self.collectionView.indexPath(for: item) else { return }
             self.select(path.item, scrollIntoView: false)
@@ -263,7 +274,6 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
             self.select(path.item, scrollIntoView: false)
             self.onActivate?(path.item)
         }
-        return item
     }
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt paths: Set<IndexPath>) {
@@ -373,6 +383,8 @@ private final class HistoryCardItem: NSCollectionViewItem {
     }
 
     func clear() {
+        card?.hideConcealedContent()
+        card?.setActionsEnabled(false)
         card?.onSelect = nil
         card?.onActivate = nil
         card?.removeFromSuperview()

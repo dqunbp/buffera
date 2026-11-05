@@ -545,7 +545,7 @@ public final class HistoryStore {
         return true
     }
 
-    private func syncImageTextJob(id: Int64) throws {
+    func syncImageTextJob(id: Int64) throws {
         let cleanup = try prepare("""
             DELETE FROM clip_ocr WHERE clip_id=? AND NOT EXISTS (
                 SELECT 1 FROM clips WHERE clips.id=clip_ocr.clip_id AND clips.kind='image' AND clips.is_concealed=0

@@ -37,8 +37,8 @@ const paths = {
   concealed: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 10h18"/>',
   app: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 16 12 7l4 9m-7-3h6"/>',
-  conceal: '<path d="m3 3 18 18M9 5c6-2 11 6 12 7l-4 4M6 6l-5 6s8 11 16 6"/>',
-  reveal: '<path d="M1 12s11-16 22 0c-11 16-22 0-22 0Z"/><circle cx="12" cy="12" r="3"/>',
+  conceal: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>',
+  reveal: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0"/>',
   preview: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
   copyAs: '<path d="M4 5h14M10 5v14m-4 0h7m2-5 3 3 4-6"/>',
   copy: '<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/>',
@@ -134,17 +134,17 @@ function renderDemo() {
     const empty = document.createElement('p'); empty.className = 'demo-empty'; empty.textContent = messages.empty; list.append(empty);
   }
   visible.forEach((item, index) => {
-    const card = document.createElement('article'); card.className = `demo-item${index === selection ? ' selected' : ''}${item.kind === 'image' ? ' image-card' : ''}`;
+    const card = document.createElement('article'); card.className = `demo-item${index === selection ? ' selected' : ''}${item.kind === 'image' && !item.concealed ? ' image-card' : ''}`;
     card.tabIndex = 0; card.dataset.id = item.id; card.setAttribute('aria-label', item.concealed ? ui.hidden : item.title);
     const content = document.createElement('div'); content.className = 'item-content';
-    if (item.kind === 'image') content.append(screenshot());
+    if (item.kind === 'image' && !item.concealed) content.append(screenshot());
     else {
       content.append(icon(item.concealed ? 'concealed' : item.kind));
       const text = document.createElement('p'); text.textContent = item.concealed ? ui.hidden : item.text; content.append(text);
     }
     const key = document.createElement('span'); key.className = 'item-key'; key.textContent = `⌘${index + 1}`; content.append(key);
     const footer = document.createElement('div'); footer.className = 'item-footer';
-    if (item.kind === 'image') {
+    if (item.kind === 'image' && !item.concealed) {
       const type = document.createElement('span'); type.className = 'item-type';
       type.title = kindLabels.image; type.setAttribute('role', 'img'); type.setAttribute('aria-label', kindLabels.image);
       type.append(icon('image')); content.append(type);
@@ -152,7 +152,9 @@ function renderDemo() {
     const meta = document.createElement('span'); meta.className = 'item-meta';
     meta.textContent = `${item.source} · ${item.time}`; meta.title = meta.textContent;
     const actions = document.createElement('div'); actions.className = 'item-actions';
-    const actionNames = item.kind === 'image' ? ['favorite', 'nearby', 'finder', 'save', 'preview', 'copyAs', 'copy'] : ['favorite', 'nearby', 'conceal', 'preview', 'copyAs', 'copy'];
+    const actionNames = item.concealed ? ['favorite', 'nearby', 'conceal', 'preview', 'copy']
+      : item.kind === 'image' ? ['favorite', 'nearby', 'conceal', 'finder', 'save', 'preview', 'copyAs', 'copy']
+        : ['favorite', 'nearby', 'conceal', 'preview', 'copyAs', 'copy'];
     for (const action of actionNames) {
       const label = action === 'favorite' ? ui[item.favorite ? 'removeFavorite' : 'addFavorite'] : action === 'conceal' ? ui[item.concealed ? 'reveal' : 'conceal'] : ui[action];
       const symbol = action === 'favorite' ? 'star' : action === 'nearby' ? 'history' : action === 'conceal' && item.concealed ? 'reveal' : action;
@@ -182,7 +184,7 @@ function openDetail(item, trigger) {
   detail.querySelector('.detail-kind').textContent = `${kindLabels[item.kind]} · ${item.source}`;
   detail.querySelector('h3').textContent = item.concealed ? ui.hidden : item.title;
   const content = detail.querySelector('.detail-content'); content.replaceChildren();
-  if (item.kind === 'image') content.append(screenshot());
+  if (item.kind === 'image' && !item.concealed) content.append(screenshot());
   else content.textContent = item.concealed ? ui.hidden : item.text;
   detailNote.textContent = previewNote;
   showDetail(trigger);

@@ -201,6 +201,158 @@ func runSecretStorageChecks() -> Int {
                 try checkEqual(try f.store.payload(id: visible), f.payload(value))
             }
         }),
+        ("explicit unconceal persists ordinary metadata, IDs and content through reopen", { f in
+            let value = "  https://example.com/private-path  "
+            let id = try f.store.insert(payload: f.payload(value), kind: .text, title: "hidden", text: "", source: "Original app",
+                                        isConcealed: true, isRemote: true, date: Date(timeIntervalSince1970: 100))
+            let neighbor = try f.insert("neighbor-stays-hidden")
+            try f.store.setFavorite(id: id, isFavorite: true)
+            try f.store.setLabel(id: id, label: "My saved link")
+            try f.store.markUsed(id: id, date: Date(timeIntervalSince1970: 500))
+            let shown = try f.store.unconceal(id: id)
+            try checkEqual(shown.id, id)
+            try check(!shown.isConcealed && shown.isFavorite && shown.isRemote)
+            try checkEqual(shown.label, "My saved link")
+            try checkEqual(shown.source, "Original app")
+            try checkEqual(shown.date, Date(timeIntervalSince1970: 100))
+            try checkEqual(try f.scalar("SELECT CAST(sort_date AS INTEGER) FROM clips WHERE id=\(id)"), 500)
+            try checkEqual(shown.kind, .link)
+            try checkEqual(shown.title, "https://example.com/private-path")
+            try checkEqual(shown.text, value)
+            try checkEqual(try f.stored(id).encoding, 0)
+            try checkEqual(try f.stored(id).fingerprint, f.payload(value).fingerprint)
+            try checkEqual(try f.store.restorablePayload(id: id), f.payload(value))
+            try check(try f.store.summary(id: neighbor).isConcealed)
+            f.store = nil; f.store = try HistoryStore(url: f.url)
+            try check(!f.store.summary(id: id).isConcealed)
+            try checkEqual(try f.store.visibleContent(id: id).payload, f.payload(value))
+            try checkEqual(try f.store.unconceal(id: id).id, id) // No key needed for an ordinary record.
+            var filter = SearchFilter(); filter.query = "private-path"
+            try checkEqual(try f.store.search(filter).map(\.id), [id])
+            f.store = nil; f.store = try HistoryStore(url: f.url, secretCipher: f.cipher)
+            try f.store.conceal(id: id)
+            try checkEqual(try f.store.search(filter).count, 0)
+            try checkEqual(try f.store.payload(id: id), f.payload(value))
+        }),
+        ("unconceal removes only secrecy markers and restores ordinary recapture identity", { f in
+            let marker = Representation(type: "org.nspasteboard.ConcealedType", data: Data())
+            let alternate = Representation(type: "com.agilebits.onepassword", data: Data([1]))
+            let content = f.payload("ordinary-after-unlock")
+            let flagged = ClipPayload(items: [content.items[0] + [marker, alternate]])
+            let id = try f.store.insert(payload: flagged, kind: .text, title: "", text: "", source: "Fixture", isConcealed: true)
+            _ = try f.store.unconceal(id: id)
+            try checkEqual(try f.store.restorablePayload(id: id), content)
+            // A previously hidden clean duplicate must not silently re-hide the
+            // explicitly unlocked content on its next ordinary capture.
+            let cleanHidden = try f.insert("normalized-hidden-duplicate")
+            try f.store.setFavorite(id: cleanHidden, isFavorite: true)
+            try f.store.setLabel(id: cleanHidden, label: "Inherited duplicate label")
+            let flaggedDuplicate = ClipPayload(items: [f.payload("normalized-hidden-duplicate").items[0] + [marker]])
+            let selected = try f.store.insert(payload: flaggedDuplicate, kind: .text, title: "", text: "", source: "Fixture", isConcealed: true)
+            let normalized = try f.store.unconceal(id: selected)
+            try check(normalized.isFavorite && normalized.label == "Inherited duplicate label")
+            try checkThrows(try f.store.summary(id: cleanHidden))
+            try checkEqual(try f.insert("normalized-hidden-duplicate", secret: false), selected)
+            try check(!f.store.summary(id: selected).isConcealed)
+            try checkEqual(try f.insert("ordinary-after-unlock", secret: false), id)
+            try check(!f.store.summary(id: id).isConcealed)
+            // Content item boundaries and non-confidential markers remain intact; marker-only items are dropped.
+            let temporary = Representation(type: "org.nspasteboard.TransientType", data: Data())
+            let multiple = ClipPayload(items: [[marker], content.items[0] + [temporary]])
+            let grouped = try f.store.insert(payload: multiple, kind: .text, title: "", text: "", source: "Fixture", isConcealed: true)
+            _ = try f.store.unconceal(id: grouped)
+            let normalizedGroup = ClipPayload(items: [content.items[0] + [temporary]])
+            try checkEqual(try f.store.payload(id: grouped), normalizedGroup)
+            try f.store.conceal(id: grouped)
+            _ = try f.store.unconceal(id: grouped)
+            try checkEqual(try f.store.restorablePayload(id: grouped), normalizedGroup)
+            let markerOnly = try f.store.insert(payload: ClipPayload(items: [[marker]]), kind: .other,
+                                               title: "", text: "", source: "Fixture", isConcealed: true)
+            try checkThrows(try f.store.unconceal(id: markerOnly))
+            try check(try f.store.summary(id: markerOnly).isConcealed)
+        }),
+        ("unconceal merges a visible duplicate into its selected ID without losing favorites or labels", { f in
+            for ownLabel in [false, true] {
+                let value = "unconceal-duplicate-\(ownLabel)"
+                let secret = try f.insert(value)
+                if ownLabel {
+                    try f.store.setFavorite(id: secret, isFavorite: true)
+                    try f.store.setLabel(id: secret, label: "Selected label")
+                }
+                f.keyAvailable = false
+                let ordinary = try f.insert(value, secret: false)
+                try f.store.setFavorite(id: ordinary, isFavorite: true)
+                try f.store.setLabel(id: ordinary, label: "Duplicate label")
+                f.keyAvailable = true
+                let shown = try f.store.unconceal(id: secret)
+                try checkEqual(shown.id, secret)
+                try check(shown.isFavorite && !shown.isConcealed)
+                try checkEqual(shown.label, ownLabel ? "Selected label" : "Duplicate label")
+                try checkThrows(try f.store.summary(id: ordinary))
+                try checkEqual(try f.store.payload(id: secret), f.payload(value))
+            }
+        }),
+        ("unconceal errors leave encrypted records unchanged and store usable", { f in
+            let id = try f.insert("failed-unconceal-stays-encrypted")
+            let before = try f.stored(id)
+            f.keyAvailable = false
+            try checkThrows(try f.store.unconceal(id: id))
+            f.keyAvailable = true
+            let wrongKey = try HistoryStore(url: f.url, secretCipher: SecretPayloadCipher { _, _ in Data(repeating: 0x99, count: 32) })
+            try checkThrows(try wrongKey.unconceal(id: id))
+            try checkEqual(try f.stored(id).data, before.data)
+            try f.replace(id, data: Data([1, 2, 3]))
+            try checkThrows(try f.store.unconceal(id: id))
+            try checkEqual(try f.stored(id).data, Data([1, 2, 3]))
+            try check(try f.store.summary(id: id).isConcealed)
+            try f.replace(id, data: before.data)
+            f.keyAvailable = false
+            let duplicate = try f.insert("failed-unconceal-stays-encrypted", secret: false)
+            f.keyAvailable = true
+            try f.execute("CREATE TRIGGER fail_unconceal BEFORE UPDATE OF is_concealed ON clips WHEN NEW.is_concealed=0 BEGIN SELECT RAISE(ABORT,'fixture unconceal failure'); END")
+            try checkThrows(try f.store.unconceal(id: id))
+            try checkEqual(try f.stored(id).data, before.data)
+            try checkEqual(try f.stored(id).encoding, 1)
+            try checkEqual(try f.stored(id).fingerprint, before.fingerprint)
+            try checkEqual(try f.store.payload(id: duplicate), f.payload("failed-unconceal-stays-encrypted"))
+            try check(try f.store.summary(id: id).isConcealed)
+            try f.execute("DROP TRIGGER fail_unconceal")
+            try checkThrows(try f.store.unconceal(id: 99999))
+            try check(!f.store.unconceal(id: id).isConcealed)
+        }),
+        ("unconceal restores image OCR and text embedding eligibility atomically", { f in
+            try f.store.configureEmbeddingIndex(EmbeddingIndexIdentity(fingerprint: "unconceal-fixture", dimensions: 2))
+            let textID = try f.insert("text returns to semantic indexing")
+            let image = ClipPayload(items: [[Representation(type: "public.png", data: Data([1, 2, 3]))]])
+            let imageID = try f.store.insert(payload: image, kind: .image, title: "", text: "", source: "Fixture", isConcealed: true)
+            try checkEqual(try f.store.embeddingProgress().pending, 0)
+            try checkEqual(try f.store.imageTextProgress().pending, 0)
+            _ = try f.store.unconceal(id: textID)
+            try checkEqual(try f.store.nextPendingEmbedding()?.clipID, textID)
+            try checkEqual(try f.store.unconceal(id: imageID).kind, .image)
+            try checkEqual(try f.store.nextPendingImageTextID(), imageID)
+            try checkEqual(try f.store.imageTextProgress().pending, 1)
+            try f.store.conceal(id: textID)
+            try checkEqual(try f.store.embeddingProgress().pending, 0)
+            try f.store.conceal(id: imageID)
+            try checkEqual(try f.store.imageTextProgress().pending, 0)
+        }),
+        ("shared ordinary metadata matches capture limits and file/RTF alternatives", { f in
+            let long = String(repeating: "a", count: 200_005)
+            let text = ClipboardMetadata(payload: f.payload(long))
+            try checkEqual(text.title.count, 240)
+            try checkEqual(text.text.count, 200_000)
+            let file = ClipboardMetadata(payload: ClipPayload(items: [[Representation(type: "public.file-url", data: Data("file:///not-accessed/Hello%20world.txt".utf8))]]))
+            try checkEqual(file.kind, .file)
+            try checkEqual(file.title, "Hello world.txt")
+            try checkEqual(file.text, "/not-accessed/Hello world.txt")
+            let rtf = Representation(type: "public.rtf", data: Data("{\\rtf1\\ansi First RTF}".utf8))
+            let fromRTF = ClipboardMetadata(payload: ClipPayload(items: [[rtf]]))
+            try checkEqual(fromRTF.kind, .text)
+            try checkEqual(fromRTF.text, "First RTF")
+            let alternative = ClipboardMetadata(payload: ClipPayload(items: [[rtf], [Representation(type: "public.utf8-plain-text", data: Data("Second plain".utf8))]]))
+            try checkEqual(alternative.text, "Second plain")
+        }),
         ("key access never holds a write transaction or payload read snapshot", { f in
             f.onKeyAccess = { [unowned f] in
                 try f.raw { db in
@@ -219,6 +371,7 @@ func runSecretStorageChecks() -> Int {
             _ = try f.store.payload(id: secret)
             _ = try f.store.restorablePayload(id: secret)
             _ = try f.store.revealedContent(id: secret)
+            _ = try f.store.unconceal(id: secret)
             let legacy = try f.insert("preflight-legacy", secret: false)
             try f.execute("UPDATE clips SET is_concealed=1 WHERE id=\(legacy)")
             try f.store.protectLegacySecrets()

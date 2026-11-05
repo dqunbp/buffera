@@ -91,7 +91,7 @@ Drag cards into other apps: text and links into editors and input fields, images
 
 Dragging only copies: original files and the history record stay in place, and the general clipboard is unchanged. Original files and folders must be available at their saved paths; if any are unavailable, the entire operation is cancelled with a message. Concealed clips use neutral previews without their content. Escape, releasing the mouse before preparation finishes and rejected drops do not reorder history. An accepted drop counts as use while preserving the original copy date.
 
-The pin icon to the right of search pins the window above other apps when you switch between them. Click it again to restore ordinary automatic dismissal. `⌘⌥V` first returns focus to pinned history, preserving the query, selection and list position. Escape and switching apps do not close a pinned window; explicit copy confirmation does. Pinning itself lasts until Buffera quits. Revealed text is masked again when you switch to another app.
+The pin icon to the right of search pins the window above other apps when you switch between them. Click it again to restore ordinary automatic dismissal. `⌘⌥V` first returns focus to pinned history, preserving the query, selection and list position. Escape and switching apps do not close a pinned window; explicit copy confirmation does. Pinning itself lasts until Buffera quits. Each item’s lock state persists when switching apps, closing the window, and restarting Buffera.
 
 | Action | Keys |
 | --- | --- |
@@ -104,7 +104,7 @@ The pin icon to the right of search pins the window above other apps when you sw
 | Preview the selected clip | `Space` with list focus; `⌘Y` also works from search |
 | Add to / remove from favorites | `⌘D` |
 | Show nearby clips by copy time | `⇧⌘N` |
-| Conceal content / temporarily reveal it | `⇧⌘H` |
+| Conceal content / return a concealed item to ordinary history | `⇧⌘H` |
 | Show an image in Finder | `⇧⌘R` |
 | Save an image to a chosen folder | `⇧⌘S` |
 | Focus search | `⌘F` |
@@ -165,7 +165,7 @@ Choose 1–4 columns and a density of 3–12 visible rows. One column gives a li
 - The card's star adds a clip to Favorites. Favorites combines with search and every filter; clips survive restart and are protected from automatic history cleanup.
 - Pages of 150 clips loaded as you scroll. Full binary payloads are read separately from the list.
 - PNG/TIFF can be exported as PNG: Save As… creates a permanent file at a chosen location; Show in Finder creates a temporary file with automatic cleanup.
-- Marked confidential clips are skipped by default; encrypted storage shows them behind dots. Ordinary text or links can be concealed manually. Show temporarily reveals the selected concealed clip's content.
+- Marked confidential clips are skipped by default; encrypted storage shows them behind dots. Ordinary clips can be concealed manually. Show Content returns the selected clip to ordinary history; it remains visible until manually concealed.
 - Pause capture from the menu, delete individual clips, and set count and size limits in Settings → History.
 
 ## Initial setup
@@ -218,9 +218,9 @@ One clip is limited to 64 MB of original representations; indexed text is limite
 
 Settings → History → Secrets in History offers two modes: Do Not Save Secrets (default) and Save Secrets Encrypted. Secrets are identified by the markers `org.nspasteboard.ConcealedType` and `com.agilebits.onepassword`. In the first mode, Buffera skips the entire group before reading content; in the second, it encrypts all representations. Ordinary clips retain their existing storage behavior.
 
-The list shows dots and a lock. A secret's content does not enter its title, search, OCR, semantic index or MCP. You can find the clip through a safe title, app and date; these metadata remain unencrypted. Show temporarily reveals text inside Buffera, while copying restores the original formats with a confidentiality marker.
+The list shows dots and a lock. A secret's content does not enter its title, search, OCR, semantic index or MCP. You can find the clip through a safe title, app and date; these metadata remain unencrypted. Copying a still-concealed item restores its original formats with a confidentiality marker. Clicking its Show Content lock decrypts the item and saves it as ordinary history: it stays visible after closing or restarting and becomes available to search, OCR, the built-in assistant, and permitted MCP reading again. Neighboring locks do not change. Clicking Hide Content encrypts the item again.
 
-If the source app does not mark a password, it is saved as ordinary text; Buffera does not detect passwords from their content. Hide for saved text or a link encrypts the payload and removes plaintext and indexes regardless of capture mode. When the key is available, recapturing the same payload retains its secrecy. If the key is unavailable, new unmarked clips are handled as ordinary content; marked data is never stored in plaintext.
+If the source app does not mark a password, it is saved as ordinary text; Buffera does not detect passwords from their content. Hide for a saved clip encrypts the payload and removes plaintext and indexes regardless of capture mode. When the key is available, recapturing the same payload retains its secrecy. If the key is unavailable, new unmarked clips are handled as ordinary content; marked data is never captured in plaintext.
 
 Encryption uses AES-256-GCM with a fresh nonce for every write. A random key lives in macOS Keychain with access for the main app; MCP does not receive the key. If Keychain access fails, the secret is skipped with an error, without falling back to plaintext storage. macOS may ask for permission to access the key, especially after updating an app with a temporary ad-hoc signature. Losing the key makes saved secrets unrecoverable.
 
@@ -249,4 +249,4 @@ The smoke check uses a separate named system pasteboard and does not modify your
 
 `zsh scripts/check-history-panel.sh` checks the panel in two locales, cards and drag-and-drop. Pass `ClipDragChecks` to run a single suite. After building, `.build/localized-panel-checks/ClipDragChecks --interactive` opens a separate harness with the real panel, synthetic clips, a native editor and a local web form. The `Delay preparation 2s` checkbox lets you test releasing the mouse and pressing Escape before data is ready. The harness does not use your history or write the general clipboard; drop results are also logged to `/tmp/buffera-drag-ui.log`.
 
-Manual check: copy text, an image and several files; open the window and release the keys (it should remain open); move with the arrow keys and press Enter (it should close), then paste into the original app. Reopen with `⌘⌥V`, keep holding `⌘⌥`, press V/C again and release the modifiers: the selected clip should be copied and the window should close. Separate single presses with a release after each should not close the window. Scroll down, close and reopen: clips should appear without a flash of an empty list; the used clip should move to its new position while closed, and the prepared panel should open immediately without another query. First opening, unfinished preparation and search reset may require loading. Check card actions and their tooltips, `⌘1`–`⌘9`, preview with Space and `⌘Y`, favorites after recapture and restart, search retention between openings and explicit reset with `⌘0`. Check Escape, the app filter, calendar, temporary export, Save As… and concealment/temporary reveal using synthetic content. Completed checks and their limitations are recorded in [verification.md (Russian)](../verification.md).
+Manual check: copy text, an image and several files; open the window and release the keys (it should remain open); move with the arrow keys and press Enter (it should close), then paste into the original app. Reopen with `⌘⌥V`, keep holding `⌘⌥`, press V/C again and release the modifiers: the selected clip should be copied and the window should close. Separate single presses with a release after each should not close the window. Scroll down, close and reopen: clips should appear without a flash of an empty list; the used clip should move to its new position while closed, and the prepared panel should open immediately without another query. First opening, unfinished preparation and search reset may require loading. Check card actions and their tooltips, `⌘1`–`⌘9`, preview with Space and `⌘Y`, favorites after recapture and restart, search retention between openings and explicit reset with `⌘0`. Check Escape, the app filter, calendar, temporary export, Save As… and concealment and unconcealment using synthetic content: unconceal two neighboring items, conceal one, check that the other stays visible and retains that state after restart. Completed checks and their limitations are recorded in [verification.md (Russian)](../verification.md).

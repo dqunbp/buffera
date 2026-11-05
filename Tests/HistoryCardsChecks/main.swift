@@ -84,6 +84,12 @@ transformCard.setCopyTransformOperations(nil)
 check(!transformButton.isHidden, "invalidating applicability restores the pending button")
 let privateClip = ClipSummary(id: 901, date: Date(), kind: .text, title: "Private", text: "Private",
                               source: "Checks", byteCount: 7, isConcealed: true)
+for kind in ClipKind.allCases {
+    let ordinary = ClipSummary(id: 902, date: Date(), kind: kind, title: "Ordinary", text: "",
+                               source: "Checks", byteCount: 7)
+    check(ClipCardAction.reveal.isAvailable(for: ordinary),
+          "ordinary \(kind.rawValue) records can be explicitly hidden again after unlocking")
+}
 let privateCard = ClipCardView(clip: privateClip, revealedText: "Private", thumbnail: nil) { _ in }
 privateCard.setCopyTransformOperations([.text(.plainText)])
 check(privateCard.menu(for: menuEvent)?.item(withTag: ClipCardAction.copyDifferently.rawValue) == nil,
@@ -195,7 +201,7 @@ check(imageView.frame.width == 226 && imageView.frame.height == 54,
 check(!descendants(of: imageCard).compactMap { $0 as? NSTextField }.contains { $0.stringValue == imageClip.displayTitle },
       "image cards omit the redundant visible type label")
 let imageButtons = descendants(of: imageCard).compactMap { $0 as? NSButton }
-check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
+check(imageButtons.count == 8 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions fit in a compact 230 pt card")
 previewHost.setFrameSize(NSSize(width: 444, height: 208))
@@ -210,7 +216,7 @@ let imageBadge = descendants(of: imageCard).compactMap { $0 as? NSTextField }.fi
 check(imageView.frame.contains(imageBadge.frame) && imageView.frame.width == 440,
       "quick-selection hint overlays the image without shrinking it")
 imageCard.setQuickShortcut(nil)
-check(imageButtons.count == 7 && imageButtons.allSatisfy { button in
+check(imageButtons.count == 8 && imageButtons.allSatisfy { button in
     !button.isHidden && imageCard.bounds.contains(button.convert(button.bounds, to: imageCard))
 }, "all image actions remain inside the card")
 

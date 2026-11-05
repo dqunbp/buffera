@@ -172,6 +172,64 @@ extension HistoryStore {
         return try PropertyListDecoder().decode(ClipPayload.self, from: plain)
     }
 
+    /// Explicitly return a protected entry to ordinary history. The change is
+    /// durable; merely reading a secret still never changes its protection.
+    @discardableResult
+    public func unconceal(id: Int64) throws -> ClipSummary {
+        let existing = try summary(id: id)
+        guard existing.isConcealed else { return existing }
+        // Keychain access must happen without a transaction or active statement.
+        let key = try prepareSecretKey()
+        try execute("BEGIN IMMEDIATE")
+        do {
+            let current = try summary(id: id)
+            guard current.isConcealed else {
+                try execute("COMMIT")
+                return current
+            }
+            try registerSecretKey(key)
+            let record = try storedPayload(id: id)
+            guard record.encoding == 1 else { throw SecretStorageError.legacyPayload }
+            let plaintext = try key.open(record.data, fingerprint: record.fingerprint)
+            let original = try PropertyListDecoder().decode(ClipPayload.self, from: plaintext)
+            guard !original.items.isEmpty, original.items.allSatisfy({ !$0.isEmpty }) else { throw HistoryError.invalidPayload }
+            // These flags are protection instructions, not content. Retaining
+            // them would re-hide the entry when its ordinary payload is copied.
+            // Preserve all content representations and boundaries between
+            // nonempty items. Marker-only items cannot be restored to NSPasteboard.
+            let markers: Set<String> = ["org.nspasteboard.ConcealedType", "com.agilebits.onepassword"]
+            let items = original.items.map { $0.filter { !markers.contains($0.type) } }.filter { !$0.isEmpty }
+            guard !items.isEmpty else { throw HistoryError.invalidPayload }
+            let payload = ClipPayload(items: items)
+            let metadata = ClipboardMetadata(payload: payload)
+            let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
+            let encoded = try encoder.encode(payload)
+            let fingerprint = payload.fingerprint
+            let duplicates = try summaries("SELECT \(Self.summaryColumns) FROM clips WHERE fingerprint IN (?,?) AND id<>?",
+                                           bindings: [.text(fingerprint), .text(key.fingerprint(fingerprint)), .integer(id)])
+            for duplicate in duplicates {
+                if duplicate.isFavorite { try setFavorite(id: id, isFavorite: true) }
+                try inheritLabel(from: duplicate, to: id)
+                try delete(id: duplicate.id)
+            }
+            let blob = try prepare("UPDATE payloads SET data=?,encoding=0 WHERE clip_id=?")
+            defer { sqlite3_finalize(blob) }
+            try bind([.blob(encoded), .integer(id)], to: blob)
+            guard sqlite3_step(blob) == SQLITE_DONE else { throw failure() }
+            let statement = try prepare("UPDATE clips SET fingerprint=?,kind=?,title=?,text=?,search=?,bytes=?,is_concealed=0 WHERE id=?")
+            defer { sqlite3_finalize(statement) }
+            let search = SearchFilter.normalize(metadata.title + " " + metadata.text + " " + current.source)
+            try bind([.text(fingerprint), .text(metadata.kind.rawValue), .text(metadata.title), .text(metadata.text),
+                      .text(search), .integer(Int64(encoded.count)), .integer(id)], to: statement)
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            try syncImageTextJob(id: id)
+            try syncEmbeddingJob(id: id)
+            let result = try summary(id: id)
+            try execute("COMMIT")
+            return result
+        } catch { try? execute("ROLLBACK"); throw error }
+    }
+
     /// Re-copying a manually hidden entry must preserve its privacy marker.
     public func restorablePayload(id: Int64) throws -> ClipPayload {
         let record = try storedPayload(id: id)

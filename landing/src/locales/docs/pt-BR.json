@@ -359,11 +359,11 @@
             },
             {
               "type": "paragraph",
-              "text": "Ocultar criptografa um item de texto ou link salvo com AES-256-GCM e remove seu conteúdo dos índices de busca. A chave fica nas Chaves do macOS. A data, o app e os demais metadados permanecem sem criptografia."
+              "text": "Ocultar conteúdo criptografa um registro salvo com AES-256-GCM e remove seu conteúdo dos índices de busca. A chave permanece nas Chaves do macOS. Data, app e outros metadados não são criptografados."
             },
             {
               "type": "paragraph",
-              "text": "O conteúdo oculto não fica disponível para a busca, o OCR, o assistente integrado ou o MCP. Você pode revelá-lo temporariamente ou copiá-lo dentro do Buffera."
+              "text": "Enquanto um registro está oculto, seu conteúdo não fica disponível para busca, OCR, assistente integrado ou MCP; você pode copiá-lo explicitamente no Buffera. Abrir seu cadeado devolve o registro ao histórico comum, onde essas funções podem usá-lo. Ele continua visível depois de fechar a janela e reiniciar, até você ocultá-lo de novo manualmente. Os cadeados vizinhos não mudam."
             }
           ]
         },
@@ -471,7 +471,7 @@
                 ],
                 [
                   "⇧⌘H",
-                  "Ocultar / revelar temporariamente"
+                  "Ocultar / devolver ao histórico comum"
                 ],
                 [
                   "⇧⌘R",

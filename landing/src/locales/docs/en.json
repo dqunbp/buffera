@@ -359,11 +359,11 @@
             },
             {
               "type": "paragraph",
-              "text": "Hide encrypts a saved text clip or link using AES-256-GCM and removes its content from search indexes. The key stays in macOS Keychain. The date, app and other metadata remain unencrypted."
+              "text": "Hide Content encrypts a saved item using AES-256-GCM and removes its content from search indexes. The key stays in macOS Keychain. The date, app and other metadata remain unencrypted."
             },
             {
               "type": "paragraph",
-              "text": "Hidden content is unavailable to search, OCR, the built-in assistant and MCP. You can temporarily reveal or copy it inside Buffera."
+              "text": "While an item is hidden, its content is unavailable to search, OCR, the built-in assistant and MCP; you can explicitly copy it in Buffera. Opening its lock returns the item to ordinary history, where these features can use it. It stays visible after closing the window and restarting until you manually hide it again. Neighboring locks do not change."
             }
           ]
         },
@@ -471,7 +471,7 @@
                 ],
                 [
                   "⇧⌘H",
-                  "Hide / temporarily reveal"
+                  "Hide / return to ordinary history"
                 ],
                 [
                   "⇧⌘R",

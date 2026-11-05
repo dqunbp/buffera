@@ -359,11 +359,11 @@
             },
             {
               "type": "paragraph",
-              "text": "Ocultar cifra un elemento de texto o enlace guardado con AES-256-GCM y elimina su contenido de los índices de búsqueda. La clave se queda en el Llavero de macOS. La fecha, la app y los demás metadatos permanecen sin cifrar."
+              "text": "Ocultar contenido cifra una entrada guardada con AES-256-GCM y elimina su contenido de los índices de búsqueda. La clave permanece en el Llavero de macOS. La fecha, la app y otros metadatos no se cifran."
             },
             {
               "type": "paragraph",
-              "text": "El contenido oculto no está disponible para la búsqueda, el OCR, el asistente integrado ni MCP. Puedes mostrarlo temporalmente o copiarlo dentro de Buffera."
+              "text": "Mientras una entrada está oculta, su contenido no está disponible para la búsqueda, el OCR, el asistente integrado ni MCP; puedes copiarla explícitamente en Buffera. Abrir su candado la devuelve al historial normal, donde estas funciones pueden usarla. Permanece visible al cerrar la ventana y reiniciar hasta que la ocultes de nuevo manualmente. Los candados vecinos no cambian."
             }
           ]
         },
@@ -471,7 +471,7 @@
                 ],
                 [
                   "⇧⌘H",
-                  "Ocultar / mostrar temporalmente"
+                  "Ocultar / devolver al historial normal"
                 ],
                 [
                   "⇧⌘R",

@@ -11,6 +11,158 @@ func loadingPresentationChecks() {
         return value.cards.collectionView(collection, numberOfItemsInSection: 0)
     }
 
+    for target in [0, 2, 9] {
+        let many = (1...30).map { id in
+            ClipSummary(id: Int64(id), date: fixture(id).date, kind: .text, title: "Fixture \(id)",
+                        text: String(repeating: "Search fixture \(id) ", count: id % 4 + 1),
+                        source: "Panel Fixture App", byteCount: 10)
+        }
+        let docked = PanelHarness(rows: many)
+        defer { docked.panel.close(restoreFocus: false); docked.finish() }
+        docked.cards.sizesToContent = true
+        docked.panel.window.setContentSize(NSSize(width: 440, height: 1100))
+        docked.panel.window.contentView?.layoutSubtreeIfNeeded()
+        docked.cards.select(target, scrollIntoView: true)
+        let card = docked.cards.card(at: target)!
+        var concealed: [Int64] = []
+        docked.panel.onConceal = { concealed.append($0) }
+        let button = descendants(of: card).compactMap { $0 as? NSButton }.first { $0.tag == ClipCardAction.reveal.rawValue }!
+        button.performClick(nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        check(concealed == [Int64(target + 1)], "docked lock targets the clicked record at \(target)")
+        docked.panel.concealFinished(id: Int64(target + 1))
+        let masks = descendants(of: docked.cards).compactMap { $0 as? NSTextField }.filter { $0.stringValue == "••••••••" }
+        check(masks.count == 1, "only one mask remains in the docked view tree (target=\(target), masks=\(masks.count))")
+        func neighborsRemainReadable() -> Bool {
+            docked.cards.visibleIndices().filter { $0 != target }.allSatisfy { index in
+                let text = descendants(of: docked.cards.card(at: index)!).compactMap { $0 as? NSTextField }.map(\.stringValue)
+                return text.contains(many[index].text.trimmingCharacters(in: .whitespacesAndNewlines)) && !text.contains("••••••••")
+            }
+        }
+        check(neighborsRemainReadable(), "docked concealment leaves all neighboring records readable (target=\(target))")
+        check(card.superview == nil && !button.isEnabled, "outgoing card is detached and cannot dispatch another action")
+        let hidden = ClipSummary(id: Int64(target + 1), date: fixture(target + 1).date, kind: .text,
+                                 title: "Скрытая запись", text: "", source: "Panel Fixture App", byteCount: 10, isConcealed: true)
+        var stored = many; stored[target] = hidden
+        docked.panel.receive(stored, total: stored.count, offset: 0)
+        docked.panel.onReveal = { _ in
+            stored[target] = many[target]
+            docked.panel.unconcealFinished(stored[target])
+            docked.panel.receive(stored, total: stored.count, offset: 0)
+        }
+        docked.panel.onConceal = { id in
+            concealed.append(id)
+            stored[target] = hidden
+            docked.panel.concealFinished(id: id)
+            docked.panel.receive(stored, total: stored.count, offset: 0)
+        }
+        for toggle in 0..<2 {
+            let button = descendants(of: docked.cards.card(at: target)!).compactMap { $0 as? NSButton }.first { $0.tag == ClipCardAction.reveal.rawValue }!
+            button.performClick(nil)
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+            check(neighborsRemainReadable(), "docked lock toggle leaves all neighbors readable (target=\(target), toggle=\(toggle))")
+            let masks = descendants(of: docked.cards).compactMap { $0 as? NSTextField }.filter { $0.stringValue == "••••••••" }
+            check(masks.count == toggle, "persisted unlock/rehide has no outgoing masked duplicates (target=\(target), toggle=\(toggle))")
+        }
+        check(concealed == [Int64(target + 1), Int64(target + 1)], "both explicit hides target the same docked card at \(target)")
+    }
+
+    for nearby in [false, true] {
+        var stored = [fixture(1), fixture(2), fixture(3)]
+        let clicks = PanelHarness(rows: stored)
+        defer { clicks.panel.close(restoreFocus: false); clicks.finish() }
+        if nearby {
+            clicks.panel.showNearby(id: 1)
+            clicks.panel.receiveNearby(stored, anchorID: 1, token: clicks.nearbyRequests.last!.token)
+        }
+        func deliver() {
+            if nearby {
+                clicks.panel.receiveNearby(stored, anchorID: 1, token: clicks.nearbyRequests.last!.token)
+            } else { clicks.panel.receive(stored, total: stored.count, offset: 0) }
+        }
+        func hide(_ index: Int) {
+            let id = Int64(index + 1)
+            stored[index] = ClipSummary(id: id, date: fixture(index + 1).date, kind: .text, title: "Скрытая запись", text: "",
+                                       source: "Panel Fixture App", byteCount: 10, isConcealed: true)
+            clicks.panel.concealFinished(id: id)
+        }
+        var concealedIDs: [Int64] = []
+        var revealIDs: [Int64] = []
+        clicks.panel.onConceal = { concealedIDs.append($0) }
+        clicks.panel.onReveal = { id in
+            revealIDs.append(id)
+            let index = Int(id) - 1
+            stored[index] = fixture(Int(id))
+            clicks.panel.unconcealFinished(stored[index])
+            deliver()
+        }
+        func clickLock(_ index: Int) {
+            let button = descendants(of: clicks.cards.card(at: index)!).compactMap { $0 as? NSButton }
+                .first { $0.tag == ClipCardAction.reveal.rawValue }!
+            button.performClick(nil)
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        }
+        func readable(_ index: Int) -> Bool {
+            descendants(of: clicks.cards.card(at: index)!).compactMap { $0 as? NSTextField }
+                .contains { $0.stringValue == "Search fixture \(index + 1)" }
+        }
+        clickLock(1)
+        check(concealedIDs == [2], "clicking the middle lock conceals only that record (nearby=\(nearby))")
+        hide(1); deliver()
+        check(readable(0) && readable(2), "neighbors stay readable after middle-card concealment (nearby=\(nearby))")
+        clickLock(1)
+        check(revealIDs == [2] && readable(1), "opening the lock returns its stored record to ordinary content (nearby=\(nearby))")
+        clickLock(2)
+        check(concealedIDs == [2, 3] && readable(1), "selecting the neighboring lock leaves the previously unlocked record ordinary (nearby=\(nearby))")
+        hide(2)
+        check(readable(1), "pending concealment refresh preserves the unlocked neighbor (nearby=\(nearby))")
+        deliver()
+        check(readable(1), "completed concealment refresh preserves the unlocked neighbor (nearby=\(nearby))")
+        clickLock(2)
+        check(revealIDs == [2, 3] && (0..<3).allSatisfy(readable),
+              "consecutive hide/unlock leaves both requested records ordinary (nearby=\(nearby))")
+        clickLock(2); hide(2); deliver()
+        check(concealedIDs == [2, 3, 3] && readable(0) && readable(1),
+              "explicitly hiding the neighboring record does not affect either ordinary neighbor (nearby=\(nearby))")
+        clicks.cards.select(0, scrollIntoView: false)
+        check(readable(1), "selection does not rehide an unlocked record (nearby=\(nearby))")
+    }
+
+    for nearby in [false, true] {
+        let masking = PanelHarness(rows: [fixture(1), fixture(2), fixture(3)])
+        defer { masking.panel.close(restoreFocus: false); masking.finish() }
+        if nearby {
+            masking.panel.showNearby(id: 1)
+            let request = masking.nearbyRequests.last!
+            masking.panel.receiveNearby([fixture(1), fixture(2), fixture(3)], anchorID: 1, token: request.token)
+        }
+        let outgoing = masking.cards.card(at: 0)!
+        let unaffected = masking.cards.card(at: 1)
+        masking.panel.concealFinished(id: 1)
+        let text = descendants(of: masking.panel.window.contentView!).compactMap { $0 as? NSTextField }.map(\.stringValue)
+        let oldText = descendants(of: outgoing).compactMap { $0 as? NSTextField }.map(\.stringValue)
+        check(count(masking) == 3 && masking.cards.card(at: 1) === unaffected,
+              "concealment retains unrelated cards while the replacement query is delayed (nearby=\(nearby))")
+        check(text.contains("••••••••") && !text.contains("Search fixture 1") && !oldText.contains("Search fixture 1"),
+              "concealment scrubs both the displayed and outgoing card before refreshing (nearby=\(nearby))")
+        check(masking.panel.selected == nil && descendants(of: masking.cards).compactMap { $0 as? NSButton }.allSatisfy { !$0.isEnabled },
+              "retained concealment results stay display-only until refreshed (nearby=\(nearby))")
+        let hidden = ClipSummary(id: 1, date: fixture(1).date, kind: .text, title: "Скрытая запись", text: "",
+                                 source: "Panel Fixture App", byteCount: 10, isConcealed: true)
+        if nearby {
+            let request = masking.nearbyRequests.last!
+            masking.panel.receiveNearby([hidden, fixture(2), fixture(3)], anchorID: 1, token: request.token)
+        } else {
+            // The original text query no longer matches the newly concealed record.
+            masking.panel.receive([fixture(2), fixture(3)], total: 2, offset: 0)
+        }
+        check(masking.panel.selected?.id == (nearby ? 1 : 2),
+              "fresh concealment results restore selection and apply search membership (nearby=\(nearby))")
+        masking.panel.close(restoreFocus: false)
+        let closedText = descendants(of: masking.panel.window.contentView!).compactMap { $0 as? NSTextField }.map(\.stringValue)
+        check(!closedText.contains("Search fixture 1"), "closing after concealment cannot revive saved plaintext (nearby=\(nearby))")
+    }
+
     let value = PanelHarness(rows: [fixture(1), fixture(2), fixture(3)])
     defer { value.panel.close(restoreFocus: false); value.finish() }
     waitUntil("initial cards") { value.cards.card(at: 0) != nil }

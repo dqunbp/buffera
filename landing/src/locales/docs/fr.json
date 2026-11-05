@@ -359,11 +359,11 @@
             },
             {
               "type": "paragraph",
-              "text": "Masquer chiffre un texte ou un lien enregistré avec AES-256-GCM et retire son contenu des index de recherche. La clé reste dans le Trousseau macOS. La date, l’app et les autres métadonnées restent non chiffrées."
+              "text": "Masquer le contenu chiffre une entrée enregistrée avec AES-256-GCM et retire son contenu des index de recherche. La clé reste dans le Trousseau macOS. La date, l’app et les autres métadonnées ne sont pas chiffrées."
             },
             {
               "type": "paragraph",
-              "text": "Le contenu masqué est inaccessible à la recherche, à l’OCR, à l’assistant intégré et à MCP. Vous pouvez le révéler temporairement ou le copier dans Buffera."
+              "text": "Tant qu’une entrée est masquée, son contenu est inaccessible à la recherche, à l’OCR, à l’assistant intégré et à MCP ; vous pouvez la copier explicitement dans Buffera. Ouvrir son cadenas la rétablit dans l’historique ordinaire, où ces fonctions peuvent l’utiliser. Elle reste visible après la fermeture de la fenêtre et les redémarrages, jusqu’à ce que vous la masquiez à nouveau manuellement. Les cadenas voisins ne changent pas."
             }
           ]
         },
@@ -471,7 +471,7 @@
                 ],
                 [
                   "⇧⌘H",
-                  "Masquer / révéler temporairement"
+                  "Masquer / rétablir dans l’historique ordinaire"
                 ],
                 [
                   "⇧⌘R",

@@ -96,6 +96,7 @@ if CommandLine.arguments.contains("--search-status-checks") { exit(0) }
 menuFocusChecks()
 historyResetChecks()
 loadingPresentationChecks()
+independentRevealChecks()
 labelChecks()
 
 func photoThumbnailChecks() {
@@ -993,33 +994,33 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     let maskPin = descendants(of: masked.panel.window.contentView!).compactMap { $0 as? NSButton }
         .first { $0.identifier?.rawValue == "history.pin" }!
     maskPin.performClick(nil)
-    var revealedToken = 0
-    masked.panel.onReveal = { _, token in revealedToken = token }
-    func revealSecret() {
-        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
-                                    windowNumber: masked.panel.window.windowNumber, context: nil,
-                                    characters: "h", charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4)!
-        masked.panel.window.sendEvent(event)
+    let unlocked = ClipSummary(id: secret.id, date: secret.date, kind: secret.kind, title: "Secret title",
+                               text: "Secret body", source: secret.source, byteCount: secret.byteCount)
+    var revealedIDs: [Int64] = []
+    masked.panel.onReveal = { id in
+        revealedIDs.append(id)
+        masked.panel.unconcealFinished(unlocked)
+        masked.panel.receive([unlocked], total: 1, offset: 0)
     }
     func visibleSecretText() -> [String] {
         descendants(of: masked.panel.window.contentView!).compactMap { $0 as? NSTextField }.map(\.stringValue)
     }
-    revealSecret()
-    masked.panel.showConcealedText("Secret body", id: 1, token: revealedToken)
-    results.append((visibleSecretText().contains { $0.contains("Secret body") },
-                    "the pinned fixture can reveal a concealed record through its explicit action"))
+    let revealEvent = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
+                                     windowNumber: masked.panel.window.windowNumber, context: nil,
+                                     characters: "h", charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4)!
+    masked.panel.window.sendEvent(revealEvent)
+    results.append((revealedIDs == [1] && masked.panel.selected?.isConcealed == false
+                    && visibleSecretText().contains { $0.contains("Secret body") },
+                    "the pinned fixture unlocks a concealed record into ordinary stored content"))
     masked.panel.window.resignKey()
     masked.panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: masked.panel.window))
     flushMainQueue()
-    results.append((masked.panel.window.isVisible && visibleSecretText().contains("••••••••")
-                    && !visibleSecretText().contains { $0.contains("Secret body") },
-                    "pinned history remasks revealed content when keyboard focus leaves"))
-    revealSecret()
-    let delayedToken = revealedToken
+    results.append((masked.panel.window.isVisible && visibleSecretText().contains { $0.contains("Secret body") }
+                    && !visibleSecretText().contains("••••••••"),
+                    "pinned history keeps unlocked ordinary content when keyboard focus leaves"))
     NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
-    masked.panel.showConcealedText("Secret body", id: 1, token: delayedToken)
-    results.append((masked.panel.window.isVisible && !visibleSecretText().contains { $0.contains("Secret body") },
-                    "app deactivation invalidates a late reveal response without hiding pinned history"))
+    results.append((masked.panel.window.isVisible && visibleSecretText().contains { $0.contains("Secret body") },
+                    "app deactivation does not rehide an explicitly unlocked record"))
     return results
 }
 for (passed, message) in selectionLifecycleChecks() { check(passed, message) }
@@ -1031,11 +1032,16 @@ func previewPrivacyChecks() {
                              source: "Panel Fixture App", byteCount: 32, isConcealed: true)
     let value = PanelHarness(rows: [fixture(1), secret])
     defer { value.panel.close(restoreFocus: false); value.finish() }
+    var previewIDs: [Int64] = []
     value.panel.onPreview = { [weak value] clip, token in
-        value?.panel.showPreview(.text(ordinaryText), id: clip.id, token: token)
+        previewIDs.append(clip.id)
+        value?.panel.showPreview(.text(clip.id == secret.id ? secretText : ordinaryText), id: clip.id, token: token)
     }
-    value.panel.onReveal = { [weak value] id, token in
-        value?.panel.showConcealedText(secretText, id: id, token: token)
+    value.panel.onReveal = { [weak value] id in
+        let ordinary = ClipSummary(id: id, date: secret.date, kind: secret.kind, title: "Unlocked",
+                                   text: secretText, source: secret.source, byteCount: secret.byteCount)
+        value?.panel.unconcealFinished(ordinary)
+        value?.panel.receive([fixture(1), ordinary], total: 2, offset: 0)
     }
     func key(_ code: UInt16, characters: String, flags: NSEvent.ModifierFlags = []) {
         let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
@@ -1059,18 +1065,21 @@ func previewPrivacyChecks() {
           && ordinary.validateMenuItem(copy), "ordinary preview text retains native selection copying")
     key(53, characters: "\u{1b}")
     value.panel.move(1)
+    key(16, characters: "y", flags: .command)
+    check(previewIDs == [1], "a still-concealed record cannot request an ordinary content preview")
     key(4, characters: "h", flags: [.command, .shift])
     key(16, characters: "y", flags: .command)
     let hidden = previewText(secretText)
     hidden.selectAll(nil)
-    check(!hidden.isSelectable && hidden.selectedRange().length == 0 && !hidden.validateMenuItem(copy),
-          "revealed secret preview cannot select or copy plaintext through the native text view")
-    check(value.confirmations.isEmpty, "revealing and inspecting a secret never copies it implicitly")
+    check(previewIDs == [1, 2] && hidden.isSelectable
+          && hidden.selectedRange().length == (secretText as NSString).length && hidden.validateMenuItem(copy),
+          "persistently unlocked content uses the ordinary selectable preview path")
+    check(value.confirmations.isEmpty, "unlocking and inspecting a record never copies it implicitly")
     let enter = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
                                 windowNumber: hidden.window!.windowNumber, context: nil,
                                 characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
     NSApp.sendEvent(enter)
-    check(value.confirmations == [secret.id], "Enter in secret preview retains the normal history confirmation path")
+    check(value.confirmations == [secret.id], "Enter in unlocked preview retains the normal history confirmation path")
 }
 previewPrivacyChecks()
 
@@ -1360,7 +1369,7 @@ func nearbyChecks() -> [(Bool, String)] {
     var concealRequests: [Int64] = []
     newlyConcealed.panel.onConceal = { concealRequests.append($0) }
     _ = key(newlyConcealed, code: 4, characters: "h", flags: [.command, .shift])
-    newlyConcealed.panel.refresh(preservingSelection: true)
+    newlyConcealed.panel.concealFinished(id: 1)
     complete(newlyConcealed, rows: [hiddenSecret])
     newlyConcealed.panel.close(restoreFocus: false)
     let textAfterClose = descendants(of: newlyConcealed.panel.window.contentView!)

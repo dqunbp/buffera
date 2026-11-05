@@ -98,10 +98,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var resetAppliedWhileClosed = false
     private var recentCaptureID: Int64?
     private var pendingFavorites: Set<Int64> = []
-    private var revealed: (id: Int64, text: String)?
-    private var revealToken = 0
+    private var pendingVisibility: Set<Int64> = []
     private var lastSelectedID: Int64?
-    private var revealing = false
     private var confirming = false
     private var rows: [ClipSummary] = []
     private var total = 0
@@ -121,7 +119,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onConfirm: ((Int64) -> Void)?
     var requestDragPayload: ((Int64, @escaping (Result<ClipDragPayload, Error>) -> Void) -> Void)?
     var onDragCompleted: ((Int64) -> Void)?
-    var onReveal: ((Int64, Int) -> Void)?
+    var onReveal: ((Int64) -> Void)?
     var onConceal: ((Int64) -> Void)?
     var requestThumbnail: ((Int64, @escaping (NSImage?) -> Void) -> Void)?
     var onExport: ((Int64, Bool) -> Void)?
@@ -193,7 +191,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             guard let self, self.rows.indices.contains(index) else { return maximumHeight }
             let clip = self.rows[index]
             return ClipCardView.preferredHeight(for: clip,
-                revealedText: self.revealed?.id == clip.id ? self.revealed?.text : nil,
+                revealedText: nil,
                 width: width, maximumHeight: maximumHeight)
         }
         cards.onSelect = { [weak self] _ in self?.updateSelection() }
@@ -250,7 +248,6 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         closedAt = nil
         resetAppliedWhileClosed = false
         if resetOnOpening { resetNavigationState() }
-        invalidateReveal()
         updateNavigationControls()
         commandHeld = false
         if appearance.mode == .floating { keepOnScreen() }
@@ -439,7 +436,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func presentNearbyIntroduction(anchorID: Int64?) {
         guard nearbyIntroduction == nil else { nearbyIntroduction?.show(); return }
-        cancelShortcutGesture(); dismissPreview(); remaskConcealedText()
+        cancelShortcutGesture(); dismissPreview()
         let controller = NearbyIntroductionWindow(explainingOnly: anchorID == nil, defaults: introductionDefaults)
         nearbyIntroduction = controller
         controller.onDismiss = { [weak self] accepted in
@@ -499,16 +496,19 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         loadNearby(anchorID: clip.id, date: clip.date)
     }
 
-    private func loadNearby(anchorID: Int64, date: Date, preservingSelection: Bool = false) {
+    private func loadNearby(anchorID: Int64, date: Date, preservingSelection: Bool = false, retainingCards: Bool = false) {
         guard nearbyState != nil else { return }
-        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview(); invalidateReveal()
+        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview()
         nearbyToken += 1
         onNavigate?()
         nearbyState?.anchorID = anchorID; nearbyState?.anchorDate = date
         pendingSelectionID = preservingSelection ? selected?.id : nil
         pendingViewport = nil; pendingMoveDelta = 0; recentCaptureID = nil
-        loading = true; awaitingSearchResult = false; rows = []; total = 0
-        cards.replace(count: 0, selectedIndex: -1)
+        loading = true; awaitingSearchResult = retainingCards
+        if !retainingCards {
+            rows = []; total = 0
+            cards.replace(count: 0, selectedIndex: -1)
+        }
         updateNavigationControls(); updateSelection()
         status.stringValue = L10n.text("Загружаем соседние записи…")
         status.toolTip = nearbyState?.title
@@ -522,7 +522,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             nearbyFailed(HistoryError.missing, token: token); return
         }
         nearbyState?.anchorDate = anchor.date
-        rows = result; total = result.count; loading = false
+        rows = result; total = result.count; loading = false; awaitingSearchResult = false
         let base = result.firstIndex(where: { $0.id == pendingSelectionID })
             ?? result.firstIndex(where: { $0.id == anchorID }) ?? 0
         let index = max(0, min(result.count - 1, base + pendingMoveDelta))
@@ -545,7 +545,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func restoreSearchFromNearby(reloadIfNeeded: Bool, render: Bool = true) {
         guard let context = nearbyState else { return }
-        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview(); invalidateReveal()
+        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview()
         nearbyToken += 1; onNavigate?()
         nearbyState = nil
         loading = false; awaitingSearchResult = false; confirming = false; commitWhenLoaded = false
@@ -653,12 +653,43 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             cards.replace(count: 0, selectedIndex: -1)
         }
         updateNavigationControls()
-        let revealedRow = revealed.flatMap { value in rows.firstIndex(where: { $0.id == value.id }) }
-        invalidateReveal()
-        if let revealedRow { cards.reloadCard(at: revealedRow) }
         updateSelection()
         status.stringValue = error.localizedDescription
         presentLoadedHistory()
+    }
+
+    func visibilityChangeFailed(_ error: Error, id: Int64) {
+        pendingVisibility.remove(id)
+        status.stringValue = error.localizedDescription
+        updateVisibleCards()
+    }
+
+    func unconcealFinished(_ clip: ClipSummary) {
+        pendingVisibility.remove(clip.id)
+        nearbyState?.needsReload = true
+        thumbnails.removeObject(forKey: NSNumber(value: clip.id))
+        if let row = rows.firstIndex(where: { $0.id == clip.id }) {
+            rows[row] = clip
+            cards.reloadCard(at: row)
+        }
+        refresh(preservingSelection: true, retainingCards: true)
+    }
+
+    func concealFinished(id: Int64) {
+        dismissPreview()
+        pendingVisibility.remove(id)
+        nearbyState?.needsReload = true
+        thumbnails.removeObject(forKey: NSNumber(value: id))
+        if let index = rows.firstIndex(where: { $0.id == id }) {
+            let clip = rows[index]
+            cards.card(at: index)?.prepareForConcealment()
+            rows[index] = ClipSummary(id: clip.id, date: clip.date, kind: clip.kind,
+                                     title: "Скрытая запись", text: "", source: clip.source,
+                                     byteCount: clip.byteCount, isConcealed: true,
+                                     isFavorite: clip.isFavorite, isRemote: clip.isRemote, label: clip.label)
+            cards.reloadCard(at: index)
+        }
+        refresh(preservingSelection: true, retainingCards: true)
     }
 
     func refresh(preservingSelection: Bool = false, retainingCards: Bool = false) {
@@ -669,7 +700,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 // Its obsolete snapshot must not survive into the next opening.
                 retainedSelectionID = selected?.id ?? pendingSelectionID ?? retainedSelectionID
                 nearbyState?.needsReload = true
-                invalidateReveal(); thumbnails.removeAllObjects()
+                thumbnails.removeAllObjects()
                 rows = []
                 cards.replace(count: 0, selectedIndex: -1)
             }
@@ -678,7 +709,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if !retainingCards { thumbnails.removeAllObjects() }
         if let context = nearbyState {
             nearbyState?.needsReload = true
-            loadNearby(anchorID: context.anchorID, date: context.anchorDate, preservingSelection: preservingSelection)
+            loadNearby(anchorID: context.anchorID, date: context.anchorDate, preservingSelection: preservingSelection,
+                       retainingCards: retainingCards)
             return
         }
         pendingViewport = nil
@@ -686,7 +718,6 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         pendingSelectionID = preservingSelection ? (selected?.id ?? pendingSelectionID ?? retainedSelectionID) : nil
         let limit = preservingSelection ? max(150, rows.count, retainedRowCount) : 150
         dismissPreview()
-        invalidateReveal()
         preparingHiddenHistory = !window.isVisible && !presentationPending
         loading = true
         awaitingSearchResult = true
@@ -733,7 +764,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if !rows.isEmpty { retainedRowCount = rows.count }
         presentationToken += 1; let token = presentationToken; isClosing = true
         dismissPreview(); commandHeld = false
-        commitWhenLoaded = false; confirming = false; invalidateReveal()
+        commitWhenLoaded = false; confirming = false
         filters.dismiss(); saveFloatingFrame()
         onClose?()
         let finish = { [weak self] in
@@ -774,31 +805,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         commandHeld = NSEvent.modifierFlags.contains(.command); updateVisibleCards()
     }
     func windowDidResignKey(_ notification: Notification) {
-        if dragSourceID != nil {
-            invalidateReveal()
-            for index in cards.visibleIndices() { cards.card(at: index)?.hideConcealedContent() }
-        }
         closeIfUnfocused()
     }
 
     @objc private func applicationDidResignActive(_ notification: Notification) {
         guard isPinned, window.isVisible, !isClosing else { return }
-        if dragSourceID != nil {
-            invalidateReveal()
-            for index in cards.visibleIndices() { cards.card(at: index)?.hideConcealedContent() }
-            return
-        }
         focusToken += 1
         cancelShortcutGesture()
         dismissPreview()
-        remaskConcealedText()
-    }
-
-    private func remaskConcealedText() {
-        let revealedRow = revealed.flatMap { value in rows.firstIndex(where: { $0.id == value.id }) }
-        invalidateReveal()
         commandHeld = false
-        if let revealedRow { cards.reloadCard(at: revealedRow) }
         updateVisibleCards()
     }
 
@@ -875,7 +890,6 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
            !cardMenuTracking, !preview.isShown {
             focusToken += 1
             cancelShortcutGesture()
-            if isPinned { remaskConcealedText() }
         }
         let token = presentationToken
         let interactionToken = outsideInteractionToken
@@ -891,24 +905,6 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     func setSources(_ sources: [String]) { filters.setSources(sources) }
-    func showConcealedText(_ text: String?, id: Int64, token: Int) {
-        guard token == revealToken, window.isVisible, selected?.id == id, selected?.isConcealed == true else { return }
-        revealing = false
-        guard let text else { status.stringValue = L10n.text("В записи нет текста для показа."); updateSelection(); return }
-        revealed = (id, String(text.prefix(4_000)))
-        cards.reloadCard(at: cards.selectedIndex)
-        updateSelection()
-    }
-
-    private func invalidateReveal() {
-        if let id = revealed?.id, let row = rows.firstIndex(where: { $0.id == id }) {
-            // Collection-view reloads may keep an outgoing cell in the view tree.
-            // Remove plaintext before replacing it, including accessibility text.
-            cards.card(at: row)?.hideConcealedContent()
-        }
-        revealToken += 1; revealed = nil; revealing = false
-    }
-
     private func keepOnScreen() {
         let frame = window.frame
         let screens = NSScreen.screens.map(\.visibleFrame)
@@ -1065,7 +1061,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             pendingFavorites.insert(id); updateVisibleCards()
             onFavorite?(id, !clip.isFavorite)
         case .reveal:
-            if clip.isConcealed || clip.kind == .text || clip.kind == .link { revealSelected() }
+            revealSelected()
         case .finder, .save:
             guard clip.kind == .image, !clip.isConcealed else { return }
             onExport?(id, action == .save)
@@ -1077,7 +1073,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func editLabel(_ clip: ClipSummary) {
         guard clip.isFavorite, pendingFavorites.isEmpty, let onLabel else { return }
-        cancelShortcutGesture(); invalidateReveal()
+        cancelShortcutGesture()
         let alert = NSAlert()
         alert.messageText = L10n.text("Подпись к записи")
         alert.informativeText = L10n.text("Например, «Пароль от Wi-Fi». Подпись видна даже у скрытой записи и хранится без шифрования. Не вводите в неё сам пароль. Пустое поле удалит подпись.")
@@ -1141,7 +1137,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         select(id: id, scrollIntoView: false)
         copyTransformHistoryDirty = loading || silentSearchRefresh || searchIndexDirty
         onNavigate?()
-        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview(); invalidateReveal()
+        cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview()
         loading = false; confirming = true; copyTransformSourceID = id
         copyTransformToken += 1
         let token = copyTransformToken
@@ -1231,13 +1227,12 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if preview.isShown { dismissPreview(); return }
         guard let clip = selected else { return }
         previewToken += 1
-        if clip.isConcealed {
-            guard revealed?.id == clip.id else { status.stringValue = L10n.text("Сначала нажмите «Показать» на скрытой записи."); return }
-            showPreview(.text(revealed!.text), id: clip.id, token: previewToken)
-        } else {
-            previewRequestPending = onPreview != nil
-            onPreview?(clip, previewToken)
+        guard !clip.isConcealed else {
+            status.stringValue = L10n.text("Сначала нажмите «Показать» на скрытой записи.")
+            return
         }
+        previewRequestPending = onPreview != nil
+        onPreview?(clip, previewToken)
     }
 
     func showPreview(_ content: ClipPreviewContent, id: Int64, token: Int) {
@@ -1259,16 +1254,11 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func dismissPreview() { previewToken += 1; previewRequestPending = false; preview.close() }
     @objc private func revealSelected() {
-        guard let selected else { return }
-        if !selected.isConcealed { onConceal?(selected.id); return }
-        if revealed?.id == selected.id {
-            invalidateReveal()
-            cards.reloadCard(at: cards.selectedIndex)
-            updateSelection()
-        } else {
-            revealToken += 1; revealing = true; updateSelection()
-            onReveal?(selected.id, revealToken)
-        }
+        guard let selected, !pendingVisibility.contains(selected.id),
+              let action = selected.isConcealed ? onReveal : onConceal else { return }
+        pendingVisibility.insert(selected.id)
+        updateVisibleCards()
+        action(selected.id)
     }
     private func scrolled() { if cards.isNearEnd { loadMore() } }
     private func loadMore() {
@@ -1284,7 +1274,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private var searchIndexInteractionIsIdle: Bool {
-        !confirming && !commitWhenLoaded && !preview.isShown && !previewRequestPending && !revealing
+        !confirming && !commitWhenLoaded && !preview.isShown && !previewRequestPending && pendingVisibility.isEmpty
             && !cardMenuTracking && !filters.isPresenting
             && window.attachedSheet == nil && pendingFavorites.isEmpty
     }
@@ -1383,7 +1373,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func makeCard(at row: Int) -> ClipCardView {
         let clip = rows[row]
-        let card = ClipCardView(clip: clip, revealedText: revealed?.id == clip.id ? revealed?.text : nil,
+        let card = ClipCardView(clip: clip, revealedText: nil,
                                 thumbnail: thumbnails.object(forKey: NSNumber(value: clip.id))) { [weak self] action in
             // Context menu actions run after tracking has ended, through the same
             // path as buttons and keyboard actions.
@@ -1462,7 +1452,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         card.setNearbyAnchor(nearbyState?.anchorID == rows[row].id)
         card.setQuickShortcut(commandHeld && row < 9 ? row + 1 : nil)
         card.setActionsEnabled(!awaitingSearchResult && !confirming && !commitWhenLoaded && !pendingFavorites.contains(rows[row].id)
-                               && !(revealing && selected?.id == rows[row].id))
+                               && !pendingVisibility.contains(rows[row].id))
     }
 
     private func updateVisibleCards() {
@@ -1475,12 +1465,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     private func updateSelection() {
         if lastSelectedID != selected?.id {
-            let previous = revealed?.id
             dismissPreview()
-            invalidateReveal(); lastSelectedID = selected?.id
-            if let previous, let row = rows.firstIndex(where: { $0.id == previous }) {
-                cards.reloadCard(at: row)
-            }
+            lastSelectedID = selected?.id
         }
         updateVisibleCards()
     }
@@ -1598,7 +1584,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         let background = HistoryBackdropView(frame: window.contentView!.bounds)
         window.contentView = background
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 10
-        root.edgeInsets = NSEdgeInsets(top: 16, left: 14, bottom: 10, right: 14)
+        root.edgeInsets = NSEdgeInsets(top: 11, left: 14, bottom: 10, right: 14)
         root.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(root)
         NSLayoutConstraint.activate([root.leadingAnchor.constraint(equalTo: background.leadingAnchor), root.trailingAnchor.constraint(equalTo: background.trailingAnchor), root.topAnchor.constraint(equalTo: background.topAnchor), root.bottomAnchor.constraint(equalTo: background.bottomAnchor)])
@@ -1662,7 +1648,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         searchOptionsRow.spacing = 8; searchOptionsRow.distribution = .fill; searchOptionsRow.alignment = .centerY
         root.addArrangedSubview(searchOptionsRow)
         searchOptionsRow.widthAnchor.constraint(equalTo: toolbar.widthAnchor).isActive = true
-        root.setCustomSpacing(6, after: toolbar)
+        root.setCustomSpacing(11, after: toolbar)
         root.setCustomSpacing(8, after: searchOptionsRow)
         semanticSetup.target = self; semanticSetup.action = #selector(setupSemanticSearch)
         semanticSetup.bezelStyle = .inline; semanticSetup.controlSize = .small

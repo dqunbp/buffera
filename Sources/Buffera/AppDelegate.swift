@@ -409,8 +409,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        panel.onReveal = { [weak self] id, token in
-            self?.loadPayload(id) { [weak self] payload in self?.panel.showConcealedText(ClipboardService.revealedText(payload), id: id, token: token) }
+        panel.onReveal = { [weak self] id in
+            guard let self else { return }
+            self.work.async {
+                self.secretKeys.retryAccess()
+                do {
+                    let clip = try self.store.unconceal(id: id)
+                    self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
+                    DispatchQueue.main.async {
+                        self.panel.unconcealFinished(clip)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.panel.visibilityChangeFailed(error, id: id); self.showError(error)
+                    }
+                }
+            }
         }
         panel.onConceal = { [weak self] id in
             guard let self else { return }
@@ -422,10 +436,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.imageTextIndexer?.schedule(); self.scheduleEmbeddings()
                     DispatchQueue.main.async {
                         self.historyChat?.historyChanged(id: id)
-                        self.panel.refresh(preservingSelection: true)
+                        self.panel.concealFinished(id: id)
                     }
                 }
-                catch { DispatchQueue.main.async { self.panel.failed(error); self.showError(error) } }
+                catch { DispatchQueue.main.async { self.panel.visibilityChangeFailed(error, id: id); self.showError(error) } }
             }
         }
         panel.onFavorite = { [weak self] id, isFavorite in
@@ -937,7 +951,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
 
-        В настройках истории выберите: не сохранять секреты или сохранять их зашифрованными. Сохранённые секреты скрыты точками. Кнопка глаза раскрывает секрет или шифрует и скрывает обычный текст.
+        В настройках истории выберите: не сохранять секреты или сохранять их зашифрованными. Сохранённые секреты скрыты точками. Открытие замка возвращает запись в обычную историю до ручного скрытия. Закрытие замка шифрует и скрывает запись.
         """)
         alert.runModal()
     }

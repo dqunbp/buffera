@@ -112,26 +112,8 @@ final class ClipboardService {
             return CapturedClip(payload: payload, kind: kind, title: "Скрытая запись", text: "",
                                 source: source, isConcealed: true, isRemote: isRemote)
         }
-        let fileURLs = originals.compactMap { $0.string(forType: .fileURL).flatMap(URL.init(string:)) }
-        var text = originals.compactMap { $0.string(forType: .string) }.joined(separator: "\n")
-        if text.isEmpty, let rtf = originals.first?.data(forType: .rtf) {
-            text = (try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil).string) ?? ""
-        }
-        let kind: ClipKind
-        let title: String
-        if !fileURLs.isEmpty {
-            kind = .file; text = fileURLs.map(\.path).joined(separator: "\n")
-            title = fileURLs.map(\.lastPathComponent).joined(separator: ", ")
-        } else if types.contains(.png) || types.contains(.tiff) {
-            kind = .image; title = "Картинка"
-        } else if !text.isEmpty {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            kind = ["https", "http"].contains(URL(string: trimmed)?.scheme?.lowercased() ?? "") && !trimmed.contains(where: \.isWhitespace) ? .link : .text
-            title = String(trimmed.replacingOccurrences(of: "\n", with: " ").prefix(240))
-        } else {
-            kind = .other; title = "Данные: " + (originals.first?.types.first?.rawValue ?? "неизвестный формат")
-        }
-        return CapturedClip(payload: payload, kind: kind, title: title, text: String(text.prefix(200_000)),
+        let metadata = ClipboardMetadata(payload: payload)
+        return CapturedClip(payload: payload, kind: metadata.kind, title: metadata.title, text: metadata.text,
                             source: source, isConcealed: false, isRemote: isRemote)
     }
 
@@ -162,7 +144,7 @@ final class ClipboardService {
         ["loginwindow", "windowserver"].contains(name.lowercased()) ? "" : name
     }
 
-    // Only an explicit reveal action should decode a concealed entry for display.
+    // Decode textual representations for an ordinary preview or explicit operation.
     static func revealedText(_ payload: ClipPayload) -> String? {
         let parts = payload.items.compactMap(text(in:))
         return parts.isEmpty ? nil : parts.joined(separator: "\n")
