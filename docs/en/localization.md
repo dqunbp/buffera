@@ -142,7 +142,7 @@ languages or change the language of model answers.
 ## Documentation translations
 
 The project README, website user guides, `docs/INSTALL.txt` and the release notes
-in `docs/releases/1.1.0.md` and `docs/releases/1.0.0.md` are available in all eight languages.
+in `docs/releases/1.2.0.md`, `docs/releases/1.1.0.md` and `docs/releases/1.0.0.md` are available in all eight languages.
 The release index is in [releases/README.md](../releases/README.md).
 `package-release.sh` copies the installation instructions into the DMG as
 `README.txt`; `create-appcast.sh` embeds the notes for the corresponding version

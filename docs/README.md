@@ -17,7 +17,7 @@ The project overview and website guides are available in all eight interface lan
 | 简体中文 | [README](../README.zh-Hans.md) | [使用指南](https://buffera.app/zh-Hans/docs/) |
 | 日本語 | [README](../README.ja.md) | [ガイド](https://buffera.app/ja/docs/) |
 
-[Installation instructions](INSTALL.txt) and the release notes for [1.1.0](releases/1.1.0.md) and [1.0.0](releases/1.0.0.md) each include all eight languages. See the [release index](releases/README.md) for earlier versions. The release scripts copy the instructions into the DMG and embed the release notes in its signed appcast. Source edits do not replace previously published assets; updated packaged documents ship in a new release.
+[Installation instructions](INSTALL.txt) and the release notes for [1.2.0](releases/1.2.0.md), [1.1.0](releases/1.1.0.md) and [1.0.0](releases/1.0.0.md) each include all eight languages. See the [release index](releases/README.md) for earlier versions. The release scripts copy the instructions into the DMG and embed the release notes in its signed appcast. Source edits do not replace previously published assets; updated packaged documents ship in a new release.
 
 ## Technical documentation
 
