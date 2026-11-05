@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         catch { showError(error, alert: true); return }
         clipboard.savesConcealed = SecretHistoryMode.load() == .encrypted
+        clipboard.savesTemporary = TemporaryHistoryPreferences.load()
         // Queued before capture/indexing, so old plaintext secrets are protected first.
         work.async {
             do {
@@ -832,6 +833,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try self.hotKeys.apply(value)
                 self.panel.applyShortcuts(value)
                 self.updateShortcutMenu()
+            }
+            controller.onTemporaryHistoryChange = { [weak self] enabled in
+                self?.clipboard.savesTemporary = enabled
+                self?.clipboard.discardPendingChanges()
             }
             controller.onSecretHistoryChange = { [weak self] mode, completion in
                 guard let self else { completion(.failure(SecretStorageError.keyUnavailable)); return }

@@ -332,6 +332,20 @@
           ]
         },
         {
+          "id": "temporary",
+          "title": "Éléments temporaires",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Dans Réglages → Historique, Enregistrer les éléments temporaires est désactivé par défaut. Active cette option pour enregistrer aussi le contenu que les apps signalent comme temporaire ou généré automatiquement, par exemple pendant la dictée ou l’insertion automatique de texte. Le choix s’applique aux nouvelles copies et ne supprime pas les éléments enregistrés."
+            },
+            {
+              "type": "note",
+              "text": "Si un élément est aussi signalé comme confidentiel, Enregistrer les éléments temporaires et l’enregistrement chiffré des secrets doivent être activés. Son contenu est enregistré sous forme chiffrée."
+            }
+          ]
+        },
+        {
           "id": "secrets",
           "title": "Secrets dans l’historique",
           "blocks": [
@@ -620,7 +634,8 @@
                 "Autorisez l’accès au presse-papiers si macOS le demande.",
                 "Appuyez sur ⌘0 pour supprimer la recherche et les filtres.",
                 "Copiez à nouveau le contenu. Les copies effectuées pendant le verrouillage ou la veille sont ignorées.",
-                "Vérifiez les réglages des secrets : les éléments marqués confidentiels ne sont pas enregistrés par défaut."
+                "Vérifiez les réglages des secrets : les éléments marqués confidentiels ne sont pas enregistrés par défaut.",
+                "Pour la dictée ou l’insertion automatique de texte, vérifie Enregistrer les éléments temporaires dans Réglages → Historique. Ces éléments ne sont pas enregistrés par défaut ; les éléments confidentiels nécessitent aussi l’enregistrement chiffré des secrets."
               ]
             }
           ]

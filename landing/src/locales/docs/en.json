@@ -332,6 +332,20 @@
           ]
         },
         {
+          "id": "temporary",
+          "title": "Temporary clips",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "In Settings → History, Save temporary clips is off by default. Enable it to also save content that apps mark as temporary or automatically generated, for example during dictation and automatic text insertion. The choice applies to new copies and does not delete saved clips."
+            },
+            {
+              "type": "note",
+              "text": "If a clip is also marked confidential, both Save temporary clips and Save secrets encrypted must be enabled. Its content is stored encrypted."
+            }
+          ]
+        },
+        {
           "id": "secrets",
           "title": "Secrets in history",
           "blocks": [
@@ -620,7 +634,8 @@
                 "Allow clipboard access if macOS requests it.",
                 "Press ⌘0 to remove the query and filters.",
                 "Copy the content again. Copies made during lock or sleep are skipped.",
-                "Check secret settings: marked confidential clips are not saved by default."
+                "Check secret settings: marked confidential clips are not saved by default.",
+                "For dictation or automatic text insertion, check Save temporary clips in Settings → History. These clips are not saved by default; confidential clips also require encrypted secret storage."
               ]
             }
           ]

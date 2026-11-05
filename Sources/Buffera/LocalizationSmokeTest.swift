@@ -208,7 +208,7 @@ func runLocalizationSmokeTest() throws {
     try check(!descendants(content).contains { $0.identifier?.rawValue == "settings.textFileNaming" },
               "File export must not appear among history settings")
     for (section, controls) in [
-        ("storage", ["countLimit", "byteLimit", "revealData"]),
+        ("storage", ["countLimit", "byteLimit", "saveTemporaryClips", "revealData"]),
         ("secrets", ["secretHistoryMode"]),
         ("reopening", ["historyReset.enabled", "historyReset.immediately", "historyReset.afterDelay", "historyReset.minutes"])
     ] {
@@ -220,6 +220,30 @@ func runLocalizationSmokeTest() throws {
                       "History control is outside its semantic group: \(control)")
         }
     }
+    guard let temporary = descendants(content).first(where: { $0.identifier?.rawValue == "settings.saveTemporaryClips" }) as? NSButton else {
+        throw HistoryError.database("Temporary history setting missing")
+    }
+    try check(temporary.state == .off && !TemporaryHistoryPreferences.load(from: defaults),
+              "Temporary history must be disabled by default")
+    var temporaryChanges: [Bool] = []
+    controller.onTemporaryHistoryChange = { temporaryChanges.append($0) }
+    temporary.state = .on
+    try check(temporary.sendAction(temporary.action, to: temporary.target), "Temporary history action is disconnected")
+    try check(TemporaryHistoryPreferences.load(from: defaults) && temporaryChanges == [true],
+              "Temporary history did not persist or notify its owner")
+    try check(SecretHistoryMode.load(from: defaults) == .skip && HistoryLimits.load(from: defaults) == customLimits,
+              "Enabling temporary history changed secret storage or ordinary limits")
+    _ = temporary.sendAction(temporary.action, to: temporary.target)
+    try check(temporaryChanges == [true], "Unchanged temporary history setting notified twice")
+    let temporaryReopened = makeSettings(1)
+    let restoredTemporary = descendants(temporaryReopened.window!.contentView!).first {
+        $0.identifier?.rawValue == "settings.saveTemporaryClips"
+    } as? NSButton
+    try check(restoredTemporary?.state == .on, "Reopened settings lost temporary history preference")
+    temporary.state = .off
+    _ = temporary.sendAction(temporary.action, to: temporary.target)
+    try check(!TemporaryHistoryPreferences.load(from: defaults) && temporaryChanges == [true, false],
+              "Disabling temporary history did not persist or notify its owner")
     var revealRequests = 0
     controller.onRevealData = { revealRequests += 1 }
     (descendants(content).first { $0.identifier?.rawValue == "settings.revealData" } as? NSButton)?.performClick(nil)
@@ -324,6 +348,12 @@ func runLocalizationSmokeTest() throws {
     finishSecretChange?(.success(()))
     try check(secrets.indexOfSelectedItem == 1 && SecretHistoryMode.load(from: defaults) == .encrypted,
               "Successful secret setting did not persist")
+    try check(!TemporaryHistoryPreferences.load(from: defaults) && temporary.state == .off,
+              "Enabling secret storage must not enable temporary history")
+    temporary.state = .on
+    _ = temporary.sendAction(temporary.action, to: temporary.target)
+    try check(TemporaryHistoryPreferences.load(from: defaults) && SecretHistoryMode.load(from: defaults) == .encrypted,
+              "Temporary history changed enabled secret storage")
     try check(secretStatus.isHidden, "Successful secret change must remove the empty status row")
     let secretReopened = makeSettings()
     let secretTabs = descendants(secretReopened.window!.contentView!).compactMap { $0 as? SettingsNavigation }.first!
@@ -335,6 +365,12 @@ func runLocalizationSmokeTest() throws {
     _ = secrets.sendAction(secrets.action, to: secrets.target)
     finishSecretChange?(.success(()))
     try check(SecretHistoryMode.load(from: defaults) == .skip, "Disabling secret capture did not persist")
+    try check(TemporaryHistoryPreferences.load(from: defaults) && temporary.state == .on,
+              "Disabling secret storage must not disable temporary history")
+    temporary.state = .off
+    _ = temporary.sendAction(temporary.action, to: temporary.target)
+    try check(!TemporaryHistoryPreferences.load(from: defaults) && SecretHistoryMode.load(from: defaults) == .skip,
+              "Disabling temporary history changed secret storage")
     try check(HistoryLimits.load(from: defaults) == customLimits, "Secret setting changed ordinary history limits")
     content.layoutSubtreeIfNeeded()
     guard let slider = descendants(content).first(where: { $0.identifier?.rawValue == "settings.byteLimit" }) as? NSSlider,
@@ -390,6 +426,8 @@ func runLocalizationSmokeTest() throws {
         // Native text fields may extend two points beyond their alignment rectangle.
         try check(container.bounds.insetBy(dx: -3, dy: -3).contains(frame), "History control \(view.identifier?.rawValue ?? String(describing: type(of: view))) \(frame) lies outside \(container.bounds)")
     }
+    try check(temporary.bounds.width >= temporary.intrinsicContentSize.width - 1,
+              "Temporary history checkbox title is clipped")
     print("PASS: \(activeLanguage) settings theme and language selection, appearance help, persistence, restart action, GitHub/support links, history groups, file naming menu, size slider and layout")
 }
 

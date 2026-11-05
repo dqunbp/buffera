@@ -332,6 +332,20 @@
           ]
         },
         {
+          "id": "temporary",
+          "title": "Registros temporales",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "En Ajustes → Historial, Guardar registros temporales está desactivado por defecto. Actívalo para guardar también el contenido que las apps marcan como temporal o generado automáticamente, por ejemplo durante el dictado y la inserción automática de texto. La opción se aplica a las nuevas copias y no elimina los registros guardados."
+            },
+            {
+              "type": "note",
+              "text": "Si un registro también está marcado como confidencial, deben estar activadas tanto Guardar registros temporales como la opción de guardar secretos cifrados. Su contenido se guarda cifrado."
+            }
+          ]
+        },
+        {
           "id": "secrets",
           "title": "Secretos en el historial",
           "blocks": [
@@ -620,7 +634,8 @@
                 "Permite el acceso al portapapeles si macOS lo solicita.",
                 "Pulsa ⌘0 para quitar la consulta y los filtros.",
                 "Vuelve a copiar el contenido. Las copias hechas durante el bloqueo o el reposo se omiten.",
-                "Comprueba los ajustes de secretos: los elementos marcados como confidenciales no se guardan de forma predeterminada."
+                "Comprueba los ajustes de secretos: los elementos marcados como confidenciales no se guardan de forma predeterminada.",
+                "Para el dictado o la inserción automática de texto, revisa Guardar registros temporales en Ajustes → Historial. Estos registros no se guardan por defecto; los confidenciales también requieren guardar secretos cifrados."
               ]
             }
           ]

@@ -666,3 +666,6 @@
 
 "Для работы помощника скачайте модель в настройках «ИИ»." = "Pour utiliser l’assistant, téléchargez un modèle dans les réglages IA.";
 "Сразу после закрытия" = "Dès la fermeture";
+
+"Сохранять временные записи" = "Enregistrer les éléments temporaires";
+"Сохранять также записи, которые приложения помечают как временные или автоматически созданные. Например, при диктовке и автоматической вставке текста" = "Enregistrer aussi les éléments que les apps marquent comme temporaires ou générés automatiquement. Par exemple, lors de la dictée et de l’insertion automatique de texte";

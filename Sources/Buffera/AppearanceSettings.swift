@@ -9,6 +9,7 @@ final class SettingsWindow: NSWindowController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onSecretHistoryChange: SecretHistorySettingsView.Apply?
+    var onTemporaryHistoryChange: ((Bool) -> Void)?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -68,6 +69,7 @@ final class SettingsWindow: NSWindowController {
             guard let apply = self?.onSecretHistoryChange else { completion(.failure(SecretStorageError.keyUnavailable)); return }
             apply(mode, completion)
         }
+        settings.onTemporaryHistoryChange = { [weak self] value in self?.onTemporaryHistoryChange?(value) }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
         settings.onCopyMCPConfiguration = { [weak self] configuration in
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
@@ -93,6 +95,7 @@ final class SettingsWindow: NSWindowController {
         settings.refreshShortcuts()
         settings.refreshMCPAccess()
         settings.refreshSecrets()
+        settings.refreshTemporaryHistory()
         settings.refreshHistoryReset()
         settings.refreshModels()
         settings.refreshGeneral()
@@ -141,6 +144,7 @@ private final class SettingsContentController: NSViewController {
     var onAppearanceChange: ((HistoryAppearance) -> Void)?
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onSecretHistoryChange: SecretHistorySettingsView.Apply?
+    var onTemporaryHistoryChange: ((Bool) -> Void)?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -156,6 +160,7 @@ private final class SettingsContentController: NSViewController {
     private let shortcutSettings: ShortcutSettingsView
     private let mcp: MCPSettingsView
     private let secrets: SecretHistorySettingsView
+    private let temporaryHistory: TemporaryHistorySettingsView
     private let historyReset: HistoryResetSettingsView
     private let models: ModelSettingsView
     private let updateSettings: NSView
@@ -191,6 +196,7 @@ private final class SettingsContentController: NSViewController {
         shortcutSettings = ShortcutSettingsView(value: .load(from: shortcutDefaults))
         self.limitsDefaults = limitsDefaults
         secrets = SecretHistorySettingsView(defaults: limitsDefaults)
+        temporaryHistory = TemporaryHistorySettingsView(defaults: limitsDefaults)
         historyReset = HistoryResetSettingsView(defaults: limitsDefaults)
         self.limits = HistoryLimits.load(from: limitsDefaults)
         self.launchLanguage = launchLanguage
@@ -203,6 +209,7 @@ private final class SettingsContentController: NSViewController {
             guard let apply = self?.onSecretHistoryChange else { completion(.failure(SecretStorageError.keyUnavailable)); return }
             apply(mode, completion)
         }
+        temporaryHistory.onChange = { [weak self] value in self?.onTemporaryHistoryChange?(value) }
         shortcutSettings.onApply = { [weak self] value in
             guard let self, let apply = self.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
             try apply(value)
@@ -407,6 +414,7 @@ private final class SettingsContentController: NSViewController {
     }
 
     func refreshSecrets() { secrets.refresh() }
+    func refreshTemporaryHistory() { temporaryHistory.refresh() }
     func refreshHistoryReset() { historyReset.refresh() }
 
     private func historyPage() -> NSView {
@@ -438,9 +446,9 @@ private final class SettingsContentController: NSViewController {
         folder.imagePosition = .imageLeading
         let storage = paragraph(L10n.text("История хранится локально. Ключ шифрования секретов хранится в Связке ключей macOS. При потере ключа восстановить секреты не получится."))
         let retention = vertical([label(L10n.text("Хранение записей"), size: 13, weight: .semibold),
-                                  grid, note, folder], spacing: 10)
+                                  grid, note, temporaryHistory, folder], spacing: 10)
         retention.identifier = NSUserInterfaceItemIdentifier("settings.history.storage")
-        for child in [grid, note] { child.widthAnchor.constraint(equalTo: retention.widthAnchor).isActive = true }
+        for child in [grid, note, temporaryHistory] { child.widthAnchor.constraint(equalTo: retention.widthAnchor).isActive = true }
         let privacy = vertical([secrets, storage], spacing: 8)
         privacy.identifier = NSUserInterfaceItemIdentifier("settings.history.secrets")
         for child in [secrets, storage] { child.widthAnchor.constraint(equalTo: privacy.widthAnchor).isActive = true }

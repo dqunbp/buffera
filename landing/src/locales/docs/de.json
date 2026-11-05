@@ -332,6 +332,20 @@
           ]
         },
         {
+          "id": "temporary",
+          "title": "Temporäre Einträge",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Unter Einstellungen → Verlauf ist Temporäre Einträge speichern standardmäßig deaktiviert. Aktiviere diese Option, um auch Inhalte zu speichern, die Apps als temporär oder automatisch erzeugt markieren, etwa beim Diktieren oder automatischen Einfügen von Text. Die Auswahl gilt für neue Kopiervorgänge und löscht keine gespeicherten Einträge."
+            },
+            {
+              "type": "note",
+              "text": "Ist ein Eintrag zusätzlich als vertraulich markiert, müssen sowohl Temporäre Einträge speichern als auch die verschlüsselte Speicherung von Geheimnissen aktiviert sein. Sein Inhalt wird verschlüsselt gespeichert."
+            }
+          ]
+        },
+        {
           "id": "secrets",
           "title": "Vertrauliche Inhalte im Verlauf",
           "blocks": [
@@ -620,7 +634,8 @@
                 "Erlaube den Zugriff auf die Zwischenablage, falls macOS danach fragt.",
                 "Drücke ⌘0, um Suchanfrage und Filter zu entfernen.",
                 "Kopiere den Inhalt erneut. Kopien während der Sperre oder des Ruhezustands werden übersprungen.",
-                "Prüfe die Einstellungen für vertrauliche Inhalte: Als vertraulich markierte Einträge werden standardmäßig nicht gespeichert."
+                "Prüfe die Einstellungen für vertrauliche Inhalte: Als vertraulich markierte Einträge werden standardmäßig nicht gespeichert.",
+                "Prüfe für Diktate oder automatisch eingefügten Text die Option Temporäre Einträge speichern unter Einstellungen → Verlauf. Solche Einträge werden standardmäßig nicht gespeichert; vertrauliche Einträge erfordern zusätzlich die verschlüsselte Speicherung von Geheimnissen."
               ]
             }
           ]

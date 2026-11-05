@@ -332,6 +332,20 @@
           ]
         },
         {
+          "id": "temporary",
+          "title": "Registros temporários",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Em Ajustes → Histórico, Salvar registros temporários fica desativado por padrão. Ative a opção para salvar também conteúdo que os apps marcam como temporário ou gerado automaticamente, por exemplo durante o ditado e a inserção automática de texto. A escolha se aplica às novas cópias e não exclui os registros salvos."
+            },
+            {
+              "type": "note",
+              "text": "Se um registro também estiver marcado como confidencial, é necessário ativar tanto Salvar registros temporários quanto o armazenamento criptografado de segredos. Seu conteúdo é salvo criptografado."
+            }
+          ]
+        },
+        {
           "id": "secrets",
           "title": "Segredos no histórico",
           "blocks": [
@@ -620,7 +634,8 @@
                 "Permita o acesso à área de transferência se o macOS solicitar.",
                 "Pressione ⌘0 para remover a consulta e os filtros.",
                 "Copie o conteúdo novamente. Cópias feitas durante o bloqueio ou repouso são ignoradas.",
-                "Verifique os ajustes de segredos: itens marcados como confidenciais não são salvos por padrão."
+                "Verifique os ajustes de segredos: itens marcados como confidenciais não são salvos por padrão.",
+                "Para ditado ou inserção automática de texto, verifique Salvar registros temporários em Ajustes → Histórico. Esses registros não são salvos por padrão; os confidenciais também exigem o armazenamento criptografado de segredos."
               ]
             }
           ]
