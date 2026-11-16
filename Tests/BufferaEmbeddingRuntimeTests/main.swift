@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-if CommandLine.arguments.dropFirst().first == "--live" {
+if ["--live", "--external-live"].contains(CommandLine.arguments.dropFirst().first ?? "") {
     do { exit(try await runLiveEmbeddingChecks(arguments: CommandLine.arguments)) }
     catch { print("FAIL: \(error.localizedDescription)"); exit(1) }
 }

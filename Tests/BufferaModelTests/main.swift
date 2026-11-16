@@ -613,5 +613,7 @@ do {
     manager.shutdown()
 }
 
+try runExternalChecks(descriptor: descriptor(), payload: fullPayload, root: temporary)
+
 print("Model checks: \(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

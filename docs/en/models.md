@@ -11,6 +11,53 @@ Settings → AI provides two independent features: Semantic Search and [Ask Buff
 
 These are download sizes, not promises about memory use. Both models are distributed under Apache 2.0. The catalog uses the public [EmbeddingGemma 2](https://huggingface.co/ggml-org/embeddinggemma-2-GGUF) and [Gemma 4 E2B IT](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) repositories maintained by ggml-org. No Hugging Face account or token is required.
 
+## Reuse downloaded models
+
+The default remains llama.cpp and the GGUF catalog above. Each feature card shows
+the model, file source, and feature state. **Download model** downloads the recommended
+variant. **Connect your model** opens a separate window: first an explanation of file
+reuse and guidance to download through Buffera when unsure; after **Next**, the exact supported variants for that feature, discovered models
+with the selected source and path, and a manual file picker.
+
+Choosing a file makes no changes. **Connect** verifies its contents, records the original
+path, and enables the feature. The window closes after successful activation; errors
+remain in the window and allow retry. Weights are never copied. **Use the Buffera model
+again** restores the standard model. **Disconnect file** removes only the reference.
+Previously downloaded Buffera-owned weights are retained.
+
+When an external file fails, its card shows “Model file unavailable”, the original path, “Locate file…” and “Use Buffera model”. This renders an error detected by the manager; the original folder is not continuously monitored. The selection window shows supported variants first, then automatically discovered files with their paths, then manual file selection.
+
+Supported exact weight variants are listed in `ExternalModels.supported`:
+the two GGUF files above, Foresight EmbeddingGemma 2 (474,120,192 bytes), and
+Foresight Gemma 4 E4B (3,659,530,240 bytes). Other quantizations, versions, and
+speech models are currently rejected. Filenames may differ: compatibility is
+verified against the full SHA-256, not a name or extension.
+
+Discovery reads `~/.ai-edge/models/.manifest.json` (schema 1). This is Google's
+internal format, so unknown schemas are ignored and manual selection remains
+available. Buffera only reads ready entries; it never modifies Google's
+manifest, app references, or weights. If the original is moved, removed or
+changed, the runtime stops using it and literal search remains available.
+Selecting a different embedding model rebuilds the index when enabled.
+
+Discovered models appear in a dropdown. The first compatible file is preselected, but only **Connect** changes the active model. Manual selection is preserved when discovery refreshes.
+
+Discovery also reads Hugging Face cache snapshots: `HF_HUB_CACHE`, then `HF_HOME/hub`, then `XDG_CACHE_HOME/huggingface/hub` or `~/.cache/huggingface/hub`. These are Buffera process environment variables. Snapshot links resolve to files inside the cache and duplicate targets collapse; weights are never copied. Scanning is bounded to 20,000 entries and four nested directory levels within each snapshot. Extension and size are discovery hints; connection still requires full SHA-256 verification. The selected source and path appear below the dropdown. **Refresh list** rescans, preserves manual selection, and removes vanished discovered files.
+
+`.litertlm` uses separate native C++ workers with pinned LiteRT-LM 0.19.1
+(GPU WebGPU over Metal), without Python. Compilation caches live separately
+under `Models/RuntimeCache/litert`; no weight duplication does not mean no
+additional cache. LiteRT indexing uses UTF-8 windows up to 384 bytes, with up
+to 64 bytes of overlap, preserving character boundaries, and at most 32 chunks.
+Semantic queries for this backend are limited to 384 bytes; longer queries
+fall back to literal search. These parameters are part of the index identity.
+
+Sources: `Sources/BufferaModels/ExternalModels.swift`, `LocalModelManager.swift`,
+`LocalModelReadAccess.swift`, `Sources/Buffera/ModelSourceView.swift`,
+`Sources/BufferaModelRuntime/LiteRT*Worker.mm`, `scripts/prepare-litert-runtime.sh`.
+Runtime checks accept `--external-live /absolute/Buffera.app /absolute/model`
+for synthetic inference using external weights without copying or changing user settings.
+
 ## Controls
 
 - Download and Enable explicitly starts downloading the selected model. The feature is enabled automatically after verification. Before downloading, the switch for a disabled feature is unavailable; while preparation is in progress, you can switch it off to stop work and retain the downloaded portion.
@@ -29,7 +76,7 @@ In the history window, Include semantic search supplements text matches with sem
 
 Indexing uses saved text, links, file paths, and completed image OCR. Files at those paths are not opened. Concealed items are never passed to the embedding model; concealing an item removes its vectors along with its OCR. The prepared portion of the index is available while the rest of history is being processed. If the model is disabled, deleted, or unavailable, search continues using literal matches.
 
-Long items are split into chunks: up to 512 text tokens, an overlap of 64 tokens, and at most 32 chunks per item. Input is limited to 128 KiB of UTF-8; truncation does not split a character. Partial processing of long items is shown in progress information, and original content is unchanged. Literal search continues to use saved text and OCR up to 200,000 characters.
+With llama.cpp, long items are split into chunks: up to 512 text tokens, an overlap of 64 tokens, and at most 32 chunks per item. Input is limited to 128 KiB of UTF-8; truncation does not split a character. Partial processing of long items is shown in progress information, and original content is unchanged. Literal search continues to use saved text and OCR up to 200,000 characters.
 
 ## Battery use
 

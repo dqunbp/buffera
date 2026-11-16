@@ -8,10 +8,12 @@ import CryptoKit
 func runFeatureSettingsSmokeTest() throws {
     NSApplication.shared.setActivationPolicy(.prohibited)
     try checkBackgroundPreparationPolicy()
+    try checkDiscoveredModelPresentation()
+    try checkUnavailableExternalPresentation()
     let fresh = try FeatureSettingsFixture(state: .notDownloaded)
     defer { fresh.cleanup() }
-    let search = try fresh.control("models.embedding.enabled", as: NSButton.self)
-    let assistant = try fresh.control("models.assistant.enabled", as: NSButton.self)
+    let search = try fresh.control("models.embedding.enabled", as: NSSwitch.self)
+    let assistant = try fresh.control("models.assistant.enabled", as: NSSwitch.self)
     try featureCheck(!search.isEnabled && !assistant.isEnabled,
                      "Fresh feature switches bypass the explicit download action")
     try featureCheck(search.state == .off && assistant.state == .off,
@@ -22,6 +24,9 @@ func runFeatureSettingsSmokeTest() throws {
         let download = try fresh.control("\(prefix).download", as: NSButton.self)
         let name = try fresh.control("\(prefix).name", as: NSTextField.self)
         let energyNote = try fresh.control("\(prefix).energyNote", as: NSTextField.self)
+        let connectOwn = try fresh.control("\(prefix).connectOwn", as: NSButton.self)
+        try featureCheck(!connectOwn.isHiddenOrHasHiddenAncestor && connectOwn.title == L10n.text("Подключить свою модель"),
+                         "Each feature must offer its own connection flow")
         let snapshot = fresh.manager.snapshots.first { $0.descriptor.role == role }!
         try featureCheck(!status.isHiddenOrHasHiddenAncestor && !status.stringValue.isEmpty,
                          "The missing model has no visible preparation status")
@@ -29,7 +34,7 @@ func runFeatureSettingsSmokeTest() throws {
                          name.stringValue.contains(snapshot.descriptor.title) &&
                          name.stringValue.contains("\(snapshot.totalBytes)"),
                          "Model identity and download size are hidden before activation")
-        try featureCheck(!download.isHiddenOrHasHiddenAncestor && download.title == L10n.text("Скачать модель и включить"),
+        try featureCheck(!download.isHiddenOrHasHiddenAncestor && download.title == L10n.text("Скачать модель"),
                          "The explicit download-and-enable action is missing")
         try featureCheck(!energyNote.isHiddenOrHasHiddenAncestor && !energyNote.stringValue.isEmpty,
                          "A local feature omits its energy-use explanation")
@@ -53,7 +58,7 @@ func runFeatureSettingsSmokeTest() throws {
     let installed = try FeatureSettingsFixture(state: .downloaded)
     defer { installed.cleanup() }
     try installed.waitUntil { $0.allSatisfy { $0.state == .downloaded } }
-    let toggle = try installed.control("models.embedding.enabled", as: NSButton.self)
+    let toggle = try installed.control("models.embedding.enabled", as: NSSwitch.self)
     let remove = try installed.control("models.embedding.remove", as: NSButton.self)
     let details = try installed.control("models.embedding.details", as: NSButton.self)
     let name = try installed.control("models.embedding.name", as: NSTextField.self)
@@ -123,7 +128,7 @@ func runFeatureSettingsSmokeTest() throws {
 
     let paused = try FeatureSettingsFixture(state: .paused, enabled: true)
     defer { paused.cleanup() }
-    let pausedToggle = try paused.control("models.embedding.enabled", as: NSButton.self)
+    let pausedToggle = try paused.control("models.embedding.enabled", as: NSSwitch.self)
     let resume = try paused.control("models.embedding.download", as: NSButton.self)
     try featureCheck(pausedToggle.state == .on && resume.title == L10n.text("Продолжить"),
                      "Paused preparation loses the activation request or resume action")
@@ -143,6 +148,115 @@ func runFeatureSettingsSmokeTest() throws {
                      "Preparation failure hides its error or recovery action")
     try featureCheck([fresh, installed, paused, failed].allSatisfy { !$0.window.isVisible },
                      "Settings checks unexpectedly opened a window")
+}
+
+private func checkDiscoveredModelPresentation() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("buffera-discovery-ui-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    var entries: [String: Any] = [:]
+    for model in ExternalModels.supported where model.engine == .liteRT {
+        let url = root.appendingPathComponent(model.filename)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        let file = try FileHandle(forWritingTo: url)
+        try file.truncate(atOffset: UInt64(model.byteCount))
+        try file.close()
+        entries[model.filename] = ["physicalState": "ready", "storage": [
+            "canonicalAbsolutePath": url.path, "expectedSizeBytes": model.byteCount]]
+    }
+    try JSONSerialization.data(withJSONObject: ["schemaVersion": 1, "models": entries])
+        .write(to: root.appendingPathComponent(".manifest.json"))
+    let fixture = try FeatureSettingsFixture(state: .notDownloaded, discovery: { ExternalModels.discover(in: root) })
+    defer { fixture.cleanup() }
+    let sheet = ModelConnectionSheet(manager: fixture.manager, role: .assistant,
+                                     discovery: { ExternalModels.discover(in: root) })
+    func control<T: NSView>(_ id: String, _ type: T.Type) throws -> T {
+        func find(_ view: NSView) -> T? {
+            if view.identifier?.rawValue == id, let result = view as? T { return result }
+            for child in view.subviews { if let result = find(child) { return result } }
+            return nil
+        }
+        guard let result = find(sheet.window.contentView!) else { throw HistoryError.database("Missing sheet control: \(id)") }
+        return result
+    }
+    let next = try control("models.connection.next", NSButton.self)
+    let choose = try control("models.assistant.chooseFile", NSButton.self)
+    try featureCheck(!next.isHiddenOrHasHiddenAncestor && choose.isHiddenOrHasHiddenAncestor,
+                     "Connection flow must start with an explanation, not file selection")
+    next.performClick(nil)
+    sheet.window.contentView?.layoutSubtreeIfNeeded()
+    try featureCheck(!choose.isHiddenOrHasHiddenAncestor && next.isHiddenOrHasHiddenAncestor,
+                     "Next must reveal only the chosen feature's file selector")
+    let source = try control("models.assistant.source", NSPopUpButton.self)
+    let deadline = Date().addingTimeInterval(3)
+    while !source.isEnabled && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    let connect = try control("models.assistant.connectSource", NSButton.self)
+    try featureCheck(source.numberOfItems == 1 && source.indexOfSelectedItem == 0 && connect.isEnabled,
+                     "First discovered model should be preselected without connecting")
+    source.sendAction(source.action!, to: source.target)
+    try featureCheck(connect.isEnabled && fixture.manager.snapshots.allSatisfy { $0.externalURL == nil && !$0.isEnabled },
+                     "Browsing files must not select or enable a model")
+    let supported = try control("models.assistant.supportedSources", NSTextField.self)
+    try featureCheck(supported.stringValue.contains(".gguf") && supported.stringValue.contains("LiteRT-LM"),
+                     "File selection must explain exact supported variants")
+    // Discovery can become stale before connection. Reject the changed file and keep the dialog usable.
+    for file in ExternalModels.supported where file.role == .assistant && file.engine == .liteRT {
+        let handle = try FileHandle(forWritingTo: root.appendingPathComponent(file.filename))
+        try handle.truncate(atOffset: 0)
+        try handle.close()
+    }
+    connect.performClick(nil)
+    let status = try control("models.assistant.sourceStatus", NSTextField.self)
+    let failureDeadline = Date().addingTimeInterval(3)
+    while !connect.isEnabled && Date() < failureDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    try featureCheck(connect.isEnabled && !status.isHidden && status.textColor == .systemRed,
+                     "Rejected files must show an error and allow retry")
+    try featureCheck(fixture.manager.snapshots.allSatisfy { $0.externalURL == nil && !$0.isEnabled },
+                     "Rejected file must preserve the previous model")
+    let origin = try control("models.assistant.sourceOrigin", NSTextField.self)
+    try featureCheck(origin.stringValue == L10n.text("Найдена в Foresight"), "Selected model shows its source")
+    let rescan = try control("models.assistant.rescan", NSButton.self)
+    rescan.performClick(nil)
+    let rescanDeadline = Date().addingTimeInterval(3)
+    while !rescan.isEnabled && Date() < rescanDeadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    try featureCheck(rescan.isEnabled && !connect.isEnabled && origin.isHidden,
+                     "Refresh removes a vanished candidate and disables connection")
+    var closed = false
+    sheet.onClose = { closed = true }
+    try control("models.connection.cancel", NSButton.self).performClick(nil)
+    try featureCheck(closed, "Cancel must close the connection flow")
+
+}
+
+private func checkUnavailableExternalPresentation() throws {
+    let fixture = try FeatureSettingsFixture(state: .failed)
+    defer { fixture.cleanup() }
+    var snapshots = fixture.manager.snapshots
+    for index in snapshots.indices {
+        snapshots[index].externalURL = URL(fileURLWithPath: "/Models/previous-model.gguf")
+    }
+    fixture.view.update(snapshots)
+    fixture.layout()
+    for role in ModelRole.allCases {
+        let prefix = "models.\(role.rawValue)"
+        let status = try fixture.control("\(prefix).status", as: NSTextField.self)
+        let path = try fixture.control("\(prefix).recovery", as: NSTextField.self)
+        let reconnect = try fixture.control("\(prefix).connectOwn", as: NSButton.self)
+        let standard = try fixture.control("\(prefix).defaultSource", as: NSButton.self)
+        try featureCheck(status.stringValue == L10n.text("Файл модели недоступен") &&
+                         !path.isHidden && path.stringValue.contains("/Models/previous-model.gguf"),
+                         "Unavailable external files need an explanation and original path")
+        try featureCheck(reconnect.title == L10n.text("Указать файл…") &&
+                         !standard.isHiddenOrHasHiddenAncestor,
+                         "Unavailable external files need reconnect and standard-model recovery")
+    }
+    try fixture.checkPresentation(suffix: "-missing-file")
 }
 
 private func featureCheck(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -191,7 +305,8 @@ private final class FeatureSettingsFixture {
     let view: ModelSettingsView
     let window: NSWindow
 
-    init(state: ModelState, enabled: Bool = false) throws {
+    init(state: ModelState, enabled: Bool = false,
+         discovery: @escaping () -> [ExternalModels.Candidate] = { [] }) throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("buffera-feature-ui-\(UUID())")
         let payload = Data("Temporary settings fixture".utf8)
         let revision = String(repeating: "a", count: 40)
@@ -219,7 +334,7 @@ private final class FeatureSettingsFixture {
         }
         try JSONSerialization.data(withJSONObject: receipts).write(to: root.appendingPathComponent("state.json"))
         manager = try LocalModelManager(rootURL: root, descriptors: descriptors)
-        view = ModelSettingsView(manager: manager)
+        view = ModelSettingsView(manager: manager, discovery: discovery)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
                           styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -250,6 +365,7 @@ private final class FeatureSettingsFixture {
         layout()
         for role in ModelRole.allCases {
             let card = try control("models.\(role.rawValue)", as: NSBox.self)
+            if card.isHiddenOrHasHiddenAncestor { continue }
             try featureCheck(card.frame.width > 500 && card.frame.height > 50,
                              "Feature card did not fill the settings column")
             for child in descendants(card) where !child.isHiddenOrHasHiddenAncestor && child is NSControl {
@@ -261,7 +377,8 @@ private final class FeatureSettingsFixture {
         }
     }
 
-    func checkPresentation() throws {
+    func checkPresentation(suffix: String = "") throws {
+        layout()
         let introduction = try control("models.introduction", as: NSStackView.self)
         let privacy = try control("models.privacy", as: NSTextField.self)
         let firstCard = try control("models.embedding", as: NSBox.self)
@@ -274,13 +391,18 @@ private final class FeatureSettingsFixture {
                          "The local-processing explanation must appear before the feature cards")
         for role in ModelRole.allCases {
             let prefix = "models.\(role.rawValue)"
+            if firstCard.isHiddenOrHasHiddenAncestor { continue }
             let mark = try control("\(prefix).mark", as: NSView.self)
             let heading = try control("\(prefix).heading", as: NSStackView.self)
-            let toggle = try control("\(prefix).enabled", as: NSButton.self)
+            let toggle = try control("\(prefix).enabled", as: NSSwitch.self)
             let title = try control("\(prefix).title", as: NSTextField.self)
             let markFrame = heading.convert(mark.bounds, from: mark)
             let titleFrame = heading.convert(title.bounds, from: title)
             let toggleFrame = heading.convert(toggle.bounds, from: toggle)
+            let description = try control("\(prefix).description", as: NSTextField.self)
+            let descriptionFrame = heading.convert(description.bounds, from: description)
+            try featureCheck(toggleFrame.minX - descriptionFrame.maxX >= 13,
+                             "Description must leave a separate column and gap for the switch: \(descriptionFrame), \(toggleFrame)")
             try featureCheck(markFrame.width >= 44 && titleFrame.minX >= markFrame.maxX + 10,
                              "Feature mark must not crowd the title")
             try featureCheck(title.bounds.width >= title.intrinsicContentSize.width - 1 &&
@@ -296,7 +418,7 @@ private final class FeatureSettingsFixture {
             if let bitmap = document.bitmapImageRepForCachingDisplay(in: document.bounds) {
                 document.cacheDisplay(in: document.bounds, to: bitmap)
                 try bitmap.representation(using: .png, properties: [:])?.write(to:
-                    URL(fileURLWithPath: "/tmp/buffera-ai-settings-\(L10n.language)-\(appearance.rawValue).png"))
+                    URL(fileURLWithPath: "/tmp/buffera-ai-settings-\(L10n.language)-\(appearance.rawValue)\(suffix).png"))
             }
         }
         view.appearance = nil

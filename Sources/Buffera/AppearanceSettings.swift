@@ -182,7 +182,6 @@ private final class SettingsContentController: NSViewController {
     private let byteValue = NSTextField(labelWithString: "")
     private var countValues = HistoryLimits.countChoices
     private let tabs = SettingsNavigation(frame: .zero)
-    private let pageTitle = NSTextField(labelWithString: "")
     private let general: GeneralSettingsView
     private let saveNotice = NSTextField(labelWithString: "")
     private let body = NSView()
@@ -288,9 +287,6 @@ private final class SettingsContentController: NSViewController {
         root.addSubview(rail, positioned: .below, relativeTo: header)
         tabs.translatesAutoresizingMaskIntoConstraints = false
         rail.addSubview(tabs)
-        pageTitle.font = .systemFont(ofSize: 22, weight: .semibold)
-        pageTitle.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(pageTitle)
         body.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(body)
 
@@ -312,11 +308,9 @@ private final class SettingsContentController: NSViewController {
             githubStar.leadingAnchor.constraint(greaterThanOrEqualTo: header.trailingAnchor, constant: 20),
             githubStar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24),
             githubStar.centerYAnchor.constraint(equalTo: header.centerYAnchor),
-            pageTitle.leadingAnchor.constraint(equalTo: body.leadingAnchor),
-            pageTitle.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 28),
             body.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 204),
             body.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24),
-            body.topAnchor.constraint(equalTo: pageTitle.bottomAnchor, constant: 18),
+            body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 24),
             body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -14),
             footer.leadingAnchor.constraint(equalTo: body.leadingAnchor),
             footer.trailingAnchor.constraint(equalTo: body.trailingAnchor),
@@ -550,7 +544,6 @@ private final class SettingsContentController: NSViewController {
 
     private func presentPage(_ index: Int) {
         guard pages.indices.contains(index) else { return }
-        pageTitle.stringValue = tabs.label(forSegment: index) ?? ""
         saveNotice.stringValue = index == 2 ? L10n.text("Сочетания применяются без перезапуска") : L10n.text("Изменения сохраняются сразу")
         for view in body.subviews { view.removeFromSuperview() }
         let page = pages[index]

@@ -5,7 +5,11 @@ import Foundation
 /// Hashing uses a utility queue and generation tokens so deletion cannot revive a model.
 public final class LocalModelManager: @unchecked Sendable {
     private final class Entry {
-        let descriptor: LocalModelDescriptor
+        let defaultDescriptor: LocalModelDescriptor
+        var descriptor: LocalModelDescriptor
+        var externalURL: URL?
+        var externalIdentity: VerifiedModelFile?
+        var selection: ModelVerification?
         var state: ModelState = .notDownloaded
         var received: Int64 = 0
         // The feature preference is independent of download/verification readiness.
@@ -18,10 +22,13 @@ public final class LocalModelManager: @unchecked Sendable {
         var verificationRequests: [(Result<URL, Error>) -> Void] = []
         var lastNotification = Date.distantPast
 
-        init(_ descriptor: LocalModelDescriptor) { self.descriptor = descriptor }
+        init(_ descriptor: LocalModelDescriptor) {
+            self.descriptor = descriptor
+            self.defaultDescriptor = descriptor
+        }
         var snapshot: LocalModelSnapshot {
             LocalModelSnapshot(descriptor: descriptor, state: state, receivedBytes: received,
-                               totalBytes: descriptor.byteCount, isEnabled: enabled, errorMessage: error)
+                               totalBytes: descriptor.byteCount, isEnabled: enabled, errorMessage: error, externalURL: externalURL)
         }
     }
 
@@ -45,8 +52,15 @@ public final class LocalModelManager: @unchecked Sendable {
         let loaded = try Self.loadReceipts(at: receiptURL)
         let receipts = loaded.receipts
         for entry in entries.values {
+            let receipt = receipts[entry.descriptor.role.rawValue]
+            if let receipt, let path = receipt.externalPath, path.hasPrefix("/"),
+               let selected = ExternalModels.descriptor(for: receipt, role: entry.descriptor.role)
+                ?? (receipt.sha256 == entry.defaultDescriptor.sha256 && receipt.revision == entry.defaultDescriptor.revision ? entry.defaultDescriptor : nil) {
+                entry.descriptor = selected
+                entry.externalURL = URL(fileURLWithPath: path)
+                entry.externalIdentity = receipt.externalIdentity
+            }
             let descriptor = entry.descriptor
-            let receipt = receipts[descriptor.role.rawValue]
             if receipt?.revision == descriptor.revision && receipt?.sha256 == descriptor.sha256 {
                 entry.enabled = receipt?.enabled ?? false
                 entry.error = receipt?.error
@@ -55,8 +69,10 @@ public final class LocalModelManager: @unchecked Sendable {
             where FileManager.default.fileExists(atPath: directory.path) {
                 try ModelStorage.createDirectory(directory)
             }
-            let finalSize = try ModelStorage.fileSize(fileURL(entry))
-            let partialSize = try ModelStorage.fileSize(partialURL(entry))
+            let finalSize = entry.externalURL != nil
+                ? ((try? ModelStorage.fileSize(fileURL(entry))) ?? 0)
+                : try ModelStorage.fileSize(fileURL(entry))
+            let partialSize = entry.externalURL != nil ? 0 : try ModelStorage.fileSize(partialURL(entry))
             if finalSize > 0 {
                 entry.needsVerification = true
                 entry.received = min(finalSize, descriptor.byteCount)
@@ -70,6 +86,10 @@ public final class LocalModelManager: @unchecked Sendable {
                     entry.state = .failed
                     entry.error = ModelStorageError.unexpectedSize.localizedDescription
                 }
+            } else if entry.externalURL != nil {
+                entry.state = .failed
+                entry.needsVerification = true
+                entry.error = ModelStorageError.notDownloaded.localizedDescription
             } else if partialSize > 0 {
                 entry.state = .paused
                 entry.received = min(partialSize, descriptor.byteCount)
@@ -155,6 +175,11 @@ public final class LocalModelManager: @unchecked Sendable {
     }
 
     private func startDownload(_ entry: Entry) {
+        if let external = entry.externalURL {
+            cancel(entry)
+            verify(entry, at: external)
+            return
+        }
         guard entry.state != .downloading, entry.state != .verifying,
               entry.state != .downloaded || entry.needsVerification else { return }
         do {
@@ -227,6 +252,10 @@ public final class LocalModelManager: @unchecked Sendable {
             guard let self, !self.stopped, let entry = self.entries[role] else { return }
             self.cancel(entry)
             entry.enabled = false
+            if entry.externalURL != nil {
+                self.restoreDefault(entry)
+                return
+            }
             do {
                 let directory = self.rootURL.appendingPathComponent(role.rawValue, isDirectory: true)
                 if FileManager.default.fileExists(atPath: directory.path) {
@@ -249,10 +278,13 @@ public final class LocalModelManager: @unchecked Sendable {
     public func setEnabled(_ enabled: Bool, for role: ModelRole) {
         queue.async { [weak self] in
             guard let self, !self.stopped, let entry = self.entries[role] else { return }
+            entry.selection?.cancel()
+            entry.selection = nil
             entry.enabled = enabled
             entry.error = nil
-            if enabled && entry.state == .downloaded && entry.needsVerification {
+            if enabled && entry.state == .downloaded && (entry.needsVerification || entry.externalURL != nil) {
                 entry.generation = UUID()
+                entry.needsVerification = true
                 self.verify(entry, at: self.fileURL(entry))
                 return
             }
@@ -268,13 +300,91 @@ public final class LocalModelManager: @unchecked Sendable {
         }
     }
 
+    /// Verifies in place, then atomically selects the file without enabling the feature.
+    /// A failed or superseded selection preserves the previous model.
+    public func selectExternal(_ url: URL, for role: ModelRole,
+                               completion: @escaping (Result<Void, Error>) -> Void) {
+        queue.async { [self] in
+            guard !stopped, let entry = entries[role] else {
+                DispatchQueue.main.async { completion(.failure(CancellationError())) }
+                return
+            }
+            entry.selection?.cancel()
+            let token = ModelVerification()
+            entry.selection = token
+            DispatchQueue.global(qos: .utility).async { [self] in
+                let result = Result {
+                    let identity = try ModelStorage.fileIdentity(url)
+                    let descriptor = try ExternalModels.identify(url, role: role, token: token,
+                        descriptors: ExternalModels.supported + [entry.defaultDescriptor])
+                    return (descriptor, identity)
+                }
+                queue.async { [self] in
+                    do {
+                        try token.checkCancellation()
+                        guard !stopped, entry.selection === token else { throw CancellationError() }
+                        let (descriptor, identity) = try result.get()
+                        guard try ModelStorage.fileIdentity(url) == identity else { throw ModelStorageError.unsafeFile }
+                        let previous = (entry.descriptor, entry.externalURL, entry.externalIdentity,
+                                        entry.enabled, entry.state, entry.needsVerification, entry.received, entry.error)
+                        cancel(entry)
+                        entry.descriptor = descriptor
+                        entry.externalURL = url.standardizedFileURL
+                        entry.externalIdentity = identity
+                        entry.enabled = false
+                        entry.state = .downloaded
+                        entry.needsVerification = false
+                        entry.received = descriptor.byteCount
+                        entry.error = nil
+                        do { try persist() }
+                        catch {
+                            (entry.descriptor, entry.externalURL, entry.externalIdentity,
+                             entry.enabled, entry.state, entry.needsVerification, entry.received, entry.error) = previous
+                            if [.downloading, .verifying].contains(entry.state) { entry.state = .paused }
+                            publish()
+                            throw error
+                        }
+                        publish()
+                        DispatchQueue.main.async { completion(.success(())) }
+                    } catch {
+                        if entry.selection === token { entry.selection = nil }
+                        DispatchQueue.main.async { completion(.failure(error)) }
+                    }
+                }
+            }
+        }
+    }
+
+    public func useDefault(for role: ModelRole) {
+        queue.async { [self] in
+            guard !stopped, let entry = entries[role], entry.externalURL != nil else { return }
+            cancel(entry)
+            restoreDefault(entry)
+        }
+    }
+
+    private func restoreDefault(_ entry: Entry) {
+        entry.externalURL = nil
+        entry.externalIdentity = nil
+        entry.descriptor = entry.defaultDescriptor
+        entry.enabled = false
+        entry.error = nil
+        entry.received = (try? ModelStorage.fileSize(fileURL(entry))) ?? 0
+        entry.needsVerification = entry.received > 0
+        entry.state = entry.received == entry.descriptor.byteCount ? .downloaded : .notDownloaded
+        saveAndPublish(entry)
+    }
+
     public func shutdown() {
         queue.sync {
             stopped = true
-            for entry in entries.values
-            where entry.verification != nil || entry.state == .downloading || entry.state == .verifying {
-                cancel(entry)
-                if entry.state != .downloaded { entry.state = .paused }
+            for entry in entries.values {
+                entry.selection?.cancel()
+                entry.selection = nil
+                if entry.verification != nil || [.downloading, .verifying].contains(entry.state) {
+                    cancel(entry)
+                    if entry.state != .downloaded { entry.state = .paused }
+                }
             }
             do { try persist() }
             catch {
@@ -315,6 +425,7 @@ public final class LocalModelManager: @unchecked Sendable {
                         }
                         try FileManager.default.moveItem(at: url, to: destination)
                     }
+                    if entry.externalURL != nil { entry.externalIdentity = try ModelStorage.fileIdentity(destination) }
                     entry.state = .downloaded
                     entry.needsVerification = false
                     entry.received = descriptor.byteCount
@@ -324,7 +435,7 @@ public final class LocalModelManager: @unchecked Sendable {
                         self.finishVerificationRequests(entry, result: .success(destination))
                     }
                 } catch {
-                    if error is ModelStorageError {
+                    if error is ModelStorageError && entry.externalURL == nil {
                         do {
                             if FileManager.default.fileExists(atPath: url.path) {
                                 try FileManager.default.removeItem(at: url)
@@ -347,6 +458,8 @@ public final class LocalModelManager: @unchecked Sendable {
 
     private func cancel(_ entry: Entry, error: Error = CancellationError()) {
         entry.generation = UUID()
+        entry.selection?.cancel()
+        entry.selection = nil
         entry.download?.cancel()
         entry.download = nil
         entry.verification?.cancel()
@@ -366,7 +479,7 @@ public final class LocalModelManager: @unchecked Sendable {
     }
 
     private func fileURL(_ entry: Entry) -> URL {
-        directoryURL(entry).appendingPathComponent(entry.descriptor.filename)
+        entry.externalURL ?? directoryURL(entry).appendingPathComponent(entry.descriptor.filename)
     }
 
     private func partialURL(_ entry: Entry) -> URL {
@@ -396,7 +509,8 @@ public final class LocalModelManager: @unchecked Sendable {
         let receipts = Dictionary(uniqueKeysWithValues: entries.values.map {
             ($0.descriptor.role.rawValue, ModelReceipt(revision: $0.descriptor.revision,
                                                       sha256: $0.descriptor.sha256,
-                                                      state: $0.state, enabled: $0.enabled, error: $0.error))
+                                                      state: $0.state, enabled: $0.enabled, error: $0.error,
+                                                      externalPath: $0.externalURL?.path, externalIdentity: $0.externalIdentity))
         })
         let data = try JSONEncoder().encode(receipts)
         try data.write(to: rootURL.appendingPathComponent("state.json"), options: .atomic)

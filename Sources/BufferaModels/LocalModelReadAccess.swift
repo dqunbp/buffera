@@ -13,6 +13,7 @@ public enum EmbeddingConfiguration {
 
     public static func modelKey(descriptor: LocalModelDescriptor) -> String {
         "\(descriptor.repository)@\(descriptor.revision):\(descriptor.sha256):\(pipelineVersion)"
+            + (descriptor.engine == .liteRT ? ":litert-utf8-chunks-v1" : "")
     }
 
     public static var fingerprint: String {
@@ -61,43 +62,54 @@ public struct LocalModelReadAccess: Sendable {
     }
 
     public func enabledEmbedding() throws -> InstalledEmbeddingModel {
-        let fileURL = try enabledFileURL(role: .embedding, unavailable: EmbeddingRuntimeError.unavailable,
+        let (selected, fileURL) = try enabledFileURL(role: .embedding, unavailable: EmbeddingRuntimeError.unavailable,
                                          disabled: EmbeddingRuntimeError.disabled)
-        return InstalledEmbeddingModel(descriptor: descriptor, fileURL: fileURL)
+        return InstalledEmbeddingModel(descriptor: selected, fileURL: fileURL)
     }
 
     public func enabledAssistant() throws -> InstalledAssistantModel {
-        let fileURL = try enabledFileURL(role: .assistant, unavailable: ChatRuntimeError.unavailable,
+        let (selected, fileURL) = try enabledFileURL(role: .assistant, unavailable: ChatRuntimeError.unavailable,
                                          disabled: ChatRuntimeError.disabled)
-        return InstalledAssistantModel(descriptor: descriptor, fileURL: fileURL)
+        return InstalledAssistantModel(descriptor: selected, fileURL: fileURL)
     }
 
-    private func enabledFileURL(role: ModelRole, unavailable: Error, disabled: Error) throws -> URL {
+    private func enabledFileURL(role: ModelRole, unavailable: Error, disabled: Error) throws -> (LocalModelDescriptor, URL) {
         try ModelStorage.validate(descriptor)
-        guard descriptor.role == role else { throw unavailable }
-        let roleDirectory = rootURL.appendingPathComponent(role.rawValue)
-        let revisionDirectory = roleDirectory.appendingPathComponent(descriptor.revision)
-        for directory in [rootURL, roleDirectory, revisionDirectory] {
-            guard let attributes = try? FileManager.default.attributesOfItem(atPath: directory.path),
-                  attributes[.type] as? FileAttributeType == .typeDirectory else {
-                throw unavailable
-            }
-        }
+        guard descriptor.role == role,
+              let rootAttributes = try? FileManager.default.attributesOfItem(atPath: rootURL.path),
+              rootAttributes[.type] as? FileAttributeType == .typeDirectory else { throw unavailable }
         let receiptURL = rootURL.appendingPathComponent("state.json")
         guard let receiptSize = try? ModelStorage.fileSize(receiptURL),
               receiptSize > 0, receiptSize <= 16_384,
               let bytes = try? Data(contentsOf: receiptURL),
               let receipts = try? JSONDecoder().decode([String: ModelReceipt].self, from: bytes),
-              let receipt = receipts[role.rawValue],
-              receipt.revision == descriptor.revision, receipt.sha256 == descriptor.sha256,
-              receipt.state == .downloaded else {
-            throw unavailable
-        }
+              let receipt = receipts[role.rawValue], receipt.state == .downloaded else { throw unavailable }
         guard receipt.enabled else { throw disabled }
-        let fileURL = revisionDirectory.appendingPathComponent(descriptor.filename)
-        guard (try? ModelStorage.fileSize(fileURL)) == descriptor.byteCount else {
-            throw unavailable
+        let selected: LocalModelDescriptor
+        let fileURL: URL
+        if let path = receipt.externalPath {
+            guard path.hasPrefix("/"), let external = ExternalModels.descriptor(for: receipt, role: role)
+                ?? (receipt.sha256 == descriptor.sha256 && receipt.revision == descriptor.revision ? descriptor : nil) else {
+                throw unavailable
+            }
+            selected = external
+            fileURL = URL(fileURLWithPath: path)
+            guard let identity = receipt.externalIdentity,
+                  (try? ModelStorage.fileIdentity(fileURL)) == identity else { throw unavailable }
+        } else {
+            guard receipt.revision == descriptor.revision, receipt.sha256 == descriptor.sha256 else {
+                throw unavailable
+            }
+            selected = descriptor
+            let roleDirectory = rootURL.appendingPathComponent(role.rawValue)
+            let revisionDirectory = roleDirectory.appendingPathComponent(descriptor.revision)
+            for directory in [rootURL, roleDirectory, revisionDirectory] {
+                guard let attributes = try? FileManager.default.attributesOfItem(atPath: directory.path),
+                      attributes[.type] as? FileAttributeType == .typeDirectory else { throw unavailable }
+            }
+            fileURL = revisionDirectory.appendingPathComponent(descriptor.filename)
         }
-        return fileURL
+        guard (try? ModelStorage.fileSize(fileURL)) == selected.byteCount else { throw unavailable }
+        return (selected, fileURL)
     }
 }

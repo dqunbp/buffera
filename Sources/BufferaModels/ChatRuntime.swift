@@ -64,6 +64,8 @@ public final class ChatRuntime: @unchecked Sendable {
     private let queueKey = DispatchSpecificKey<UInt8>()
     private let access: LocalModelReadAccess
     private let executable: URL
+    private let liteRTExecutable: URL
+    private let cacheURL: URL
     private let idleTimeout: TimeInterval
     private let requestTimeout: TimeInterval
     private var pending: [Request] = []
@@ -79,6 +81,8 @@ public final class ChatRuntime: @unchecked Sendable {
                 descriptor: LocalModelDescriptor = LocalModelCatalog.models.first { $0.role == .assistant }!) {
         access = LocalModelReadAccess(rootURL: modelRootURL, descriptor: descriptor)
         executable = executableURL ?? bundleURL.appendingPathComponent("Contents/MacOS/BufferaChatWorker")
+        liteRTExecutable = executableURL ?? bundleURL.appendingPathComponent("Contents/MacOS/BufferaLiteRTChatWorker")
+        cacheURL = modelRootURL.appendingPathComponent("RuntimeCache/litert", isDirectory: true)
         self.idleTimeout = max(0.05, idleTimeout)
         self.requestTimeout = max(0.05, requestTimeout)
         queue.setSpecific(key: queueKey, value: 1)
@@ -192,7 +196,8 @@ public final class ChatRuntime: @unchecked Sendable {
     }
 
     private func startWorker(model: InstalledAssistantModel) throws {
-        guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+        let workerURL = model.descriptor.engine == .liteRT ? liteRTExecutable : executable
+        guard FileManager.default.isExecutableFile(atPath: workerURL.path) else {
             throw ChatRuntimeError.runtimeMissing
         }
         let next = Run(model: model)
@@ -220,8 +225,13 @@ public final class ChatRuntime: @unchecked Sendable {
     }
 
     private func launch(_ next: Run) throws {
-        next.process.executableURL = executable
+        let liteRT = next.model.descriptor.engine == .liteRT
+        next.process.executableURL = liteRT ? liteRTExecutable : executable
         next.process.arguments = [next.model.fileURL.path]
+        if liteRT {
+            try FileManager.default.createDirectory(at: cacheURL, withIntermediateDirectories: true)
+            next.process.arguments?.append(cacheURL.path)
+        }
         next.process.standardInput = next.input
         next.process.standardOutput = next.output
         next.process.standardError = FileHandle.nullDevice

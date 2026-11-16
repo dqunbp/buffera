@@ -28,14 +28,19 @@ final class ModelProbeController {
     private let queue = DispatchQueue(label: "app.buffera.model-check")
     private var runs: [ModelRole: Run] = [:]
     private let executable: URL
+    private let bundleURL: URL
 
     init(bundleURL: URL = Bundle.main.bundleURL) {
+        self.bundleURL = bundleURL
         executable = bundleURL.appendingPathComponent("Contents/MacOS/BufferaModelProbe")
     }
 
-    func check(_ role: ModelRole, modelURL: URL) {
+    func check(_ role: ModelRole, modelURL: URL, engine: ModelEngine = .llama) {
         queue.async { [self] in
             cancelOnQueue(role, message: nil)
+            let executable = engine == .liteRT
+                ? bundleURL.appendingPathComponent("Contents/MacOS/BufferaLiteRT\(role == .embedding ? "Embedding" : "Chat")Worker")
+                : self.executable
             guard FileManager.default.isExecutableFile(atPath: executable.path) else {
                 publish(role, L10n.text("Движок недоступен. Пересоберите или обновите Buffera."), running: false)
                 return
@@ -46,6 +51,11 @@ final class ModelProbeController {
             run.process.standardInput = FileHandle.nullDevice
             run.process.standardOutput = run.output
             do {
+                if engine == .liteRT {
+                    let cache = FileManager.default.temporaryDirectory.appendingPathComponent("buffera-litert-probe-cache")
+                    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+                    run.process.arguments = ["--probe", modelURL.path, cache.path]
+                }
                 guard FileManager.default.createFile(atPath: run.diagnostics.path, contents: nil) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
