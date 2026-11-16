@@ -53,7 +53,7 @@ final class HotKeys {
         // releases only newly acquired keys and leaves the active pair untouched.
         try ensure([binding(value, previous: false), binding(value, previous: true)] + captureBindings(value))
         preferences = value
-        resetPressedKeys()
+        resetNavigationPressedKeys()
         releaseUnused()
     }
 
@@ -136,7 +136,14 @@ final class HotKeys {
         onPress?(entry.key == binding(preferences, previous: false) ? 1 : -1, isRepeat)
     }
 
-    func resetPressedKeys() { pressedIDs.removeAll() }
+    /// History dismissal/gesture resets must not release held recording commands.
+    func resetNavigationPressedKeys() {
+        for previous in [false, true] {
+            if let registration = registrations[binding(preferences, previous: previous)] {
+                pressedIDs.remove(registration.id)
+            }
+        }
+    }
 
     deinit {
         for registration in registrations.values { registration.release() }

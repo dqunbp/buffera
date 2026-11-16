@@ -509,13 +509,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
-        panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetPressedKeys() }
+        panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetNavigationPressedKeys() }
         panel.onClose = { [weak self] in
             self?.generation += 1
             self?.searchGeneration += 1
             self?.searchTask?.cancel()
             self?.confirmationToken += 1
-            self?.hotKeys.resetPressedKeys()
+            self?.hotKeys.resetNavigationPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
         }
     }

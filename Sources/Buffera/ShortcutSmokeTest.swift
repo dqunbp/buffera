@@ -101,6 +101,33 @@ func runShortcutSmokeTest() throws {
         hotKeys.receive(id: id, released: true)
     }
     try check(pauses == 1 && skips == 1, "Recording commands ignore held-key repeats")
+    for letter in ["P", "O"] {
+        try hotKeys.setPreviousEnabled(true)
+        let id = active[HotKeys.Binding(key: ShortcutPreferences.keyCode(letter), modifiers: recording.base.carbonModifiers)]!
+        hotKeys.receive(id: id, released: false)
+        let beforeReset = pauses + skips
+        hotKeys.resetNavigationPressedKeys() // Gesture completion.
+        hotKeys.receive(id: id, released: false)
+        try hotKeys.setPreviousEnabled(false)
+        hotKeys.resetNavigationPressedKeys() // History dismissal.
+        hotKeys.receive(id: id, released: false)
+        try check(pauses + skips == beforeReset, "History resets preserve held recording shortcut \(letter)")
+        try hotKeys.apply(recording)
+        hotKeys.receive(id: id, released: false)
+        try check(pauses + skips == beforeReset, "Reapplying bindings preserves held recording shortcut \(letter)")
+        hotKeys.receive(id: id, released: true)
+        hotKeys.receive(id: id, released: false)
+        try check(pauses + skips == beforeReset + 1, "Recording shortcut \(letter) fires again after release")
+        hotKeys.receive(id: id, released: true)
+    }
+    let navigationID = active[HotKeys.Binding(key: recording.nextKeyCode, modifiers: recording.base.carbonModifiers)]!
+    hotKeys.receive(id: navigationID, released: false)
+    hotKeys.receive(id: navigationID, released: false)
+    try check(events.last?.1 == true, "Navigation still tracks held repeats")
+    hotKeys.resetNavigationPressedKeys()
+    hotKeys.receive(id: navigationID, released: false)
+    try check(events.last?.1 == false, "History reset still clears navigation tracking")
+    hotKeys.receive(id: navigationID, released: true)
     var duplicate = recording; duplicate.pause = duplicate.next
     try check((try? hotKeys.apply(duplicate)) == nil && hotKeys.preferences == recording, "Recording conflicts preserve bindings")
     var replacement = recording; replacement.pause = "Q"; replacement.skipNext = "W"
