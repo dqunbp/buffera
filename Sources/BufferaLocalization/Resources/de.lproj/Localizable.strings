@@ -669,3 +669,16 @@
 
 "Сохранять временные записи" = "Temporäre Einträge speichern";
 "Сохранять также записи, которые приложения помечают как временные или автоматически созданные. Например, при диктовке и автоматической вставке текста" = "Auch Einträge speichern, die Apps als temporär oder automatisch erstellt markieren. Zum Beispiel beim Diktieren und beim automatischen Einfügen von Text";
+
+
+"Не назначено" = "Nicht zugewiesen";
+"Приостановить / возобновить запись" = "Aufzeichnung pausieren / fortsetzen";
+"Пропустить следующее копирование" = "Nächsten Kopiervorgang überspringen";
+"Для разных действий нужны разные сочетания." = "Verwende unterschiedliche Tastenkürzel für unterschiedliche Aktionen.";
+"Сочетания сохранены." = "Tastenkürzel gespeichert.";
+"Запись приостановлена" = "Aufzeichnung pausiert";
+"Запись возобновлена" = "Aufzeichnung fortgesetzt";
+"Следующее копирование не сохранится" = "Der nächste Kopiervorgang wird nicht gespeichert";
+"Пропуск отменён" = "Überspringen abgebrochen";
+"Возобновить запись" = "Aufzeichnung fortsetzen";
+"Отменить пропуск копирования" = "Überspringen abbrechen";

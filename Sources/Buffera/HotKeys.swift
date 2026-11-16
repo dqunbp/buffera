@@ -24,6 +24,8 @@ final class HotKeys {
     private let logger = Logger(subsystem: "local.buffera.app", category: "hotkeys")
     private(set) var preferences: ShortcutPreferences
     var isRegistered: Bool { registrations[binding(preferences, previous: false)] != nil }
+    var onPause: (() -> Void)?
+    var onSkipNext: (() -> Void)?
     var onPress: ((Int, Bool) -> Void)?
 
     init(preferences: ShortcutPreferences = .load(), register: Register? = nil) {
@@ -35,15 +37,21 @@ final class HotKeys {
         Binding(key: previous ? value.previousKeyCode : value.nextKeyCode, modifiers: value.base.carbonModifiers)
     }
 
+    private func captureBindings(_ value: ShortcutPreferences) -> [Binding] {
+        [value.pause, value.skipNext].compactMap { $0 }.map {
+            Binding(key: ShortcutPreferences.keyCode($0), modifiers: value.base.carbonModifiers)
+        }
+    }
+
     func register() throws {
-        try ensure([binding(preferences, previous: false)])
+        try ensure([binding(preferences, previous: false)] + captureBindings(preferences))
     }
 
     func apply(_ value: ShortcutPreferences) throws {
         try value.validate()
         // Validate both directions even when history is closed. On failure ensure
         // releases only newly acquired keys and leaves the active pair untouched.
-        try ensure([binding(value, previous: false), binding(value, previous: true)])
+        try ensure([binding(value, previous: false), binding(value, previous: true)] + captureBindings(value))
         preferences = value
         resetPressedKeys()
         releaseUnused()
@@ -82,9 +90,10 @@ final class HotKeys {
     }
 
     private func releaseUnused() {
-        let keep: Set<Binding> = previousEnabled
+        var keep: Set<Binding> = previousEnabled
             ? [binding(preferences, previous: false), binding(preferences, previous: true)]
             : [binding(preferences, previous: false)]
+        keep.formUnion(captureBindings(preferences))
         for key in Array(registrations.keys) where !keep.contains(key) {
             if let registration = registrations.removeValue(forKey: key) {
                 pressedIDs.remove(registration.id)
@@ -116,6 +125,14 @@ final class HotKeys {
         guard let entry = registrations.first(where: { $0.value.id == id }) else { return }
         if released { pressedIDs.remove(id); return }
         let isRepeat = !pressedIDs.insert(id).inserted
+        if let letter = preferences.pause, entry.key.key == ShortcutPreferences.keyCode(letter) {
+            if !isRepeat { onPause?() }
+            return
+        }
+        if let letter = preferences.skipNext, entry.key.key == ShortcutPreferences.keyCode(letter) {
+            if !isRepeat { onSkipNext?() }
+            return
+        }
         onPress?(entry.key == binding(preferences, previous: false) ? 1 : -1, isRepeat)
     }
 

@@ -83,6 +83,34 @@ func runShortcutSmokeTest() throws {
     hotKeys.receive(id: nextID, released: false)
     try check(events.count == eventCount, "Late event for released binding ignored")
 
+    let legacy = Data(#"{"base":"controlOption","next":"J","previous":"K"}"#.utf8)
+    defaults.set(legacy, forKey: ShortcutPreferences.preferenceKey)
+    try check(ShortcutPreferences.load(from: defaults) == candidate, "Legacy shortcuts retain their bindings")
+    var recording = candidate
+    recording.pause = "P"; recording.skipNext = "O"
+    try recording.save(to: defaults)
+    try check(ShortcutPreferences.load(from: defaults) == recording, "Recording shortcuts round trip")
+    try hotKeys.apply(recording)
+    try check(active.count == 3, "Recording shortcuts remain global with history closed")
+    var pauses = 0, skips = 0
+    hotKeys.onPause = { pauses += 1 }; hotKeys.onSkipNext = { skips += 1 }
+    for letter in ["P", "O"] {
+        let id = active[HotKeys.Binding(key: ShortcutPreferences.keyCode(letter), modifiers: recording.base.carbonModifiers)]!
+        hotKeys.receive(id: id, released: false)
+        hotKeys.receive(id: id, released: false)
+        hotKeys.receive(id: id, released: true)
+    }
+    try check(pauses == 1 && skips == 1, "Recording commands ignore held-key repeats")
+    var duplicate = recording; duplicate.pause = duplicate.next
+    try check((try? hotKeys.apply(duplicate)) == nil && hotKeys.preferences == recording, "Recording conflicts preserve bindings")
+    var replacement = recording; replacement.pause = "Q"; replacement.skipNext = "W"
+    blocked = HotKeys.Binding(key: ShortcutPreferences.keyCode("W"), modifiers: recording.base.carbonModifiers)
+    let beforeFailure = active
+    try check((try? hotKeys.apply(replacement)) == nil && active == beforeFailure, "Last recording binding failure rolls back all new registrations")
+    blocked = nil
+    try hotKeys.apply(candidate)
+    try check(active.count == 1, "Removing recording shortcuts releases registrations")
+
     try ShortcutPreferences.defaults.save(to: defaults)
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -104,6 +132,8 @@ func runShortcutSmokeTest() throws {
     let base = control("base", as: NSPopUpButton.self)
     let next = control("next", as: NSPopUpButton.self)
     let previous = control("previous", as: NSPopUpButton.self)
+    let pause = control("pause", as: NSPopUpButton.self)
+    let skip = control("skipNext", as: NSPopUpButton.self)
     let apply = control("apply", as: NSButton.self)
     let reset = control("reset", as: NSButton.self)
     let status = control("status", as: NSTextField.self)
@@ -123,13 +153,17 @@ func runShortcutSmokeTest() throws {
     failRegistration = false; reset.performClick(nil)
     try check(hotKeys.preferences == .defaults && ShortcutPreferences.load(from: defaults) == .defaults, "Reset applies defaults")
     try check(base.indexOfSelectedItem == 0 && next.titleOfSelectedItem == "V" && previous.titleOfSelectedItem == "C", "Reset refreshes controls")
+    pause.selectItem(withTitle: "P"); skip.selectItem(withTitle: "O"); apply.performClick(nil)
+    try check(ShortcutPreferences.load(from: defaults).pause == "P" && hotKeys.preferences.skipNext == "O", "Settings save both recording actions")
+    reset.performClick(nil)
+    try check(pause.indexOfSelectedItem == 0 && skip.indexOfSelectedItem == 0, "Reset removes optional recording shortcuts")
     let reopened = settingsWindow()
     let reopenedTabs = descendants(reopened.window!.contentView!).compactMap { $0 as? SettingsNavigation }.first!
     reopenedTabs.selectedSegment = 2; _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
     let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "shortcuts.next" } as? NSPopUpButton
     try check(selected?.titleOfSelectedItem == "V", "Reopened settings reflect saved value")
     root.layoutSubtreeIfNeeded()
-    for view in [base, next, previous, apply, reset] {
+    for view in [base, next, previous, pause, skip, apply, reset] {
         let frame = root.convert(view.bounds, from: view)
         try check(frame.width > 0 && frame.height > 0 && root.bounds.contains(frame), "Shortcut controls are visible inside settings")
         if let scroll = view.enclosingScrollView {

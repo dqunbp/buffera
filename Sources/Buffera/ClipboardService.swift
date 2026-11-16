@@ -35,7 +35,26 @@ final class ClipboardService {
     var onCapture: ((CapturedClip) -> Void)?
     var onError: ((Error) -> Void)?
     var captureIsAllowed: () -> Bool = { true }
-    var paused = false
+    var onRecordingChange: (() -> Void)?
+    private var recordingGeneration = 0
+    private(set) var skipsNextCopy = false
+    var paused = false {
+        didSet {
+            guard paused != oldValue else { return }
+            recordingGeneration += 1
+            discardPendingChanges()
+            skipsNextCopy = false
+            onRecordingChange?()
+        }
+    }
+
+    func toggleSkipNextCopy() {
+        guard !paused else { return }
+        recordingGeneration += 1
+        discardPendingChanges()
+        skipsNextCopy.toggle()
+        onRecordingChange?()
+    }
     var savesConcealed = false
     var savesTemporary = false
     // Confidential entries are retained by user choice, with no plaintext summary.
@@ -65,12 +84,23 @@ final class ClipboardService {
         guard change != lastChange else { return }
         lastChange = change
         guard !paused else { return }
+        if skipsNextCopy {
+            // Inspect types only: skipped payloads never cross into capture/storage.
+            guard let items = pasteboard.pasteboardItems, !items.isEmpty else { return }
+            let types = Set(items.flatMap { $0.types.map(\.rawValue) })
+            guard !types.subtracting(bookkeeping).isEmpty,
+                  types.isDisjoint(with: temporary) else { return }
+            skipsNextCopy = false
+            onRecordingChange?()
+            return
+        }
+        let generation = recordingGeneration
         do {
             let clip = try capture()
             // Reading a promised remote representation may take time. Recheck
             // the session before handing its contents to the storage queue.
             guard captureIsAllowed() else { discardPendingChanges(); return }
-            if let clip, pasteboard.changeCount == change { onCapture?(clip) }
+            if let clip, !paused, generation == recordingGeneration, pasteboard.changeCount == change { onCapture?(clip) }
         } catch { onError?(error) }
     }
 

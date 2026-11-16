@@ -133,4 +133,6 @@ monitor.stop()
 check(callbackAllowances == [true, false, true, false], "stop callback safely observes disabled capture")
 monitor.onTransition = nil
 
+recordingChecks()
+
 print("Passed \(checkCount) clipboard session checks")

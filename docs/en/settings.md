@@ -18,8 +18,14 @@ History offers limits of 10, 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000
 
 The **Reset window state** checkbox enables two modes: **Immediately after closing** and **After the specified number of minutes** (1–1,440). In the first mode, the minute field is disabled; the selected delay is retained when returning to the second mode. Reset after one minute remains enabled by default. The interface explains: “Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).” Reset does not delete saved clips or favorites. Immediate mode resets state before background preparation so the next opening can reuse prepared history; an open window is not reset.
 
-In Shortcuts, **Reset shortcuts** restores `⌘⌥V` / `⌘⌥C`; its behavior is unchanged.
+Shortcut reset behavior is described under Recording controls below.
 
 Implementation: `AppearanceSettings.swift`, `SettingsNavigation.swift`, `GeneralSettingsView.swift`, `AppPreferences.swift`, `IssueReport.swift`, `SupportBuffera.swift`, `TemporaryHistorySettings.swift`, `ClipboardService.swift`, with wiring in `AppDelegate.swift`.
 
 Verification: `--localization-ui-smoke-test` checks the new controls and light/dark snapshots in all eight languages, visibility persistence, and login errors/approval using an injected service. Temporary capture checks cover the default, persistence after reopening, and independence from the secrets mode. `--smoke-test` exercises combinations of temporary and confidentiality markers and preferences on a separate pasteboard, including rejection before reading excluded content. Tests do not open a browser or change system registration. Existing `--shortcuts-ui-smoke-test`, `--features-ui-smoke-test`, and `--updates-ui-smoke-test` check navigation and existing actions. Synthetic checks do not establish that the installed app starts after an actual macOS logout/login.
+
+## Recording controls
+
+The Buffera menu offers Pause / Resume Recording and Skip Next Copy. Invoking skip again cancels it. Skip is unavailable during a pause; starting a pause cancels a pending skip. A skip covers the entire next clipboard group before reading its contents. Empty clears, transient service writes and copies restored from history do not consume it. Recording resumes automatically after the skip, with no timer. Resuming discards changes accumulated during a pause. Recording state resets when the app restarts.
+
+In Shortcuts, each command accepts an A–Z key with the shared modifier base, or Not assigned (the default). All assigned combinations must differ; a registration error preserves the previous settings. Reset shortcuts restores `⌘⌥V` / `⌘⌥C` navigation and removes both recording bindings. Commands show brief feedback without taking focus, including when the menu bar icon is hidden. Encryption behavior is unchanged.

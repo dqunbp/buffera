@@ -41,6 +41,9 @@ struct ShortcutPreferences: Equatable, Codable {
     let base: Base
     let next: String
     let previous: String
+    var pause: String? = nil
+    var skipNext: String? = nil
+    static func keyCode(_ letter: String) -> UInt16 { keyCodes[letters.firstIndex(of: letter)!] }
     var nextTitle: String { base.title + next }
     var previousTitle: String { base.title + previous }
     var nextKeyCode: UInt16 { Self.keyCodes[Self.letters.firstIndex(of: next)!] }
@@ -49,9 +52,12 @@ struct ShortcutPreferences: Equatable, Codable {
     func validate() throws {
         guard Self.letters.contains(next), Self.letters.contains(previous) else { throw ShortcutPreferenceError.invalidLetter }
         guard next != previous else { throw ShortcutPreferenceError.sameLetter }
+        let assigned = [next, previous] + [pause, skipNext].compactMap { $0 }
+        guard assigned.allSatisfy(Self.letters.contains) else { throw ShortcutPreferenceError.invalidLetter }
+        guard Set(assigned).count == assigned.count else { throw ShortcutPreferenceError.duplicate }
         // These exact combinations belong to existing Buffera/menu commands.
         let reserved: Set<String> = base == .commandOption ? ["S"] : base == .commandShift ? ["C", "H", "R", "S", "N", "Z"] : []
-        if let letter = [next, previous].first(where: { reserved.contains($0) }) {
+        if let letter = assigned.first(where: { reserved.contains($0) }) {
             throw ShortcutPreferenceError.reserved(base.title + letter)
         }
     }
@@ -80,9 +86,10 @@ struct ShortcutPreferences: Equatable, Codable {
 }
 
 enum ShortcutPreferenceError: LocalizedError {
-    case invalidLetter, sameLetter, reserved(String), unavailable
+    case invalidLetter, sameLetter, duplicate, reserved(String), unavailable
     var errorDescription: String? {
         switch self {
+        case .duplicate: return L10n.text("Для разных действий нужны разные сочетания.")
         case .invalidLetter: return L10n.text("Выберите буквы от A до Z.")
         case .sameLetter: return L10n.text("Для следующей и предыдущей записи нужны разные буквы.")
         case .reserved(let shortcut): return L10n.text("\(shortcut) уже используется другой командой Buffera. Выберите другую букву или базу.")
