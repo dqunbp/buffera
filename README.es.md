@@ -29,6 +29,12 @@ Los ajustes usan navegación lateral y tarjetas agrupadas. General incluye inici
 
 La barra lateral compacta comienza con General e IA. El idioma de la interfaz se elige en General y el tema en Apariencia; «Restablecer atajos» recupera las combinaciones predeterminadas.
 
+## Controlar la grabación
+
+Antes de copiar una contraseña, elige «Omitir la próxima copia» en el menú de Buffera. Esa copia no se guardará en el historial y la grabación se reanudará automáticamente. Para varias copias, usa «Pausar grabación» y, al terminar, «Reanudar grabación».
+
+En Ajustes → Atajos, asigna una letra A–Z a «Pausar / reanudar la grabación» y otra a «Omitir la próxima copia» con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto.
+
 ## Copia. Encuentra. Reutiliza.
 
 Buffera guarda el historial del portapapeles en tu Mac. Pulsa <kbd>⌘⌥V</kbd>, busca una entrada y pulsa <kbd>Enter</kbd>: vuelve al portapapeles, lista para pegarla con <kbd>⌘V</kbd>. También puedes arrastrar las entradas directamente a otras aplicaciones.

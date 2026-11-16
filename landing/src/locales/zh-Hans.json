@@ -94,7 +94,7 @@
     "privacy_copy_text": "历史记录留在你的 Mac 上。语义搜索、文字识别和内置助手均在本机运行。",
     "privacy_copy_text_2": "默认不保存机密内容。想随时取用？可在历史记录设置中启用加密存储。",
     "privacy_copy_text_3": "Mac 锁定或睡眠时，不记录历史内容。",
-    "privacy_copy_text_4": "随时暂停记录、删除不需要的内容、设置保存上限。",
+    "privacy_copy_text_4": "暂停记录或跳过下一次复制。为这两个命令设置快捷键。",
     "fine_print_text": "仅当来源应用将内容标记为保密时，Buffera 才会将其识别为机密内容。没有此标记的密码可能进入普通历史记录。普通条目不加密保存。",
     "all_title_text": "还有更多",
     "all_title_text_2": "让人喜欢的细节。",

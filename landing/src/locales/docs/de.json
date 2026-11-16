@@ -332,6 +332,24 @@
           ]
         },
         {
+          "id": "recording",
+          "title": "Aufzeichnung steuern",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Wähle vor dem Kopieren eines Passworts im Buffera-Menü „Nächsten Kopiervorgang überspringen“. Diese Kopie wird nicht im Verlauf gespeichert; danach wird die Aufzeichnung automatisch fortgesetzt. Für mehrere Kopiervorgänge wähle „Aufzeichnung pausieren“ und anschließend „Aufzeichnung fortsetzen“."
+            },
+            {
+              "type": "paragraph",
+              "text": "Ein erneuter Aufruf bricht das Überspringen ab. Während einer Pause ist die Funktion nicht verfügbar; eine Pause hebt ein vorgemerktes Überspringen auf. Beim Fortsetzen werden während der Pause kopierte Inhalte nicht nachträglich gespeichert. Diese Befehle ändern weder den gespeicherten Verlauf noch aktivieren sie die Verschlüsselung."
+            },
+            {
+              "type": "paragraph",
+              "text": "Das Überspringen gilt für die gesamte nächste Gruppe von Elementen, bevor deren Inhalt gelesen wird. Das Leeren der Zwischenablage, temporäre Schreibvorgänge von Apps und Kopieren aus dem Buffera-Verlauf verbrauchen es nicht. Es gibt keinen Timer; nach einem Neustart der App ist die normale Aufzeichnung wieder aktiv."
+            }
+          ]
+        },
+        {
           "id": "temporary",
           "title": "Temporäre Einträge",
           "blocks": [
@@ -508,6 +526,16 @@
             {
               "type": "note",
               "text": "Lässt du die Tasten nach dem Öffnen los, bleibt der Verlauf geöffnet. Zum schnellen Durchschalten hältst du ⌘⌥ gedrückt, drückst erneut V oder C und lässt dann die Sondertasten los, um den ausgewählten Eintrag zu kopieren."
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "title": "Aufzeichnung steuern",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Unter Einstellungen → Tastenkürzel kannst du „Aufzeichnung pausieren / fortsetzen“ und „Nächsten Kopiervorgang überspringen“ jeweils eine Taste A–Z mit den gemeinsamen Modifikatortasten zuweisen. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol."
             }
           ]
         }

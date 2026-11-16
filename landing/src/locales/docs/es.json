@@ -332,6 +332,24 @@
           ]
         },
         {
+          "id": "recording",
+          "title": "Controlar la grabación",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Antes de copiar una contraseña, elige «Omitir la próxima copia» en el menú de Buffera. Esa copia no se guardará en el historial y la grabación se reanudará automáticamente. Para varias copias, usa «Pausar grabación» y, al terminar, «Reanudar grabación»."
+            },
+            {
+              "type": "paragraph",
+              "text": "Vuelve a activar la omisión para cancelarla. No está disponible durante una pausa; pausar cancela una omisión pendiente. Al reanudar no se guarda lo copiado durante la pausa. Estos comandos no modifican el historial guardado ni activan el cifrado."
+            },
+            {
+              "type": "paragraph",
+              "text": "La omisión abarca todo el siguiente grupo de elementos antes de leer su contenido. Vaciar el portapapeles, las escrituras temporales de las aplicaciones y copiar desde el historial de Buffera no la consumen. No hay temporizador; reiniciar la aplicación restaura la grabación normal."
+            }
+          ]
+        },
+        {
           "id": "temporary",
           "title": "Registros temporales",
           "blocks": [
@@ -508,6 +526,16 @@
             {
               "type": "note",
               "text": "Soltar las teclas después de abrir deja el historial abierto. Para recorrerlo rápidamente, mantén ⌘⌥ pulsado, vuelve a pulsar V o C y suelta los modificadores para copiar el elemento seleccionado."
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "title": "Controlar la grabación",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "En Ajustes → Atajos, asigna una letra A–Z a «Pausar / reanudar la grabación» y otra a «Omitir la próxima copia» con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto."
             }
           ]
         }

@@ -84,10 +84,13 @@ swift build --disable-sandbox --product Buffera
 for language in ru en es de fr pt-BR zh-Hans ja; do
   .build/debug/Buffera --localization-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
   .build/debug/Buffera --setup-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
+  .build/debug/Buffera --shortcuts-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
   .build/debug/Buffera --updates-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
 done
 zsh scripts/check-history-panel.sh
 ```
+
+The `--shortcuts-ui-smoke-test` covers navigation and both recording commands in all eight languages: unassigned defaults, legacy preference loading, persistence, reset, conflicts and registration rollback, and control layout. Held-key regressions check that closing history and ending navigation cannot undo pause or skip through repeat events; a new press works after release. `zsh scripts/check-history-panel.sh ClipboardSessionChecks` checks skipping before reading content, item groups, clipboard clears, history restores and pause boundaries on a separate named pasteboard. These are automated checks, not confirmation of manually reproducing the AppKit sequence.
 
 Localization checks compare every catalog's keys and parameters, regional
 language selection and fallback, preference saving and clearing, escaping,
