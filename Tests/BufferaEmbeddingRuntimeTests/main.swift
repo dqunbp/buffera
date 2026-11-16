@@ -249,5 +249,6 @@ let allExited = await eventually { pids.allSatisfy { kill($0, 0) != 0 } }
 check(allExited, "all fixture worker processes exited")
 let unchangedModel = try Data(contentsOf: modelDirectory.appendingPathComponent(descriptor.filename))
 check(unchangedModel == bytes, "inference never mutates model weights")
+try await checkEngineRouting(root: root)
 print("\(passed) passed; \(failed) failed")
 exit(failed == 0 ? 0 : 1)

@@ -46,11 +46,20 @@ Discovery also reads Hugging Face cache snapshots: `HF_HUB_CACHE`, then `HF_HOME
 
 `.litertlm` uses separate native C++ workers with pinned LiteRT-LM 0.19.1
 (GPU WebGPU over Metal), without Python. Compilation caches live separately
-under `Models/RuntimeCache/litert`; no weight duplication does not mean no
-additional cache. LiteRT indexing uses UTF-8 windows up to 384 bytes, with up
+under `~/Library/Caches/Buffera/LiteRT/<role>/<UUID>`, isolated per app, MCP
+or diagnostic worker. Each cache is removed after its worker exits, including
+cancellation and launch failure; inference keeps the model store read-only.
+A crash of the host application can leave a cache until system caches are cleared.
+Avoiding weight duplication still requires temporary compilation cache space. LiteRT indexing uses UTF-8 windows up to 384 bytes, with up
 to 64 bytes of overlap, preserving character boundaries, and at most 32 chunks.
 Semantic queries for this backend are limited to 384 bytes; longer queries
-fall back to literal search. These parameters are part of the index identity.
+fall back to literal search: the worker returns a request error and remains
+available for the next request. These parameters are part of the index identity.
+
+Successful explicit verification persists the external file identity in
+`state.json`, including metadata-only changes. A receipt write failure cannot
+report verification success. Rejecting a selected file does not interrupt the
+current assistant response.
 
 Sources: `Sources/BufferaModels/ExternalModels.swift`, `LocalModelManager.swift`,
 `LocalModelReadAccess.swift`, `Sources/Buffera/ModelSourceView.swift`,
@@ -119,3 +128,10 @@ MLX Swift was considered first. At implementation time, its stable release did n
 `scripts/prepare-model-runtime.sh` downloads the pinned official llama.cpp release, verifies SHA-256, compiles `BufferaModelProbe`, `BufferaEmbeddingWorker`, and `BufferaChatWorker`, and places the required libraries and license inside the `.app`. Model weights are not bundled and are not downloaded during the build.
 
 Downloader checks: `swift run --disable-sandbox --cache-path .build/cache BufferaModelChecks`. They use separate temporary directories and fixture network responses. Results of real-model and interface checks are recorded in the [historical verification log (Russian)](../verification.md).
+
+Offline native LiteRT protocol checks: `zsh scripts/check-litert-workers.sh`.
+These run the production request loop with a synthetic encoder: overlong query
+rejection, the next valid request, UTF-8 document windows, and escaping Gemma
+control tokens while preserving `|>` / `<|` operators. Runtime checks also cover
+engine-based executable selection and cache isolation/cleanup;
+`BufferaSearchChecks` verifies vector invalidation when the backend changes.

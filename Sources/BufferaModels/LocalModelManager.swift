@@ -429,7 +429,7 @@ public final class LocalModelManager: @unchecked Sendable {
                     entry.state = .downloaded
                     entry.needsVerification = false
                     entry.received = descriptor.byteCount
-                    if remainsAvailable { self.publish() }
+                    if remainsAvailable && entry.externalURL == nil { self.publish() }
                     else { self.saveAndPublish(entry) }
                     if entry.state == .downloaded {
                         self.finishVerificationRequests(entry, result: .success(destination))

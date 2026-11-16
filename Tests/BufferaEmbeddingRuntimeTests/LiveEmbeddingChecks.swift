@@ -102,7 +102,16 @@ func runLiveEmbeddingChecks(arguments: [String]) async throws -> Int32 {
     do {
         _ = try await worker.embed([String(repeating: "banana ", count: 1000)], kind: .query)
         failed += 1
-    } catch {}
+    } catch {
+        let selected = try LocalModelReadAccess(rootURL: root).enabledEmbedding()
+        if selected.descriptor.engine == .liteRT {
+            if case EmbeddingRuntimeError.worker("Текст запроса слишком длинный.") = error {} else { failed += 1 }
+            if !worker.isRunning { failed += 1 }
+            let recovered = try await worker.embed([queries[0].0], kind: .query)
+            if recovered[0].vectors != repeated[0].vectors { failed += 1 }
+            print("LIVE LiteRT: 384-byte rejection followed by a valid query without unloading")
+        }
+    }
     worker.unload()
     if worker.isRunning { failed += 1 }
     print(String(format: "CALIBRATION positive_min=%.4f negative_max=%.4f false_positive_at_065=%d at_070=%d",

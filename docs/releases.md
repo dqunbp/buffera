@@ -11,6 +11,8 @@
 
 Исправления увеличивают PATCH, новые возможности — MINOR, несовместимые крупные изменения — MAJOR. При увеличении MINOR обнуляйте PATCH; при увеличении MAJOR обнуляйте MINOR и PATCH. Номер `build` никогда не сбрасывайте. Поддерживаются только стабильные выпуски.
 
+На Apple Silicon сборка также вызывает `scripts/prepare-litert-runtime.sh`: при отсутствии локального архива он скачивает официальный `CLiteRTLM_mac.xcframework.zip` LiteRT-LM **v0.19.1** с GitHub. Перед распаковкой проверяется SHA-256 `cedd331e78e94bf98ca8f2f28aeb3d543e20277fcd51570c12deed6d49524fb6`; несовпадение останавливает сборку. Нужна сеть при первом запуске или в чистом checkout релиза. Два C++ воркера компилируются без Python и загружают библиотеку из `Contents/Frameworks/BufferaLiteRT` через rpath. Веса моделей в сборку не входят. Перед выпуском выполните `zsh scripts/check-litert-workers.sh`, соберите `.app` и проверьте подпись обоих воркеров и dylib. Фикстуры не доказывают реальную Metal-инференцию.
+
 ## Подготовка
 
 1. Измените `version` и увеличьте `build` в `AppVersion.swift`.
@@ -70,7 +72,7 @@ BUFFERA_NOTARY_PROFILE=YOUR_KEYCHAIN_PROFILE zsh scripts/create-release.sh
 
 ## Подпись и ограничения скриптов
 
-`scripts/signing.sh` задаёт общую подпись для `build-app.sh`, `prepare-model-runtime.sh` и `create-release.sh`. Без настройки используется ad-hoc. Для Developer ID Application импортируйте сертификат, соответствующий закрытому ключу в вашей Связке ключей, и найдите его SHA-1:
+`scripts/signing.sh` задаёт общую подпись для `build-app.sh`, `prepare-model-runtime.sh`, `prepare-litert-runtime.sh` и `create-release.sh`. Без настройки используется ad-hoc. Для Developer ID Application импортируйте сертификат, соответствующий закрытому ключу в вашей Связке ключей, и найдите его SHA-1:
 
 ```sh
 security import /path/to/developerID_application.cer -k "$HOME/Library/Keychains/login.keychain-db"
@@ -80,7 +82,7 @@ BUFFERA_SIGNING_IDENTITY=YOUR_40_CHARACTER_SHA1 zsh scripts/build-app.sh --build
 
 Для постоянной настройки запишите только SHA-1 одной строкой в `output/developer-id/signing-identity.txt` (папка исключена из Git). Переменная `BUFFERA_SIGNING_IDENTITY` имеет приоритет; значение `-` явно включает ad-hoc. Не сохраняйте здесь закрытый ключ или пароль. Выбранная Developer ID identity должна быть действующей и иметь закрытый ключ; иначе сборка остановится до компиляции. Отказ доступа к ключу, ошибка подписи или временной метки также останавливают сборку без отката к ad-hoc. macOS может запросить разрешение `codesign` на использование ключа.
 
-Developer ID применяется к библиотекам llama.cpp, трём модельным утилитам, MCP, Sparkle (Autoupdate → Updater.app → framework) и приложению, от вложенных компонентов к внешнему пакету. Все получают защищённую временную метку Apple (нужна сеть); исполняемые файлы — Hardened Runtime. Исключения Hardened Runtime не добавляются. `create-release.sh` передаёт выбранную identity в изолированную сборку через окружение: локальный файл настройки и сертификат в архив исходников не включаются. Порядок и параметры соответствуют [инструкции Apple](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/).
+Developer ID применяется к библиотекам llama.cpp, трём llama-утилитам, `libCLiteRTLM_mac.dylib`, `BufferaLiteRTEmbeddingWorker`, `BufferaLiteRTChatWorker`, MCP, Sparkle (Autoupdate → Updater.app → framework) и приложению, от вложенных компонентов к внешнему пакету. Все получают защищённую временную метку Apple (нужна сеть); исполняемые файлы — Hardened Runtime. Исключения Hardened Runtime не добавляются. `create-release.sh` передаёт выбранную identity в изолированную сборку через окружение: локальный файл настройки и сертификат в архив исходников не включаются. Порядок и параметры соответствуют [инструкции Apple](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/).
 
 `build-app.sh` собирает пакет во временной папке, подписывает и проверяет его там, затем копирует без служебных атрибутов в `dist/Buffera.app` и проверяет ещё раз. Это исключает повторное добавление FinderInfo файловым провайдером Documents во время подписи. Провайдер всё ещё может изменить атрибуты результата позднее; рабочую копию держите вне синхронизируемой папки.
 

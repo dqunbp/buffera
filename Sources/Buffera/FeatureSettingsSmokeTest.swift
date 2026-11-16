@@ -10,6 +10,8 @@ func runFeatureSettingsSmokeTest() throws {
     try checkBackgroundPreparationPolicy()
     try checkDiscoveredModelPresentation()
     try checkUnavailableExternalPresentation()
+    try checkExternalConnectionCompletion()
+    try checkProbeCacheLifecycle()
     let fresh = try FeatureSettingsFixture(state: .notDownloaded)
     defer { fresh.cleanup() }
     let search = try fresh.control("models.embedding.enabled", as: NSSwitch.self)
@@ -232,6 +234,60 @@ private func checkDiscoveredModelPresentation() throws {
     try control("models.connection.cancel", NSButton.self).performClick(nil)
     try featureCheck(closed, "Cancel must close the connection flow")
 
+}
+
+private func checkExternalConnectionCompletion() throws {
+    let fixture = try FeatureSettingsFixture(state: .downloaded, enabled: true)
+    defer { fixture.cleanup() }
+    try fixture.waitUntil { $0.allSatisfy { $0.isReadyForUse } }
+    let sheet = ModelConnectionSheet(manager: fixture.manager, role: .assistant, discovery: { [] })
+    func button(_ identifier: String) throws -> NSButton {
+        func find(_ view: NSView) -> NSButton? {
+            if view.identifier?.rawValue == identifier { return view as? NSButton }
+            return view.subviews.lazy.compactMap(find).first
+        }
+        guard let control = find(sheet.window.contentView!) else { throw HistoryError.database("Missing connection action") }
+        return control
+    }
+    try button("models.connection.next").performClick(nil)
+    var changes = 0
+    var closed = false
+    var busy = false
+    sheet.source.onWillChange = { changes += 1 }
+    let updateBusy = sheet.source.onBusyChanged
+    sheet.source.onBusyChanged = { busy = $0; updateBusy?($0) }
+    sheet.onClose = { closed = true }
+    fixture.manager.onChange = { _ in sheet.source.refresh() }
+    func wait(_ condition: () -> Bool) throws {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition() && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        try featureCheck(condition(), "External connection did not complete")
+    }
+    let missing = fixture.root.appendingPathComponent("missing.gguf")
+    sheet.source.selectFile(missing)
+    try wait { sheet.source.connectButton.isEnabled }
+    sheet.source.connectButton.performClick(nil)
+    try wait { !busy }
+    try featureCheck(changes == 0 && !closed && fixture.manager.snapshots.allSatisfy { $0.isReadyForUse },
+                     "Rejected selection must not interrupt the working assistant or close the sheet")
+
+    // NSOpenPanel can return /private/var/... while receipts standardize it to /var/....
+    let original = fixture.manager.modelURL(for: .assistant)!
+    let copied = fixture.root.appendingPathComponent("external.gguf")
+    try FileManager.default.copyItem(at: original, to: copied)
+    let privatePath = copied.path.hasPrefix("/private/") ? copied.path : "/private" + copied.path
+    let selected = URL(fileURLWithPath: privatePath)
+    try featureCheck(selected != selected.standardizedFileURL, "Fixture must exercise a noncanonical file URL")
+    sheet.source.selectFile(selected)
+    sheet.source.connectButton.performClick(nil)
+    try wait { closed }
+    let cancel = try button("models.connection.cancel")
+    try featureCheck(!busy && cancel.isEnabled && changes == 1, "Successful connection must close once and release the busy state")
+    let snapshot = fixture.manager.snapshots.first { $0.descriptor.role == .assistant }!
+    try featureCheck(snapshot.isReadyForUse && snapshot.externalURL == selected.standardizedFileURL,
+                     "Connection must enable the verified original file")
 }
 
 private func checkUnavailableExternalPresentation() throws {

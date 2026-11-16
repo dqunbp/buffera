@@ -117,7 +117,7 @@ final class ModelSourceView: NSStackView {
 
     func refresh() {
         guard activating, let snapshot = manager.snapshots.first(where: { $0.descriptor.role == role }) else { return }
-        if snapshot.isReadyForUse && snapshot.externalURL == selectedURL {
+        if snapshot.isReadyForUse && snapshot.externalURL?.standardizedFileURL == selectedURL?.standardizedFileURL {
             activating = false
             setBusy(false)
             onConnected?()
@@ -186,10 +186,15 @@ final class ModelSourceView: NSStackView {
         guard let window else { return }
         panel.beginSheetModal(for: window) { [weak self] result in
             guard result == .OK, let url = panel.url, let self else { return }
-            manualSelection = true
-            selectedURL = url
-            updateSelection()
+            selectFile(url)
         }
+    }
+
+    func selectFile(_ url: URL) {
+        guard !busy else { return }
+        manualSelection = true
+        selectedURL = url
+        updateSelection()
     }
 
     private func setBusy(_ value: Bool) {
@@ -215,11 +220,11 @@ final class ModelSourceView: NSStackView {
         status.isHidden = false
         status.stringValue = L10n.text("Проверяем выбранный файл…")
         onNeedsResize?()
-        onWillChange?()
         manager.selectExternal(selectedURL, for: role) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success:
+                onWillChange?()
                 activating = true
                 manager.setEnabled(true, for: role)
             case .failure(let error):

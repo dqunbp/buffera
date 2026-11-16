@@ -128,7 +128,9 @@ public enum ExternalModels {
     static func identify(_ url: URL, role: ModelRole, token: ModelVerification,
                          descriptors: [LocalModelDescriptor] = supported) throws -> LocalModelDescriptor {
         let size = try ModelStorage.fileSize(url)
-        for descriptor in descriptors where descriptor.role == role && descriptor.byteCount == size {
+        var checked = Set<String>()
+        for descriptor in descriptors where descriptor.role == role && descriptor.byteCount == size
+            && checked.insert(descriptor.sha256).inserted {
             do {
                 try ModelStorage.verify(url, descriptor: descriptor, token: token)
                 return descriptor

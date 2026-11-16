@@ -1,6 +1,7 @@
 // Native LiteRT-LM adapter for Buffera's bounded, private chat pipe protocol.
 #import <Foundation/Foundation.h>
 #include "conversation.h"
+#include "LiteRTChatText.h"
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -117,12 +118,7 @@ public:
                     throw std::runtime_error("Invalid message");
                 // LiteRT's string tokenizer recognizes model control delimiters.
                 // Keep quoted clipboard text from becoming conversation structure.
-                content = [content stringByReplacingOccurrencesOfString:@"<|" withString:@"<\u200b|"];
-                content = [content stringByReplacingOccurrencesOfString:@"|>" withString:@"|\u200b>"];
-                for (NSString * token in @[@"<bos>", @"<eos>", @"<pad>"]) {
-                    content = [content stringByReplacingOccurrencesOfString:token
-                        withString:[@"<\u200b" stringByAppendingString:[token substringFromIndex:1]]];
-                }
+                content = escapeLiteRTChatContent(content);
                 message = @{@"role": role, @"content": content};
                 [safeMessages addObject:message];
                 inputBytes += [content lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
@@ -198,7 +194,7 @@ public:
             writeFrame(@{@"id": identifier, @"event": @"done", @"stopReason": output >= maximum.intValue ? @"length" : @"completed",
                          @"inputTokens": @(input), @"outputTokens": @(output)});
         } catch (const std::exception &) {
-            writeFrame(@{@"id": identifier, @"event": @"error", @"code": @"generation", @"error": @"Answer generation failed."});
+            writeFrame(@{@"id": identifier, @"event": @"error", @"code": @"generation", @"error": @"Движок помощника вернул некорректный ответ."});
         }
     }
 };

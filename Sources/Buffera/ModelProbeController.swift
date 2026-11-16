@@ -13,6 +13,7 @@ final class ModelProbeController {
         let output = Pipe()
         let diagnostics: URL
         var timeout: DispatchWorkItem?
+        var cache: LiteRTRuntimeCache?
 
         init() {
             diagnostics = FileManager.default.temporaryDirectory
@@ -29,8 +30,10 @@ final class ModelProbeController {
     private var runs: [ModelRole: Run] = [:]
     private let executable: URL
     private let bundleURL: URL
+    private let cacheRootURL: URL?
 
-    init(bundleURL: URL = Bundle.main.bundleURL) {
+    init(bundleURL: URL = Bundle.main.bundleURL, cacheRootURL: URL? = nil) {
+        self.cacheRootURL = cacheRootURL
         self.bundleURL = bundleURL
         executable = bundleURL.appendingPathComponent("Contents/MacOS/BufferaModelProbe")
     }
@@ -52,18 +55,23 @@ final class ModelProbeController {
             run.process.standardOutput = run.output
             do {
                 if engine == .liteRT {
-                    let cache = FileManager.default.temporaryDirectory.appendingPathComponent("buffera-litert-probe-cache")
-                    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
-                    run.process.arguments = ["--probe", modelURL.path, cache.path]
+                    let cache = try LiteRTRuntimeCache(role: role, rootURL: cacheRootURL)
+                    run.cache = cache
+                    run.process.arguments = ["--probe", modelURL.path, cache.url.path]
                 }
                 guard FileManager.default.createFile(atPath: run.diagnostics.path, contents: nil) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
                 let log = try FileHandle(forWritingTo: run.diagnostics)
                 run.process.standardError = log
+                // Cache lifetime follows process exit, independently of draining stdout.
+                let cache = run.cache
+                run.process.terminationHandler = { _ in cache?.remove() }
                 try run.process.run()
+                try? run.output.fileHandleForWriting.close()
                 try? log.close()
             } catch {
+                run.cache?.remove()
                 try? FileManager.default.removeItem(at: run.diagnostics)
                 publish(role, L10n.text("Не удалось запустить проверку: \(error.localizedDescription)"), running: false)
                 return
