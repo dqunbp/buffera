@@ -77,10 +77,13 @@ swift build --disable-sandbox --product Buffera
 for language in ru en es de fr pt-BR zh-Hans ja; do
   .build/debug/Buffera --localization-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
   .build/debug/Buffera --setup-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
+  .build/debug/Buffera --shortcuts-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
   .build/debug/Buffera --updates-ui-smoke-test -interfaceLanguage "$language" -AppleLanguages "($language)"
 done
 zsh scripts/check-history-panel.sh
 ```
+
+Проверка `--shortcuts-ui-smoke-test` охватывает настройки навигации и обеих команд записи во всех восьми языках: неназначенные сочетания по умолчанию, загрузку старых настроек, сохранение, сброс, конфликты и откат регистрации, размещение элементов. Регрессия удержания клавиш проверяет, что закрытие истории и завершение навигации не отменяют паузу или пропуск автоповтором; новое нажатие срабатывает после отпускания. `zsh scripts/check-history-panel.sh ClipboardSessionChecks` проверяет пропуск до чтения содержимого, группы элементов, очистку буфера, восстановление из истории и границы паузы на отдельном именованном буфере. Это автоматические проверки, а не подтверждение ручного воспроизведения последовательности в AppKit.
 
 Проверки локализации сверяют все ключи и параметры всех каталогов, выбор
 региональных языков и fallback, сохранение и очистку настроек, экранирование,

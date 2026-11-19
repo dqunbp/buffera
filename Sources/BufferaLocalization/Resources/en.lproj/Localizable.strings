@@ -739,3 +739,15 @@
 "Ищем модели в Foresight и кеше Hugging Face…" = "Searching Foresight and the Hugging Face cache…";
 
 "В Foresight и кеше Hugging Face подходящих файлов не найдено." = "No compatible files found in Foresight or the Hugging Face cache.";
+
+"Не назначено" = "Not assigned";
+"Приостановить / возобновить запись" = "Pause / resume recording";
+"Пропустить следующее копирование" = "Skip next copy";
+"Для разных действий нужны разные сочетания." = "Use different shortcuts for different actions.";
+"Сочетания сохранены." = "Shortcuts saved.";
+"Запись приостановлена" = "Recording paused";
+"Запись возобновлена" = "Recording resumed";
+"Следующее копирование не сохранится" = "The next copy will not be saved";
+"Пропуск отменён" = "Skip cancelled";
+"Возобновить запись" = "Resume Recording";
+"Отменить пропуск копирования" = "Cancel Skip Next Copy";

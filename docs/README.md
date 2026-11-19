@@ -44,3 +44,5 @@ These documents retain their original languages and dates. They describe earlier
 - [Verification journal](verification.md) — Russian; observations and checks of earlier builds.
 - [Original development ideas](ideas.md) — Russian; planning notes originating on October 19, 2026.
 - [Release notes index](releases/README.md) — current notes and earlier releases in their original languages. Old signing and installation statements apply only to those versions.
+
+Recording menu and configurable pause / skip-next shortcuts: [settings](en/settings.md#recording-controls).

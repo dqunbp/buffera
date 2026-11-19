@@ -6,7 +6,7 @@ import BufferaSearch
 import UniformTypeIdentifiers
 import os
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var statusItem: NSStatusItem!
     private let appPreferences = AppPreferences()
     private var store: HistoryStore!
@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var exportCleanupTimer: Timer?
     private var secretMaintenanceTimer: DispatchSourceTimer?
     private var lastError: Error?
+    private var skipNextItem: NSMenuItem!
+    private var recordingNotice: NSPanel?
     private var pauseItem: NSMenuItem!
     private var errorItem: NSMenuItem!
     private var openHistoryItem: NSMenuItem!
@@ -211,6 +213,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat, fromGlobalShortcut: true) }
             else if delta > 0, !isRepeat { self.open(fromShortcut: true) }
         }
+        hotKeys.onPause = { [weak self] in self?.togglePause() }
+        hotKeys.onSkipNext = { [weak self] in self?.toggleSkipNext() }
+        clipboard.onRecordingChange = { [weak self] in self?.updateRecordingMenu() }
+        updateRecordingMenu()
         registerShortcuts()
         applicationExitObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didTerminateApplicationNotification,
                                                                                      object: nil, queue: .main) { [weak self] _ in
@@ -503,13 +509,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 catch { DispatchQueue.main.async { self.panel.failed(error) } }
             }
         }
-        panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetPressedKeys() }
+        panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetNavigationPressedKeys() }
         panel.onClose = { [weak self] in
             self?.generation += 1
             self?.searchGeneration += 1
             self?.searchTask?.cancel()
             self?.confirmationToken += 1
-            self?.hotKeys.resetPressedKeys()
+            self?.hotKeys.resetNavigationPressedKeys()
             try? self?.hotKeys.setPreviousEnabled(false)
         }
     }
@@ -909,10 +915,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateShortcutMenu() {
         let title = hotKeys.preferences.nextTitle
         openHistoryItem.title = L10n.text("Открыть историю    \(title)")
+        updateRecordingMenu()
     }
     @objc private func togglePause() {
-        clipboard.paused.toggle(); pauseItem.state = clipboard.paused ? .on : .off
-        statusItem.button?.appearsDisabled = clipboard.paused
+        clipboard.paused.toggle()
+        showRecordingNotice(clipboard.paused ? L10n.text("Запись приостановлена") : L10n.text("Запись возобновлена"))
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action != #selector(toggleSkipNext) || !clipboard.paused
+    }
+
+    @objc private func toggleSkipNext() {
+        guard !clipboard.paused else { return }
+        clipboard.toggleSkipNextCopy()
+        showRecordingNotice(clipboard.skipsNextCopy ? L10n.text("Следующее копирование не сохранится") : L10n.text("Пропуск отменён"))
+    }
+
+    private func updateRecordingMenu() {
+        guard pauseItem != nil, skipNextItem != nil else { return }
+        let preferences = hotKeys.preferences
+        func suffix(_ letter: String?) -> String { letter.map { "    " + preferences.base.title + $0 } ?? "" }
+        pauseItem.title = (clipboard.paused ? L10n.text("Возобновить запись") : L10n.text("Приостановить запись")) + suffix(preferences.pause)
+        pauseItem.state = clipboard.paused ? .on : .off
+        skipNextItem.title = (clipboard.skipsNextCopy ? L10n.text("Отменить пропуск копирования") : L10n.text("Пропустить следующее копирование")) + suffix(preferences.skipNext)
+        skipNextItem.state = clipboard.skipsNextCopy ? .on : .off
+        skipNextItem.isEnabled = !clipboard.paused
+        statusItem.button?.appearsDisabled = clipboard.paused || clipboard.skipsNextCopy
+        statusItem.button?.toolTip = clipboard.paused ? L10n.text("Запись приостановлена") : clipboard.skipsNextCopy
+            ? L10n.text("Следующее копирование не сохранится") : L10n.text("\(BrandIdentity.name) — история буфера обмена")
+    }
+
+    private func showRecordingNotice(_ message: String) {
+        recordingNotice?.orderOut(nil)
+        let label = NSTextField(labelWithString: message)
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.sizeToFit()
+        let size = NSSize(width: label.frame.width + 40, height: 58)
+        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.level = .floating
+        panel.isReleasedWhenClosed = false
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        label.frame.origin = NSPoint(x: 20, y: (size.height - label.frame.height) / 2)
+        panel.contentView?.addSubview(label)
+        if let screen = NSScreen.main {
+            panel.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - size.width / 2, y: screen.visibleFrame.maxY - 90))
+        }
+        recordingNotice = panel
+        panel.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak panel] in
+            panel?.orderOut(nil)
+            if self?.recordingNotice === panel { self?.recordingNotice = nil }
+        }
     }
     @objc private func revealData() { NSWorkspace.shared.open(folder) }
     @objc private func quit() { work.sync {}; NSApp.terminate(nil) }
@@ -991,6 +1047,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.delegate = indicator
         }
         pauseItem = add(L10n.text("Приостановить запись"), #selector(togglePause))
+        skipNextItem = add(L10n.text("Пропустить следующее копирование"), #selector(toggleSkipNext))
+
         menu.addItem(.separator())
         imageTextItem = NSMenuItem(title: L10n.text("Текст в картинках: распознаётся…"), action: nil, keyEquivalent: "")
         menu.addItem(imageTextItem)

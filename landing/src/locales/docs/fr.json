@@ -332,6 +332,24 @@
           ]
         },
         {
+          "id": "recording",
+          "title": "Contrôler l’enregistrement",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Avant de copier un mot de passe, choisissez « Ignorer la prochaine copie » dans le menu Buffera. Cette copie ne sera pas enregistrée dans l’historique, puis l’enregistrement reprendra automatiquement. Pour plusieurs copies, choisissez « Suspendre l’enregistrement », puis « Reprendre l’enregistrement » une fois terminé."
+            },
+            {
+              "type": "paragraph",
+              "text": "Activez de nouveau la commande pour annuler l’omission. Elle est indisponible pendant une pause ; suspendre l’enregistrement annule toute omission en attente. La reprise n’enregistre pas les éléments copiés pendant la pause. Ces commandes ne modifient pas l’historique enregistré et n’activent pas le chiffrement."
+            },
+            {
+              "type": "paragraph",
+              "text": "L’omission couvre tout le prochain groupe d’éléments avant la lecture de son contenu. Vider le presse-papiers, les écritures temporaires des applications et les copies depuis l’historique Buffera ne la consomment pas. Il n’y a pas de minuterie ; redémarrer l’application réactive l’enregistrement normal."
+            }
+          ]
+        },
+        {
           "id": "temporary",
           "title": "Éléments temporaires",
           "blocks": [
@@ -508,6 +526,16 @@
             {
               "type": "note",
               "text": "Relâcher les touches après l’ouverture laisse l’historique ouvert. Pour parcourir rapidement les éléments, maintenez ⌘⌥, appuyez à nouveau sur V ou C, puis relâchez les touches de modification pour copier l’élément sélectionné."
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "title": "Contrôler l’enregistrement",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Dans Réglages → Raccourcis, attribuez une lettre A–Z à « Suspendre / reprendre l’enregistrement » et une autre à « Ignorer la prochaine copie », avec les touches de modification communes. Aucun raccourci n’est attribué par défaut ; les commandes restent accessibles dans le menu. Toutes les combinaisons doivent être différentes. Réinitialiser les raccourcis rétablit ⌘⌥V / ⌘⌥C et supprime les raccourcis d’enregistrement. Maintenir une touche n’active pas de nouveau la commande, même après la fermeture de l’historique. Une brève confirmation apparaît sans prendre le focus, même si l’icône de la barre des menus est masquée."
             }
           ]
         }

@@ -332,6 +332,24 @@
           ]
         },
         {
+          "id": "recording",
+          "title": "Recording controls",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Before copying a password, choose Skip Next Copy in the Buffera menu. That copy stays out of history, then recording resumes automatically. For several copies, use Pause Recording and choose Resume Recording when you are done."
+            },
+            {
+              "type": "paragraph",
+              "text": "Invoking skip again cancels it. Skip is unavailable while paused; starting a pause cancels a pending skip. Resuming does not save anything copied during the pause. These commands do not change saved history or enable encryption."
+            },
+            {
+              "type": "paragraph",
+              "text": "A skip covers the entire next group of items before reading its contents. Clearing the clipboard, transient service writes and copying from Buffera history do not consume it. There is no timer; restarting the app restores ordinary recording."
+            }
+          ]
+        },
+        {
           "id": "temporary",
           "title": "Temporary clips",
           "blocks": [
@@ -508,6 +526,16 @@
             {
               "type": "note",
               "text": "Releasing the keys after opening leaves history open. To cycle quickly, keep holding ⌘⌥, press V or C again, then release the modifiers to copy the selected clip."
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "title": "Recording controls",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "In Settings → Shortcuts, assign a separate A–Z key to Pause / resume recording and Skip next copy using the shared modifier base. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden."
             }
           ]
         }

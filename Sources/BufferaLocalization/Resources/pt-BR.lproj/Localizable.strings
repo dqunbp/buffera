@@ -718,3 +718,15 @@
 "Ищем модели в Foresight и кеше Hugging Face…" = "Buscando no Foresight e no cache do Hugging Face…";
 
 "В Foresight и кеше Hugging Face подходящих файлов не найдено." = "Nenhum arquivo compatível encontrado no Foresight ou no cache do Hugging Face.";
+
+"Не назначено" = "Não atribuído";
+"Приостановить / возобновить запись" = "Pausar / retomar o registro";
+"Пропустить следующее копирование" = "Ignorar a próxima cópia";
+"Для разных действий нужны разные сочетания." = "Use atalhos diferentes para cada ação.";
+"Сочетания сохранены." = "Atalhos salvos.";
+"Запись приостановлена" = "Registro pausado";
+"Запись возобновлена" = "Registro retomado";
+"Следующее копирование не сохранится" = "A próxima cópia não será salva";
+"Пропуск отменён" = "Omissão cancelada";
+"Возобновить запись" = "Retomar registro";
+"Отменить пропуск копирования" = "Cancelar omissão da próxima cópia";

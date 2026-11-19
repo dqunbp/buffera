@@ -29,6 +29,12 @@ Os ajustes usam navegação lateral e cartões agrupados. Geral inclui início a
 
 A barra lateral compacta começa com Geral e IA. Escolha o idioma da interface em Geral e o tema em Aparência; «Redefinir atalhos» restaura as combinações padrão.
 
+## Controlar o registro
+
+Antes de copiar uma senha, escolha “Ignorar a próxima cópia” no menu do Buffera. Essa cópia não será salva no histórico e o registro será retomado automaticamente. Para várias cópias, use “Pausar registro” e, ao terminar, “Retomar registro”.
+
+Em Ajustes → Atalhos, atribua uma letra A–Z a “Pausar / retomar o registro” e outra a “Ignorar a próxima cópia”, com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto.
+
 ## Copie. Encontre. Reutilize.
 
 O Buffera mantém o histórico da área de transferência no seu Mac. Pressione <kbd>⌘⌥V</kbd>, encontre um item e pressione <kbd>Enter</kbd>: ele volta à área de transferência, pronto para colar com <kbd>⌘V</kbd>. Você também pode arrastar os itens diretamente para outros apps.

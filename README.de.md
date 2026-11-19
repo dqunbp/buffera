@@ -29,6 +29,12 @@ Die Einstellungen verwenden eine Seitennavigation und gruppierte Karten. Allgeme
 
 Die kompakte Seitenleiste beginnt mit Allgemein und KI. Die Oberflächensprache wählst du unter Allgemein, das Design unter Darstellung; „Kurzbefehle zurücksetzen“ stellt die Standard-Tastenkombinationen wieder her.
 
+## Aufzeichnung steuern
+
+Wähle vor dem Kopieren eines Passworts im Buffera-Menü „Nächsten Kopiervorgang überspringen“. Diese Kopie wird nicht im Verlauf gespeichert; danach wird die Aufzeichnung automatisch fortgesetzt. Für mehrere Kopiervorgänge wähle „Aufzeichnung pausieren“ und anschließend „Aufzeichnung fortsetzen“.
+
+Unter Einstellungen → Tastenkürzel kannst du „Aufzeichnung pausieren / fortsetzen“ und „Nächsten Kopiervorgang überspringen“ jeweils eine Taste A–Z mit den gemeinsamen Modifikatortasten zuweisen. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol.
+
 ## Kopieren. Finden. Wiederverwenden.
 
 Buffera speichert den Verlauf deiner Zwischenablage auf deinem Mac. Drücke <kbd>⌘⌥V</kbd>, suche einen Eintrag und drücke <kbd>Enter</kbd> — schon liegt er wieder in der Zwischenablage, bereit zum Einfügen mit <kbd>⌘V</kbd>. Du kannst Einträge auch direkt in andere Apps ziehen.

@@ -6,6 +6,8 @@ final class ShortcutSettingsView: NSStackView {
     private let base = NSPopUpButton()
     private let nextLetter = NSPopUpButton()
     private let previousLetter = NSPopUpButton()
+    private let pauseLetter = NSPopUpButton()
+    private let skipLetter = NSPopUpButton()
     private let status = NSTextField(wrappingLabelWithString: "")
     private let hint = NSTextField(wrappingLabelWithString: "")
 
@@ -14,15 +16,20 @@ final class ShortcutSettingsView: NSStackView {
         orientation = .vertical; alignment = .leading; spacing = 10
         base.addItems(withTitles: ShortcutPreferences.Base.allCases.map(\.title))
         for popup in [nextLetter, previousLetter] { popup.addItems(withTitles: ShortcutPreferences.letters) }
+        for popup in [pauseLetter, skipLetter] {
+            popup.addItems(withTitles: [L10n.text("Не назначено")] + ShortcutPreferences.letters)
+        }
         let fields: [(String, String, NSPopUpButton)] = [
             (L10n.text("Базовые клавиши"), "base", base),
             (L10n.text("Открыть / следующая запись"), "next", nextLetter),
-            (L10n.text("Предыдущая запись"), "previous", previousLetter)
+            (L10n.text("Предыдущая запись"), "previous", previousLetter),
+            (L10n.text("Приостановить / возобновить запись"), "pause", pauseLetter),
+            (L10n.text("Пропустить следующее копирование"), "skipNext", skipLetter)
         ]
         for (title, id, popup) in fields {
             popup.identifier = .init("shortcuts." + id)
             popup.setAccessibilityLabel(title)
-            popup.widthAnchor.constraint(equalToConstant: 110).isActive = true
+            popup.widthAnchor.constraint(equalToConstant: 145).isActive = true
             popup.target = self; popup.action = #selector(edit)
         }
         let grid = NSGridView(views: fields.map { [NSTextField(labelWithString: $0.0), $0.2] })
@@ -50,6 +57,8 @@ final class ShortcutSettingsView: NSStackView {
         base.selectItem(at: ShortcutPreferences.Base.allCases.firstIndex(of: value.base)!)
         nextLetter.selectItem(withTitle: value.next)
         previousLetter.selectItem(withTitle: value.previous)
+        pauseLetter.selectItem(at: value.pause.flatMap { ShortcutPreferences.letters.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        skipLetter.selectItem(at: value.skipNext.flatMap { ShortcutPreferences.letters.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
         status.stringValue = ""; status.isHidden = true
         hint.stringValue = value.usageHint
     }
@@ -61,7 +70,9 @@ final class ShortcutSettingsView: NSStackView {
 
     @objc private func applyDraft() {
         apply(ShortcutPreferences(base: ShortcutPreferences.Base.allCases[base.indexOfSelectedItem],
-                                  next: nextLetter.titleOfSelectedItem ?? "", previous: previousLetter.titleOfSelectedItem ?? ""))
+                                  next: nextLetter.titleOfSelectedItem ?? "", previous: previousLetter.titleOfSelectedItem ?? "",
+                                  pause: pauseLetter.indexOfSelectedItem == 0 ? nil : pauseLetter.titleOfSelectedItem,
+                                  skipNext: skipLetter.indexOfSelectedItem == 0 ? nil : skipLetter.titleOfSelectedItem))
     }
 
     @objc private func reset() { apply(.defaults) }
@@ -72,7 +83,7 @@ final class ShortcutSettingsView: NSStackView {
             guard let onApply else { throw ShortcutPreferenceError.unavailable }
             try onApply(value)
             refresh(value)
-            status.stringValue = L10n.text("Сохранено: \(value.nextTitle) и \(value.previousTitle).")
+            status.stringValue = L10n.text("Сочетания сохранены.")
             status.textColor = .secondaryLabelColor
         } catch {
             status.stringValue = error.localizedDescription

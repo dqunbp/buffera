@@ -29,6 +29,12 @@ Settings now use sidebar navigation and grouped cards. General includes launch a
 
 The compact sidebar starts with General and AI. Choose the interface language in General and the theme in Appearance; Reset shortcuts restores the default key combinations.
 
+## Recording controls
+
+Before copying a password, choose Skip Next Copy in the Buffera menu. That copy stays out of history, then recording resumes automatically. For several copies, use Pause Recording and choose Resume Recording when you are done.
+
+In Settings → Shortcuts, assign a separate A–Z key to Pause / resume recording and Skip next copy using the shared modifier base. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden.
+
 ## Copy. Find. Reuse.
 
 Buffera keeps your clipboard history on your Mac. Press <kbd>⌘⌥V</kbd>, find a clip and hit <kbd>Enter</kbd> — it's back on your clipboard, ready to paste with <kbd>⌘V</kbd>. You can also drag clips straight into other apps.
