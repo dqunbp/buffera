@@ -11,9 +11,20 @@ func runLiveEmbeddingChecks(arguments: [String]) async throws -> Int32 {
     let descriptor = LocalModelCatalog.models.first { $0.role == .embedding }!
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("buffera-embedding-live-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    if arguments[1] == "--external-live" {
+        let manager = try LocalModelManager(rootURL: root)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            manager.selectExternal(URL(fileURLWithPath: arguments[3]), for: .embedding) { continuation.resume(with: $0) }
+        }
+        manager.setEnabled(true, for: .embedding)
+        let ready = await eventually({ manager.snapshots.first { $0.descriptor.role == .embedding }?.isReadyForUse == true }, timeout: 30)
+        guard ready else { throw CocoaError(.fileReadCorruptFile) }
+        manager.shutdown()
+    } else {
     let directory = root.appendingPathComponent("embedding").appendingPathComponent(descriptor.revision)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.copyItem(at: URL(fileURLWithPath: arguments[3]),
                                     to: directory.appendingPathComponent(descriptor.filename))
     let receipt: [String: Any] = ["embedding": [
@@ -22,6 +33,7 @@ func runLiveEmbeddingChecks(arguments: [String]) async throws -> Int32 {
     ]]
     try JSONSerialization.data(withJSONObject: receipt)
         .write(to: root.appendingPathComponent("state.json"), options: .atomic)
+    }
     let worker = EmbeddingRuntime(modelRootURL: root, bundleURL: URL(fileURLWithPath: arguments[2]))
     defer { worker.shutdown() }
     let documents = [
@@ -90,7 +102,16 @@ func runLiveEmbeddingChecks(arguments: [String]) async throws -> Int32 {
     do {
         _ = try await worker.embed([String(repeating: "banana ", count: 1000)], kind: .query)
         failed += 1
-    } catch {}
+    } catch {
+        let selected = try LocalModelReadAccess(rootURL: root).enabledEmbedding()
+        if selected.descriptor.engine == .liteRT {
+            if case EmbeddingRuntimeError.worker("Текст запроса слишком длинный.") = error {} else { failed += 1 }
+            if !worker.isRunning { failed += 1 }
+            let recovered = try await worker.embed([queries[0].0], kind: .query)
+            if recovered[0].vectors != repeated[0].vectors { failed += 1 }
+            print("LIVE LiteRT: 384-byte rejection followed by a valid query without unloading")
+        }
+    }
     worker.unload()
     if worker.isRunning { failed += 1 }
     print(String(format: "CALIBRATION positive_min=%.4f negative_max=%.4f false_positive_at_065=%d at_070=%d",

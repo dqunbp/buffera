@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-if CommandLine.arguments.dropFirst().first == "--live" {
+if ["--live", "--external-live"].contains(CommandLine.arguments.dropFirst().first ?? "") {
     do { exit(try await runLiveEmbeddingChecks(arguments: CommandLine.arguments)) }
     catch { print("FAIL: \(error.localizedDescription)"); exit(1) }
 }
@@ -249,5 +249,6 @@ let allExited = await eventually { pids.allSatisfy { kill($0, 0) != 0 } }
 check(allExited, "all fixture worker processes exited")
 let unchangedModel = try Data(contentsOf: modelDirectory.appendingPathComponent(descriptor.filename))
 check(unchangedModel == bytes, "inference never mutates model weights")
+try await checkEngineRouting(root: root)
 print("\(passed) passed; \(failed) failed")
 exit(failed == 0 ? 0 : 1)

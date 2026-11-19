@@ -9,9 +9,20 @@ func runLiveChatChecks(arguments: [String]) async throws -> Int32 {
     }
     let descriptor = LocalModelCatalog.models.first { $0.role == .assistant }!
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("buffera-chat-live-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    if arguments[1] == "--external-live" {
+        let manager = try LocalModelManager(rootURL: root)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            manager.selectExternal(URL(fileURLWithPath: arguments[3]), for: .assistant) { continuation.resume(with: $0) }
+        }
+        manager.setEnabled(true, for: .assistant)
+        let ready = await eventually({ manager.snapshots.first { $0.descriptor.role == .assistant }?.isReadyForUse == true }, timeout: 30)
+        guard ready else { throw CocoaError(.fileReadCorruptFile) }
+        manager.shutdown()
+    } else {
     let directory = root.appendingPathComponent("assistant").appendingPathComponent(descriptor.revision)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.copyItem(at: URL(fileURLWithPath: arguments[3]),
                                     to: directory.appendingPathComponent(descriptor.filename))
     let receipt: [String: Any] = ["assistant": [
@@ -20,6 +31,7 @@ func runLiveChatChecks(arguments: [String]) async throws -> Int32 {
     ]]
     try JSONSerialization.data(withJSONObject: receipt)
         .write(to: root.appendingPathComponent("state.json"), options: .atomic)
+    }
     let worker = ChatRuntime(modelRootURL: root, bundleURL: URL(fileURLWithPath: arguments[2]))
     defer { worker.shutdown() }
     var failed = 0

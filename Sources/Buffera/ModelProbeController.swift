@@ -13,6 +13,7 @@ final class ModelProbeController {
         let output = Pipe()
         let diagnostics: URL
         var timeout: DispatchWorkItem?
+        var cache: LiteRTRuntimeCache?
 
         init() {
             diagnostics = FileManager.default.temporaryDirectory
@@ -28,14 +29,21 @@ final class ModelProbeController {
     private let queue = DispatchQueue(label: "app.buffera.model-check")
     private var runs: [ModelRole: Run] = [:]
     private let executable: URL
+    private let bundleURL: URL
+    private let cacheRootURL: URL?
 
-    init(bundleURL: URL = Bundle.main.bundleURL) {
+    init(bundleURL: URL = Bundle.main.bundleURL, cacheRootURL: URL? = nil) {
+        self.cacheRootURL = cacheRootURL
+        self.bundleURL = bundleURL
         executable = bundleURL.appendingPathComponent("Contents/MacOS/BufferaModelProbe")
     }
 
-    func check(_ role: ModelRole, modelURL: URL) {
+    func check(_ role: ModelRole, modelURL: URL, engine: ModelEngine = .llama) {
         queue.async { [self] in
             cancelOnQueue(role, message: nil)
+            let executable = engine == .liteRT
+                ? bundleURL.appendingPathComponent("Contents/MacOS/BufferaLiteRT\(role == .embedding ? "Embedding" : "Chat")Worker")
+                : self.executable
             guard FileManager.default.isExecutableFile(atPath: executable.path) else {
                 publish(role, L10n.text("Движок недоступен. Пересоберите или обновите Buffera."), running: false)
                 return
@@ -46,14 +54,24 @@ final class ModelProbeController {
             run.process.standardInput = FileHandle.nullDevice
             run.process.standardOutput = run.output
             do {
+                if engine == .liteRT {
+                    let cache = try LiteRTRuntimeCache(role: role, rootURL: cacheRootURL)
+                    run.cache = cache
+                    run.process.arguments = ["--probe", modelURL.path, cache.url.path]
+                }
                 guard FileManager.default.createFile(atPath: run.diagnostics.path, contents: nil) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
                 let log = try FileHandle(forWritingTo: run.diagnostics)
                 run.process.standardError = log
+                // Cache lifetime follows process exit, independently of draining stdout.
+                let cache = run.cache
+                run.process.terminationHandler = { _ in cache?.remove() }
                 try run.process.run()
+                try? run.output.fileHandleForWriting.close()
                 try? log.close()
             } catch {
+                run.cache?.remove()
                 try? FileManager.default.removeItem(at: run.diagnostics)
                 publish(role, L10n.text("Не удалось запустить проверку: \(error.localizedDescription)"), running: false)
                 return

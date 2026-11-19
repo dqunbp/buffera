@@ -2,6 +2,16 @@
 
 Settings use a compact sidebar with navigation aligned at the top: General, AI, Appearance, History, Shortcuts, MCP, and Updates. Icons and labels have inset spacing. Appearance and history options are grouped into cards; AI brings together semantic search and the assistant. Existing actions and model checks are retained.
 
+The selected section name appears only in the sidebar. Each AI feature card has a “Connect your model” button that opens an explanation and a guided compatible-file selection flow.
+
+In the connection dialog, the selected model’s source (Foresight, Hugging Face cache, or manual selection) and path appear below the dropdown. **Refresh list** repeats discovery without connecting a model.
+
+The Semantic Search and Ask Buffera card headers use native macOS switches. Their state reflects whether the feature is enabled; model download and verification rules are unchanged.
+
+A downloaded model can remain disabled. The Ask button in history and the Ask Buffera… menu item appear only when the assistant model is enabled and ready for use.
+
+Feature descriptions reserve the switch column on the right with a 16 pt gap.
+
 At the top of AI settings, a large green shield accompanies an explanation: “All models run locally. Your clipboard history is never sent anywhere.”. This applies to built-in AI features; separately authorized MCP access exposes history to connected agents.
 
 General includes:

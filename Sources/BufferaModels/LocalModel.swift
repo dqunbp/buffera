@@ -10,7 +10,10 @@ public enum ModelState: String, Codable, Sendable {
     case notDownloaded, downloading, paused, verifying, downloaded, failed
 }
 
+public enum ModelEngine: String, Sendable { case llama, liteRT }
+
 public struct LocalModelDescriptor: Sendable {
+    public var engine: ModelEngine { filename.hasSuffix(".litertlm") ? .liteRT : .llama }
     public let role: ModelRole
     public let title: String
     public let summary: String
@@ -46,6 +49,7 @@ public struct LocalModelSnapshot: Sendable {
     /// The user has enabled the feature, including while its files are being prepared.
     public let isEnabled: Bool
     public let errorMessage: String?
+    public var externalURL: URL? = nil
 
     /// Runtimes may start only after verified files and the feature preference agree.
     public var isReadyForUse: Bool { isEnabled && state == .downloaded }

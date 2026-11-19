@@ -36,6 +36,7 @@ public final class ChatRuntime: @unchecked Sendable {
         var reader: DispatchSourceRead?
         var ready = false
         var received = Data()
+        var cache: LiteRTRuntimeCache?
 
         init(model: InstalledAssistantModel) { self.model = model }
     }
@@ -64,6 +65,8 @@ public final class ChatRuntime: @unchecked Sendable {
     private let queueKey = DispatchSpecificKey<UInt8>()
     private let access: LocalModelReadAccess
     private let executable: URL
+    private let liteRTExecutable: URL
+    private let cacheRootURL: URL?
     private let idleTimeout: TimeInterval
     private let requestTimeout: TimeInterval
     private var pending: [Request] = []
@@ -74,11 +77,13 @@ public final class ChatRuntime: @unchecked Sendable {
     private var stopped = false
 
     public init(modelRootURL: URL, bundleURL: URL = Bundle.main.bundleURL,
-                executableURL: URL? = nil, idleTimeout: TimeInterval = 60,
+                executableURL: URL? = nil, cacheRootURL: URL? = nil, idleTimeout: TimeInterval = 60,
                 requestTimeout: TimeInterval = 240,
                 descriptor: LocalModelDescriptor = LocalModelCatalog.models.first { $0.role == .assistant }!) {
         access = LocalModelReadAccess(rootURL: modelRootURL, descriptor: descriptor)
         executable = executableURL ?? bundleURL.appendingPathComponent("Contents/MacOS/BufferaChatWorker")
+        liteRTExecutable = executableURL ?? bundleURL.appendingPathComponent("Contents/MacOS/BufferaLiteRTChatWorker")
+        self.cacheRootURL = cacheRootURL
         self.idleTimeout = max(0.05, idleTimeout)
         self.requestTimeout = max(0.05, requestTimeout)
         queue.setSpecific(key: queueKey, value: 1)
@@ -192,7 +197,8 @@ public final class ChatRuntime: @unchecked Sendable {
     }
 
     private func startWorker(model: InstalledAssistantModel) throws {
-        guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+        let workerURL = model.descriptor.engine == .liteRT ? liteRTExecutable : executable
+        guard FileManager.default.isExecutableFile(atPath: workerURL.path) else {
             throw ChatRuntimeError.runtimeMissing
         }
         let next = Run(model: model)
@@ -220,8 +226,14 @@ public final class ChatRuntime: @unchecked Sendable {
     }
 
     private func launch(_ next: Run) throws {
-        next.process.executableURL = executable
+        let liteRT = next.model.descriptor.engine == .liteRT
+        next.process.executableURL = liteRT ? liteRTExecutable : executable
         next.process.arguments = [next.model.fileURL.path]
+        if liteRT {
+            let cache = try LiteRTRuntimeCache(role: .assistant, rootURL: cacheRootURL)
+            next.cache = cache
+            next.process.arguments?.append(cache.url.path)
+        }
         next.process.standardInput = next.input
         next.process.standardOutput = next.output
         next.process.standardError = FileHandle.nullDevice
@@ -403,6 +415,7 @@ public final class ChatRuntime: @unchecked Sendable {
         previous.process.terminationHandler = nil
         if previous.process.isRunning { Darwin.kill(previous.process.processIdentifier, SIGKILL) }
         try? previous.input.fileHandleForWriting.close()
+        previous.cache?.removeAfterExit(of: previous.process)
     }
 
     private func stopAll(error: Error) {

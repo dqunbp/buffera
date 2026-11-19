@@ -28,7 +28,7 @@ Current technical documents have full English translations and retain their Russ
 | Settings, launch at login and issue reports | [Settings](en/settings.md) | [Настройки](settings.md) |
 | Detailed usage, building and checks | [Guide](en/guide.md) | [Руководство](guide.md) |
 | Architecture, storage and integration contracts | [Architecture](en/architecture.md) | [Архитектура](architecture.md) |
-| Local models, search and battery use | [Models](en/models.md) | [Модели](models.md) |
+| Local and external models, search and battery use | [Models](en/models.md) | [Модели](models.md) |
 | Assistant orchestration and privacy | [Chat](en/chat.md) | [Чат](chat.md) |
 | MCP setup, tools and access controls | [MCP](en/mcp.md) | [MCP](mcp.md) |
 | Languages, resources and translation checks | [Localization](en/localization.md) | [Локализация](localization.md) |

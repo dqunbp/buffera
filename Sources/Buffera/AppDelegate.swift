@@ -817,7 +817,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     guard let self, self.modelCheckTokens[role] == token else { return }
                     self.modelCheckTokens[role] = nil
                     switch result {
-                    case .success(let url): self.modelProbe.check(role, modelURL: url)
+                    case .success(let url):
+                        let engine = manager.snapshots.first { $0.descriptor.role == role }?.descriptor.engine ?? .llama
+                        self.modelProbe.check(role, modelURL: url, engine: engine)
                     case .failure(let error):
                         guard !(error is CancellationError) else { return }
                         self.settings?.updateModelCheck(role: role, status: error.localizedDescription, running: false)

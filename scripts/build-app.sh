@@ -45,6 +45,7 @@ rm -rf "$APP/Contents/Resources/Buffera_BufferaLocalization.bundle"
 cp -R "$BIN_DIR/Buffera_BufferaLocalization.bundle" "$APP/Contents/Resources/"
 if [[ "$(uname -m)" == arm64 ]]; then
   zsh scripts/prepare-model-runtime.sh "$APP"
+  zsh scripts/prepare-litert-runtime.sh "$APP"
 fi
 swiftc Sources/Buffera/BrandIdentity.swift scripts/generate-app-icon.swift \
   -o .build/generate-app-icon

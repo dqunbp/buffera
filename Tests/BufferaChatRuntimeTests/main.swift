@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-if CommandLine.arguments.dropFirst().first == "--live" {
+if ["--live", "--external-live"].contains(CommandLine.arguments.dropFirst().first ?? "") {
     do { exit(try await runLiveChatChecks(arguments: CommandLine.arguments)) }
     catch { print("FAIL: \(error.localizedDescription)"); exit(1) }
 }
@@ -240,5 +240,6 @@ let pids = ((try? String(contentsOf: launches, encoding: .utf8)) ?? "")
     .split(separator: "\n").compactMap { Int32($0) }
 let allExited = await eventually { pids.allSatisfy { kill($0, 0) != 0 } }
 check(allExited, "all fixture processes exited")
+try await checkEngineRouting(root: root)
 print("\(passed) passed; \(failed) failed")
 exit(failed == 0 ? 0 : 1)
