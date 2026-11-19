@@ -8,6 +8,8 @@ struct ModelReceipt: Codable {
     let state: ModelState
     let enabled: Bool
     let error: String?
+    var externalPath: String? = nil
+    var externalIdentity: VerifiedModelFile? = nil
 }
 
 final class ModelVerification: @unchecked Sendable {
@@ -30,7 +32,7 @@ final class ModelVerification: @unchecked Sendable {
 
 /// A successful hash is trusted only inside this process and for this exact file version.
 /// ctime catches rewrites even if a caller restores the old mtime; inode/birthtime catch replacement.
-private struct VerifiedModelFile: Hashable {
+struct VerifiedModelFile: Hashable, Codable {
     let device: Int64
     let inode: UInt64
     let size: Int64
@@ -175,7 +177,7 @@ enum ModelStorage {
         return try VerifiedModelFile(value)
     }
 
-    private static func fileIdentity(_ url: URL) throws -> VerifiedModelFile {
+    static func fileIdentity(_ url: URL) throws -> VerifiedModelFile {
         var value = stat()
         guard Darwin.lstat(url.path, &value) == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)

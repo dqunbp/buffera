@@ -237,6 +237,7 @@ private func checkPreparationPauses(root: URL) async throws {
         try require(await inference.calls == stoppedCalls, "Shutdown cannot be restarted")
         try await checkPreparationPauses(root: root)
         try await checkShortQueries(root: root)
+        try checkEngineIdentity(root: root)
         print("PASS: index lifecycle, pause policy, resume, retry, cancellation, conceal race, shutdown, shared search")
     }
 }

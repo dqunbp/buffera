@@ -11,6 +11,8 @@ The single source of version metadata is `Sources/BufferaCore/AppVersion.swift`:
 
 Increase PATCH for fixes, MINOR for features and MAJOR for incompatible major changes. Reset PATCH when increasing MINOR, and both MINOR and PATCH when increasing MAJOR. Never reset `build`. Only stable releases are supported.
 
+On Apple Silicon, the build also runs `scripts/prepare-litert-runtime.sh`: when the local archive is absent, it downloads the official LiteRT-LM **v0.19.1** `CLiteRTLM_mac.xcframework.zip` from GitHub. Before extraction it verifies SHA-256 `cedd331e78e94bf98ca8f2f28aeb3d543e20277fcd51570c12deed6d49524fb6`; a mismatch stops the build. Network access is required on first use or in a clean release checkout. Two C++ workers compile without Python and load the library from `Contents/Frameworks/BufferaLiteRT` through rpath. Model weights are not bundled. Before release, run `zsh scripts/check-litert-workers.sh`, build the `.app`, and verify both workers and the dylib signatures. Fixture checks do not establish real Metal inference.
+
 ## Preparation
 
 1. Change `version` and increase `build` in `AppVersion.swift`.
@@ -70,7 +72,7 @@ If the network or build is unavailable, the script exits with an error before cr
 
 ## Signing and script constraints
 
-`scripts/signing.sh` owns shared signing configuration for `build-app.sh`, `prepare-model-runtime.sh` and `create-release.sh`. Unconfigured builds use ad-hoc signing. For Developer ID Application, import the certificate matching the private key in your Keychain and find its SHA-1:
+`scripts/signing.sh` owns shared signing configuration for `build-app.sh`, `prepare-model-runtime.sh`, `prepare-litert-runtime.sh` and `create-release.sh`. Unconfigured builds use ad-hoc signing. For Developer ID Application, import the certificate matching the private key in your Keychain and find its SHA-1:
 
 ```sh
 security import /path/to/developerID_application.cer -k "$HOME/Library/Keychains/login.keychain-db"
@@ -80,7 +82,7 @@ BUFFERA_SIGNING_IDENTITY=YOUR_40_CHARACTER_SHA1 zsh scripts/build-app.sh --build
 
 For persistent configuration, put only that SHA-1 on one line in `output/developer-id/signing-identity.txt` (the folder is ignored by Git). `BUFFERA_SIGNING_IDENTITY` takes precedence; `-` explicitly selects ad-hoc signing. Do not store a private key or password there. The chosen Developer ID identity must be valid and have a private key; otherwise the build stops before compilation. Denied key access, signing errors and timestamp failures also stop the build without falling back to ad-hoc. macOS may ask you to allow `codesign` to use the key.
 
-Developer ID signing covers llama.cpp libraries, all three model helpers, MCP, Sparkle (Autoupdate → Updater.app → framework) and the app, working from nested components out to the enclosing package. All receive Apple's secure timestamp (requiring network access); executables also receive Hardened Runtime. No Hardened Runtime exceptions are added. `create-release.sh` passes the selected identity into its isolated build through the environment; the local configuration file and certificate are not included in the source archive. The order and options follow [Apple's instructions](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/).
+Developer ID signing covers llama.cpp libraries, the three llama helpers, `libCLiteRTLM_mac.dylib`, `BufferaLiteRTEmbeddingWorker`, `BufferaLiteRTChatWorker`, MCP, Sparkle (Autoupdate → Updater.app → framework) and the app, working from nested components out to the enclosing package. All receive Apple's secure timestamp (requiring network access); executables also receive Hardened Runtime. No Hardened Runtime exceptions are added. `create-release.sh` passes the selected identity into its isolated build through the environment; the local configuration file and certificate are not included in the source archive. The order and options follow [Apple's instructions](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/).
 
 `build-app.sh` assembles, signs and verifies the package in a temporary folder, then copies it without auxiliary attributes into `dist/Buffera.app` and verifies it again. This prevents the Documents file provider from reattaching FinderInfo during signing. The provider can still change the result's attributes later; keep the working app outside synchronized folders.
 

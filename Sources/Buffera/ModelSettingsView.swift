@@ -12,10 +12,14 @@ final class ModelSettingsView: NSView {
     var onContinueEmbeddingPreparation: (() -> Void)?
 
     private let manager: LocalModelManager?
+    private let discovery: () -> [ExternalModels.Candidate]
     private var cards: [ModelRole: ModelCardView] = [:]
+    private var connectionSheet: ModelConnectionSheet?
 
-    init(manager: LocalModelManager?, unavailableMessage: String? = nil) {
+    init(manager: LocalModelManager?, unavailableMessage: String? = nil,
+         discovery: @escaping () -> [ExternalModels.Candidate] = { ExternalModels.discover() }) {
         self.manager = manager
+        self.discovery = discovery
         super.init(frame: .zero)
 
         let content = NSStackView()
@@ -56,6 +60,10 @@ final class ModelSettingsView: NSView {
             let card = ModelCardView(snapshot: snapshot)
             let role = snapshot.descriptor.role
             card.onDownload = { [weak manager] in manager?.setEnabled(true, for: role) }
+            card.onRestoreDefault = { [weak self] in
+                self?.onWillDisableOrRemove?(role)
+                self?.manager?.useDefault(for: role)
+            }
             card.onPause = { [weak manager] in manager?.pause(role) }
             card.onRemove = { [weak self] in
                 self?.onWillDisableOrRemove?(role)
@@ -72,6 +80,7 @@ final class ModelSettingsView: NSView {
                 self?.onOnlyPrepareOnExternalPowerChanged?($0)
             }
             card.onContinuePreparation = { [weak self] in self?.onContinueEmbeddingPreparation?() }
+            card.onConnectOwn = { [weak self] in self?.showConnection(for: role) }
             cards[role] = card
             content.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -106,12 +115,24 @@ final class ModelSettingsView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    private func showConnection(for role: ModelRole) {
+        guard let manager, let window, connectionSheet == nil else { return }
+        let sheet = ModelConnectionSheet(manager: manager, role: role, discovery: discovery)
+        sheet.source.onWillChange = { [weak self] in self?.onWillDisableOrRemove?(role) }
+        sheet.onClose = { [weak self] in self?.connectionSheet = nil }
+        connectionSheet = sheet
+        window.beginSheet(sheet.window)
+    }
+
     func refresh() {
         if let manager { update(manager.snapshots) }
     }
 
     func update(_ snapshots: [LocalModelSnapshot]) {
-        for snapshot in snapshots { cards[snapshot.descriptor.role]?.update(snapshot) }
+        for snapshot in snapshots {
+            cards[snapshot.descriptor.role]?.update(snapshot)
+        }
+        connectionSheet?.source.refresh()
     }
 
     func updateCheck(role: ModelRole, status: String, running: Bool) {
@@ -134,6 +155,8 @@ private final class ModelSettingsDocumentView: NSView {
 
 private final class ModelCardView: NSBox {
     var onDownload: (() -> Void)?
+    var onConnectOwn: (() -> Void)?
+    var onRestoreDefault: (() -> Void)?
     var onPause: (() -> Void)?
     var onRemove: (() -> Void)?
     var onSetEnabled: ((Bool) -> Void)?
@@ -145,11 +168,17 @@ private final class ModelCardView: NSBox {
 
     private var snapshot: LocalModelSnapshot
     private var isChecking = false
-    private let enabled = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    private let management = NSStackView()
+    private let defaultChoice = NSStackView()
+    private let restoreDefault = NSButton()
+
+    private let enabled = NSSwitch()
     private let modelName = modelParagraph("")
     private let status = modelParagraph("")
+    private let recovery = modelParagraph("")
     private let progress = NSProgressIndicator()
     private let primary = NSButton()
+    private let connectOwn = NSButton()
     private let remove = NSButton()
     private let check = NSButton()
     private let checkStatus = modelParagraph("")
@@ -198,14 +227,13 @@ private final class ModelCardView: NSBox {
             : L10n.text("Локальная языковая модель (LLM) ищет в истории буфера обмена, читает найденные записи и отвечает на ваши вопросы."))
         description.font = .systemFont(ofSize: 12)
         description.textColor = .labelColor
-        let titleRow = NSStackView(views: [featureTitle, NSView(), enabled])
-        titleRow.orientation = .horizontal; titleRow.alignment = .centerY; titleRow.spacing = 8
-        let headingText = NSStackView(views: [titleRow, description])
+        description.identifier = .init("\(prefix).description")
+        let headingText = NSStackView(views: [featureTitle, description])
         headingText.orientation = .vertical; headingText.alignment = .leading; headingText.spacing = 6
-        titleRow.widthAnchor.constraint(equalTo: headingText.widthAnchor).isActive = true
         description.widthAnchor.constraint(equalTo: headingText.widthAnchor).isActive = true
-        let heading = NSStackView(views: [mark, headingText])
+        let heading = NSStackView(views: [mark, headingText, enabled])
         heading.orientation = .horizontal; heading.alignment = .top; heading.spacing = 12
+        heading.setCustomSpacing(16, after: headingText)
         heading.identifier = NSUserInterfaceItemIdentifier("\(prefix).heading")
         let energyNote = modelParagraph(isSearch
             ? L10n.text("Подготовка истории расходует заряд. Поиск по уже подготовленным записям доступен и от аккумулятора.")
@@ -223,6 +251,9 @@ private final class ModelCardView: NSBox {
 
         modelName.font = .systemFont(ofSize: 11)
         modelName.identifier = NSUserInterfaceItemIdentifier("\(prefix).name")
+        recovery.identifier = .init("\(prefix).recovery")
+        recovery.isSelectable = true
+        recovery.isHidden = true
         status.identifier = NSUserInterfaceItemIdentifier("\(prefix).status")
         progress.style = .bar
         progress.minValue = 0
@@ -246,6 +277,8 @@ private final class ModelCardView: NSBox {
         disclosure.target = self
         disclosure.action = #selector(toggleDetails)
         disclosure.identifier = NSUserInterfaceItemIdentifier("\(prefix).details")
+        configure(connectOwn, action: #selector(connectOwnModel), identifier: "\(prefix).connectOwn")
+        connectOwn.title = L10n.text("Подключить свою модель")
         let actions = NSStackView(views: [primary, remove, disclosure])
         actions.orientation = .horizontal
         actions.alignment = .centerY
@@ -280,9 +313,24 @@ private final class ModelCardView: NSBox {
         details.spacing = 8
         for view in [technicalActions, checkStatus] { details.addArrangedSubview(view) }
         details.isHidden = true
-        let stack = NSStackView(views: [heading, modelName, energyNote, status, progress,
-                                      onlyOnExternalPower, indexStatus, indexProgress, continuePreparation,
-                                      retryIndex, actions, details])
+        management.orientation = .vertical
+        management.alignment = .leading
+        management.spacing = 8
+        for view in [progress, actions, details] { management.addArrangedSubview(view) }
+        defaultChoice.orientation = .vertical
+        defaultChoice.alignment = .leading
+        defaultChoice.spacing = 8
+        if let standard = LocalModelCatalog.models.first(where: { $0.role == snapshot.descriptor.role }) {
+            let name = modelParagraph(L10n.text("Модель: \(standard.title) · \(modelByteCount(standard.byteCount))"))
+            defaultChoice.addArrangedSubview(name)
+            name.widthAnchor.constraint(equalTo: defaultChoice.widthAnchor).isActive = true
+        }
+        configure(restoreDefault, action: #selector(restoreDefaultModel), identifier: "\(prefix).defaultSource")
+        restoreDefault.title = L10n.text("Вернуться к модели Buffera")
+        defaultChoice.addArrangedSubview(restoreDefault)
+        let stack = NSStackView(views: [heading, modelName, status, recovery, management, connectOwn, defaultChoice,
+                                      energyNote, onlyOnExternalPower, indexStatus, indexProgress,
+                                      continuePreparation, retryIndex])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -295,8 +343,8 @@ private final class ModelCardView: NSBox {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
-        for view in [heading, modelName, energyNote, status, progress, onlyOnExternalPower,
-                     indexStatus, indexProgress, details] {
+        for view in [heading, modelName, energyNote, status, recovery, progress, onlyOnExternalPower,
+                     indexStatus, indexProgress, management, defaultChoice, details] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         checkStatus.widthAnchor.constraint(equalTo: details.widthAnchor).isActive = true
@@ -315,7 +363,9 @@ private final class ModelCardView: NSBox {
         let total = modelByteCount(snapshot.totalBytes)
         let received = modelByteCount(snapshot.receivedBytes)
         modelName.stringValue = L10n.text("Модель: \(snapshot.descriptor.title) · \(total)")
-        modelName.toolTip = snapshot.descriptor.summary
+        modelName.stringValue += "\n" + (snapshot.externalURL == nil
+            ? L10n.text("Источник: скачивание через Buffera") : L10n.text("Источник: ваш файл"))
+        modelName.toolTip = snapshot.externalURL?.path ?? snapshot.descriptor.summary
         enabled.state = snapshot.isEnabled ? .on : .off
         // A missing model requires an explicit download action with its size in view.
         // During preparation the requested-on switch remains available to stop it.
@@ -325,9 +375,13 @@ private final class ModelCardView: NSBox {
             : snapshot.state == .downloaded
                 ? L10n.text("Включить функцию с уже скачанной моделью")
                 : L10n.text("Для включения сначала скачайте указанную модель")
-        primary.isHidden = snapshot.state == .downloaded
+        primary.isHidden = snapshot.state == .downloaded || snapshot.externalURL != nil
         primary.isEnabled = snapshot.totalBytes > 0 && platformSupported
-        remove.isHidden = snapshot.state == .notDownloaded
+        remove.title = snapshot.externalURL == nil ? L10n.text("Удалить модель") : L10n.text("Отключить файл")
+        remove.toolTip = snapshot.externalURL == nil
+            ? L10n.text("Выключить функцию и удалить скачанную модель с этого Mac")
+            : L10n.text("Файл останется на прежнем месте")
+        remove.isHidden = snapshot.state == .notDownloaded && snapshot.externalURL == nil
         remove.isEnabled = platformSupported
         progress.isHidden = ![.downloading, .paused, .verifying].contains(snapshot.state)
         progress.isIndeterminate = snapshot.state == .verifying
@@ -340,7 +394,7 @@ private final class ModelCardView: NSBox {
         switch snapshot.state {
         case .notDownloaded:
             status.stringValue = L10n.text("Модель ещё не скачана")
-            primary.title = L10n.text("Скачать модель и включить")
+            primary.title = L10n.text("Скачать модель")
         case .downloading:
             status.stringValue = L10n.text("Скачивание модели · \(received) из \(total). После проверки функция включится.")
             primary.title = L10n.text("Пауза")
@@ -362,13 +416,27 @@ private final class ModelCardView: NSBox {
             status.textColor = .systemRed
             primary.title = snapshot.isEnabled ? L10n.text("Повторить") : L10n.text("Включить и повторить")
         }
+        if snapshot.externalURL != nil && snapshot.state == .downloaded {
+            status.stringValue = snapshot.isEnabled ? L10n.text("Внешняя модель · функция включена")
+                : L10n.text("Внешняя модель · функция выключена")
+        }
         if let error = snapshot.errorMessage, snapshot.state != .failed {
             status.stringValue += "\n\(error)"
             status.textColor = .systemRed
         }
+        let unavailable = snapshot.externalURL != nil && snapshot.state == .failed
+        recovery.isHidden = !unavailable
+        connectOwn.title = unavailable ? L10n.text("Указать файл…") : L10n.text("Подключить свою модель")
+        restoreDefault.title = unavailable ? L10n.text("Использовать модель Buffera") : L10n.text("Вернуться к модели Buffera")
+        if unavailable, let url = snapshot.externalURL {
+            status.stringValue = L10n.text("Файл модели недоступен")
+            status.textColor = .systemRed
+            recovery.stringValue = L10n.text("Файл мог быть перемещён, удалён или не пройти проверку. Укажите его заново или используйте модель Buffera.") + "\n" + url.path
+        }
         updateIndexVisibility()
         onlyOnExternalPower.isEnabled = platformSupported
         updateCheckButton()
+        updateSourceTab()
     }
 
     func updateCheck(status: String, running: Bool) {
@@ -423,6 +491,15 @@ private final class ModelCardView: NSBox {
         button.action = action
         button.identifier = NSUserInterfaceItemIdentifier(identifier)
     }
+
+    private func updateSourceTab() {
+        let externalActive = snapshot.externalURL != nil
+        management.isHidden = false
+        defaultChoice.isHidden = !externalActive
+    }
+
+    @objc private func connectOwnModel() { onConnectOwn?() }
+    @objc private func restoreDefaultModel() { onRestoreDefault?() }
 
     @objc private func primaryAction() {
         if snapshot.state == .downloading { onPause?() }
@@ -489,7 +566,7 @@ private func modelParagraph(_ text: String) -> NSTextField {
     return field
 }
 
-private func modelByteCount(_ count: Int64) -> String {
+func modelByteCount(_ count: Int64) -> String {
     let units: [(Int64, String)] = [(1_000_000_000, L10n.text("ГБ")), (1_000_000, L10n.text("МБ")), (1_000, L10n.text("КБ"))]
     for (divisor, suffix) in units where count >= divisor {
         let value = (Double(count) / Double(divisor)).formatted(

@@ -690,3 +690,52 @@
 
 "Сохранять временные записи" = "Save temporary clips";
 "Сохранять также записи, которые приложения помечают как временные или автоматически созданные. Например, при диктовке и автоматической вставке текста" = "Also save clips that apps mark as temporary or automatically generated. For example, during dictation and automatic text insertion";
+
+/* External model selection */
+"Выбрать файл…" = "Choose file…";
+"Выберите проверенную модель Buffera или Foresight. Файл останется на прежнем месте." = "Choose a verified Buffera or Foresight model. The file will stay in its original location.";
+"Проверяем выбранный файл…" = "Verifying selected file…";
+"Отключить файл" = "Disconnect file";
+"Файл останется на прежнем месте" = "The file will stay in its original location";
+"Внешняя модель · функция включена" = "External model · feature on";
+"Внешняя модель · функция выключена" = "External model · feature off";
+"Этот файл не поддерживается. Выберите проверенную модель Buffera или Foresight для этой функции." = "This file is not supported. Choose a verified Buffera or Foresight model for this feature.";
+
+/* Model connection actions */
+"Подключить" = "Connect";
+"Вернуться к модели Buffera" = "Use the Buffera model again";
+
+/* Connect existing models */
+"Подключить свою модель" = "Connect your model";
+"Поддерживаются только перечисленные версии моделей. Другие версии и квантования не подходят. Совместимость файла проверяется перед подключением." = "Only the listed model versions are supported. Other versions and quantizations are not compatible. The file is checked before connecting.";
+
+/* Model connection introduction */
+"Подключить уже скачанную модель" = "Connect a downloaded model";
+"Если вы уже скачивали совместимую модель, например через Google Foresight, Buffera может использовать тот же файл. Повторно скачивать его не нужно, копия на диске не создаётся." = "If you have already downloaded a compatible model, for example through Google Foresight, Buffera can use the same file. There is no need to download it again or create a copy on disk.";
+"Если вы не знаете, есть ли у вас такая модель, закройте это окно и нажмите «Скачать модель» в настройках — Buffera скачает подходящую автоматически." = "If you are not sure whether you have such a model, close this window and click “Download model” in settings. Buffera will download a suitable model automatically.";
+"Источник: скачивание через Buffera" = "Source: downloaded through Buffera";
+"Источник: ваш файл" = "Source: your file";
+"Выберите модель…" = "Choose a model…";
+"Скачать модель" = "Download model";
+
+/* Model selection and recovery */
+"Поддерживаемые модели" = "Supported models";
+"Если модель хранится в другой папке, выберите файл вручную." = "If your model is in another folder, choose the file manually.";
+"Указать файл…" = "Locate file…";
+"Использовать модель Buffera" = "Use Buffera model";
+"Файл модели недоступен" = "Model file unavailable";
+"Файл мог быть перемещён, удалён или не пройти проверку. Укажите его заново или используйте модель Buffera." = "The file may have been moved, deleted, or failed verification. Locate it again or use the Buffera model.";
+
+"Модель" = "Model";
+
+"Обновить список" = "Refresh list";
+
+"Найдена в Foresight" = "Found in Foresight";
+
+"Найдена в кеше Hugging Face" = "Found in the Hugging Face cache";
+
+"Выбрана вручную" = "Selected manually";
+
+"Ищем модели в Foresight и кеше Hugging Face…" = "Searching Foresight and the Hugging Face cache…";
+
+"В Foresight и кеше Hugging Face подходящих файлов не найдено." = "No compatible files found in Foresight or the Hugging Face cache.";
