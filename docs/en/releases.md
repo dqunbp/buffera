@@ -15,33 +15,28 @@ On Apple Silicon, the build also runs `scripts/prepare-litert-runtime.sh`: when 
 
 ## Preparation
 
-1. Change `version` and increase `build` in `AppVersion.swift`.
-2. Add change notes and installation instructions to `docs/releases/X.Y.Z.md` in all eight supported languages. Update every language in `docs/INSTALL.txt` if installation changes, and match button names to the app catalogs. See [1.0.0](../releases/1.0.0.md) for the structure.
-3. Review the changes and run the relevant app checks. Verify the build and package:
+1. Merge the reviewed PRs for this release into `main`. Fetch `origin/main` and create `codex/release-X.Y.Z` from it.
+2. Update `version` and increment `build` in `AppVersion.swift` on the release branch. Add change notes and installation instructions to `docs/releases/X.Y.Z.md` in all eight supported languages. Update every language in `docs/INSTALL.txt` if installation changes, and match button names to the app catalogs. See [1.0.0](../releases/1.0.0.md) for the structure.
+3. Commit the version and release notes and open a release PR against `main`. Review the diff and run the checks for the affected modules and release scripts.
 
    ```sh
-   export BUFFERA_NOTARY_PROFILE=YOUR_KEYCHAIN_PROFILE
-   zsh scripts/build-app.sh
-   zsh scripts/package-release.sh
-   zsh scripts/notarize-release.sh
-   zsh scripts/create-appcast.sh
    zsh scripts/check-signing.sh
    zsh scripts/check-notarization.sh
    zsh scripts/check-appcast.sh
    zsh scripts/check-release.sh
    ```
 
-   The packager refuses an `.app` whose version or build differs from the source.
-   `check-release.sh` checks release restrictions in a disposable repository with a fixture GitHub CLI, without network requests or publication.
-   Wait for every check to finish successfully: individual PASS lines do not establish that the entire run succeeded.
-
-4. Commit the prepared release. Exclude local history, models, support archives and keys.
-5. Create an annotated `vX.Y.Z` tag on that commit and push the commit and tag to GitHub. Example for `0.2.0`:
+4. After all checks pass, merge the release PR into `main`. Copy the exact merge commit SHA from the merged PR.
+5. In a clean checkout, create the annotated `vX.Y.Z` tag on that SHA. Substitute the version and SHA below. The command chain verifies that the commit belongs to `origin/main` and leaves the checkout at the tag for the release build.
 
    ```sh
-   git tag -a v0.2.0 -m 'Buffera 0.2.0'
-   git push origin HEAD
-   git push origin v0.2.0
+   tag=vX.Y.Z
+   release_commit=MERGE_COMMIT_SHA
+   git fetch origin main &&
+     git merge-base --is-ancestor "$release_commit" origin/main &&
+     git tag -a "$tag" "$release_commit" -m "Buffera ${tag#v}" &&
+     git push origin "refs/tags/$tag" &&
+     git switch --detach "$tag"
    ```
 
 ## Creating and publishing a release
@@ -66,7 +61,7 @@ The DMG name stays constant: website and README links to `releases/latest/downlo
 
 The app's update checker uses the public `/repos/dqunbp/buffera/releases/latest` endpoint. It compares a stable `vX.Y.Z` (or `X.Y.Z`) tag with `AppVersion.version` and offers only a newer version with a ready, nonempty `Buffera-macOS-arm64.dmg` at that tag's expected URL. Drafts, prereleases, unsupported tags, foreign URLs and incomplete assets are not offered. Rebuilding the same tag is not an update, so published releases must not be replaced. See the [guide](guide.md#updates) for UI behavior.
 
-Open the draft on GitHub and verify its description, all three assets, DMG installation and updating from the previous version. Publish using **Publish release**, marking the release Latest. A draft does not change the public latest release. The [GitHub CLI documentation](https://cli.github.com/manual/gh_release_create) describes `--draft` and `--verify-tag`.
+Open the draft on GitHub and verify its description, all three assets, and the checksums listed in `SHA256SUMS.txt`. Use the DMG and appcast from that draft to test installation and upgrading from the previous public version. Once verification passes, publish that same draft using **Publish release**, marking the release Latest. A draft does not change the public latest release. The [GitHub CLI documentation](https://cli.github.com/manual/gh_release_create) describes `--draft` and `--verify-tag`.
 
 If the network or build is unavailable, the script exits with an error before creating a release. An asset-upload failure can leave a partial draft: inspect it on GitHub and add the missing files from `dist/releases/vX.Y.Z/`. Running the script again does not overwrite an existing release. Never replace published tags or assets; issue a new version and build for fixes.
 
