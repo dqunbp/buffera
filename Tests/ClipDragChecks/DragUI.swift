@@ -52,10 +52,11 @@ final class DragUIDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHand
             guard let self else { return }; self.panel.receive(self.rows, total: self.rows.count, offset: 0)
         }
         panel.requestThumbnail = { [weak self] id, completion in completion(self?.payloads[id].flatMap(ClipboardService.thumbnail)) }
-        panel.requestDragPayload = { [weak self] id, completion in
+        panel.requestGroupTiles = { [weak self] id, completion in completion(self?.payloads[id].map(GroupTile.previews) ?? []) }
+        panel.requestDragPayload = { [weak self] id, index, completion in
             guard let self else { return }
             DispatchQueue.global().asyncAfter(deadline: .now() + (self.delayPreparation ? 2 : 0)) {
-                let prepared = Result { try ClipDragPayload.prepare(self.payloads[id]!, id: id, exports: self.exports) }
+                let prepared = Result { try ClipDragPayload.prepare(self.payloads[id]!, id: id, exports: self.exports, itemIndex: index) }
                 DispatchQueue.main.async { completion(prepared) }
             }
         }

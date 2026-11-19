@@ -81,6 +81,12 @@ let png = bitmap.representation(using: .png, properties: [:])!
 let tiff = bitmap.tiffRepresentation!
 let images = ClipPayload(items: [[.init(type: NSPasteboard.PasteboardType.png.rawValue, data: png)],
                                 [.init(type: NSPasteboard.PasteboardType.tiff.rawValue, data: tiff)]])
+let telegram = ClipPayload(items: [[rep(.fileURL, file.absoluteString)], images.items[1]])
+let tiles = GroupTile.previews(telegram)
+try check(tiles.count == 2 && tiles[0].title == file.lastPathComponent, "gallery keeps mixed items in source order")
+try check(GroupTile.previews(.init(items: [originals.items[0]])).isEmpty, "several formats of a single item are not a group")
+let chosen = try ClipDragPayload.prepare(telegram, id: 8, exports: exports, itemIndex: 1).pasteboardItems()
+try check(chosen.count == 1 && chosen[0].data(forType: .tiff) == tiff, "one image can be dragged even when a sibling file is gone")
 let imageDrag = try ClipDragPayload.prepare(images, id: 4, exports: exports)
 let imageItems = try imageDrag.pasteboardItems()
 let imageURLs = imageItems.map { URL(string: $0.string(forType: .fileURL)!)! }
@@ -130,8 +136,44 @@ var refreshes = 0
 panel.onDragCompleted = { completions.append($0) }
 panel.onConfirm = { confirmations.append($0) }
 panel.request = { _, _, _ in refreshes += 1 }
-panel.requestDragPayload = { _, _ in }
+panel.requestDragPayload = { _, _, _ in }
 let card = cards.card(at: 0)!
+card.setGroupTiles(tiles)
+panel.window.contentView?.layoutSubtreeIfNeeded()
+func mouse(_ type: NSEvent.EventType, in view: NSView, offset: CGFloat = 0) -> NSEvent {
+    let point = view.convert(NSPoint(x: view.bounds.midX + offset, y: view.bounds.midY), to: nil)
+    return NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
+                              windowNumber: view.window!.windowNumber, context: nil, eventNumber: 0,
+                              clickCount: 1, pressure: 1)!
+}
+let roomyFan = GroupFan(tiles, name: L10n.text("Группа файлов"))
+roomyFan.frame.size = NSSize(width: 320, height: 200)
+roomyFan.layoutSubtreeIfNeeded()
+let countedMark = roomyFan.subviews.first { $0 !== roomyFan.title && $0 !== roomyFan.hint }!
+try check(countedMark.frame.midX == roomyFan.bounds.midX && countedMark.frame.height > 140
+          && roomyFan.title.frame.minY >= roomyFan.hint.frame.maxY && roomyFan.hint.frame.minY >= countedMark.frame.maxY
+          && !roomyFan.hint.isHidden, "large centered fan uses the space below both labels")
+try check(card.gallery == nil && card.fan?.hint.stringValue.isEmpty == false, "group shows fan with instructions before click")
+card.mouseDown(with: mouse(.leftMouseDown, in: card))
+card.mouseUp(with: mouse(.leftMouseUp, in: card))
+try check(card.gallery?.window === panel.window && card.gallery?.isDescendant(of: card) == true, "group click expands tiles inside the same card")
+guard let tileContainer = card.gallery, let gallery = descendants(tileContainer)
+    .first(where: { ($0 as? NSTextField)?.stringValue == tiles[1].title })?.superview else {
+    fatalError("Group click must open tiles")
+}
+let tilePoint = gallery.convert(NSPoint(x: gallery.bounds.midX, y: gallery.bounds.midY), to: card.superview!)
+try check(card.hitTest(tilePoint) === gallery, "expanded card routes drag to the individual tile")
+var selectedItem: Int?
+panel.requestDragPayload = { _, index, _ in selectedItem = index }
+gallery.mouseDown(with: mouse(.leftMouseDown, in: gallery))
+gallery.mouseDragged(with: mouse(.leftMouseDragged, in: gallery, offset: 10))
+try check(selectedItem == 1, "dragging the second gallery tile requests only item 1")
+gallery.mouseUp(with: mouse(.leftMouseUp, in: gallery))
+card.mouseDown(with: mouse(.leftMouseDown, in: card))
+card.mouseUp(with: mouse(.leftMouseUp, in: card))
+try check(card.gallery == nil && card.fan?.isHidden == false, "clicking the group heading restores the fan")
+card.setActionsEnabled(false)
+card.setActionsEnabled(true)
 card.requestDrag? { _ in }
 panel.dismissForOutsideInteraction()
 panel.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: panel.window))

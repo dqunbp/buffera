@@ -751,3 +751,7 @@
 "Пропуск отменён" = "Skip cancelled";
 "Возобновить запись" = "Resume Recording";
 "Отменить пропуск копирования" = "Cancel Skip Next Copy";
+"Перетащите нужный элемент" = "Drag the item you want";
+"Группа файлов" = "File group";
+"Группа элементов" = "Item group";
+"Нажмите для просмотра. Потяните, чтобы перенести всю группу." = "Click to view. Drag to transfer the whole group.";

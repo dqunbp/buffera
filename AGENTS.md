@@ -26,6 +26,7 @@ Buffera is a Swift/AppKit clipboard manager for macOS 14+. `Sources/Buffera/` ow
 
 Verify these contracts in `Sources/Buffera/HistoryPanel.swift`, `Sources/Buffera/HistoryShortcutGesture.swift`, and `Tests/HistoryPanelChecks/main.swift`:
 
+- Ordinary multi-item records center the preview fan and adjacent count in the space below the group label and click/drag instructions. Clicking expands the item grid in the same card; clicking the heading restores the fan. A tile drag prepares only its original item, while dragging the card transfers the whole group. See `Sources/Buffera/GroupGallery.swift` and `Tests/ClipDragChecks/`.
 - Successful and cancelled drags leave history open; only a completed copy drop counts as drag use. Subsequent outside clicks/application switches dismiss an unpinned panel unless a drag, menu, preview, sheet, filter, or introduction currently blocks dismissal.
 - Escape cancels drag preparation or dismisses transient UI without also closing the panel; otherwise it closes unpinned history. Pinning prevents Escape/focus-loss dismissal, but explicit copy confirmation still closes pinned history.
 - Ending a card context menu is not an outside interaction: invalidate queued focus-loss dismissal across menu tracking, preserve history on cancellation, and let the selected action run. Subsequent outside interactions still dismiss unpinned history. See `Tests/HistoryPanelChecks/MenuFocusChecks.swift`.

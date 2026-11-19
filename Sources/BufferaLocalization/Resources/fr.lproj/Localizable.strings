@@ -730,3 +730,7 @@
 "Пропуск отменён" = "Ignorer la copie : annulé";
 "Возобновить запись" = "Reprendre l’enregistrement";
 "Отменить пропуск копирования" = "Annuler l’omission de la prochaine copie";
+"Перетащите нужный элемент" = "Faites glisser l’élément souhaité";
+"Группа файлов" = "Groupe de fichiers";
+"Группа элементов" = "Groupe d’éléments";
+"Нажмите для просмотра. Потяните, чтобы перенести всю группу." = "Cliquez pour voir les éléments. Faites glisser pour transférer le groupe entier.";
