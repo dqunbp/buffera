@@ -76,6 +76,8 @@ For visual website review, `npm run preview` in `landing/` starts a persistent l
 
 Swift tests are executable harnesses, not `swift test`; register regression methods in their runners. Use synthetic data, temporary databases, and named pasteboards. Verify changed UI in every affected locale. Distinguish automated checks, manual observation, and unreproduced reports; passing a synthetic case does not establish reproduction of an intermittent user sequence. Listed commands are not evidence of passing: require successful completion, not just intermediate PASS messages, before reporting a check as successful or proceeding with release.
 
+Buffera has no separate issue tracker. For each feature or fix, record why it was needed in the PR description or, if there is no PR, in the commit body. Describe the original scenario, the problem it caused, and what the change makes possible. A reader should be able to understand the motivation from Git history or the PR without access to the chat.
+
 Use focused imperative commits. PRs should explain behavior, validation, limitations, and include relevant issues/screenshots. Inspect existing changes before staging; exclude local history, models, support archives, and signing material.
 
 ## Application Settings
