@@ -189,6 +189,7 @@ func runShortcutSmokeTest() throws {
     let apply = control("apply", as: NSButton.self)
     let reset = control("reset", as: NSButton.self)
     let status = control("status", as: NSTextField.self)
+    let hint = control("hint", as: NSTextField.self)
     func sendKey(_ code: Int, modifiers: NSEvent.ModifierFlags = [], characters: String = "", repeat isRepeat: Bool = false) {
         let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
                                      windowNumber: window.windowNumber, context: nil, characters: characters,
@@ -225,20 +226,37 @@ func runShortcutSmokeTest() throws {
     previous.performClick(nil)
     _ = window.makeFirstResponder(nil)
     try check(previous.title == changeTitle && previousValue.stringValue == "⌘⌥C", "Focus loss stops capture")
+    try check(hint.stringValue == ShortcutPreferences.defaults.usageHint && !hint.isHidden, "The hint starts with the saved pair")
+    let beforeDraftRegistrations = active
+    capture(next, kVK_ANSI_C)
+    try check(nextValue.stringValue == "⌃C" && previousValue.stringValue == "⌃C",
+              "Changing the shared modifiers can create a conflict with an existing key")
+    try check(status.stringValue == ShortcutPreferenceError.duplicate("⌃C").localizedDescription
+              && status.textColor == .systemRed && !apply.isEnabled && hint.isHidden,
+              "The duplicate is identified immediately and disables Apply")
+    previous.performClick(nil)
+    try check(!status.isHidden && !apply.isEnabled, "The warning stays visible while recording a replacement")
+    sendKey(kVK_ANSI_C, modifiers: .control)
+    apply.performClick(nil)
+    try check(active == beforeDraftRegistrations && ShortcutPreferences.load(from: defaults) == .defaults,
+              "Two Ctrl+C assignments never reach registration or saved preferences")
     next.performClick(nil)
     sendKey(kVK_ANSI_Grave, modifiers: .control, characters: "ё")
     try check(nextValue.stringValue == "⌃`" && previousValue.stringValue == "⌃C" && next.title == changeTitle,
               "Physical keys are recorded independently of characters and share the modifiers")
     capture(previous, kVK_ANSI_0)
+    try check(apply.isEnabled && !hint.isHidden && hint.stringValue == candidate.usageHint
+              && hint.stringValue.contains("⌃`") && hint.stringValue.contains("0"),
+              "A valid draft restores Apply and updates the gesture hint before saving")
     try check(ShortcutPreferences.load(from: defaults) == .defaults, "Recording edits only the draft")
     apply.performClick(nil)
     try check(hotKeys.preferences == candidate && ShortcutPreferences.load(from: defaults) == candidate, "Real Apply saves and registers Control with punctuation and digits")
-    try check(control("hint", as: NSTextField.self).stringValue.contains("⌃`"), "Hint reflects applied shortcut")
+    try check(hint.stringValue == candidate.usageHint, "The updated hint is retained after Apply")
     let encoded = try JSONSerialization.jsonObject(with: defaults.data(forKey: ShortcutPreferences.preferenceKey)!) as? [String: Any]
     try check(encoded?["next"] as? Int == kVK_ANSI_Grave && encoded?["previous"] as? Int == kVK_ANSI_0, "Preferences persist physical key codes")
     capture(previous, kVK_ANSI_Grave)
-    apply.performClick(nil)
-    try check(status.textColor == .systemRed && ShortcutPreferences.load(from: defaults) == candidate, "Duplicate keys do not persist")
+    try check(!apply.isEnabled && status.stringValue == ShortcutPreferenceError.duplicate("⌃`").localizedDescription
+              && ShortcutPreferences.load(from: defaults) == candidate, "Duplicates keep the previously saved pair")
     capture(previous, kVK_ANSI_L)
     failRegistration = true; apply.performClick(nil)
     try check(status.textColor == .systemRed && hotKeys.preferences == candidate && ShortcutPreferences.load(from: defaults) == candidate,
@@ -248,6 +266,12 @@ func runShortcutSmokeTest() throws {
     failRegistration = false; reset.performClick(nil)
     try check(hotKeys.preferences == .defaults && ShortcutPreferences.load(from: defaults) == .defaults, "Reset applies defaults")
     try check(nextValue.stringValue == "⌘⌥V" && previousValue.stringValue == "⌘⌥C", "Reset refreshes the shortcut values")
+    capture(next, kVK_ANSI_S, modifiers: [.command, .option])
+    try check(!apply.isEnabled && status.stringValue == ShortcutPreferenceError.reserved("⌘⌥S").localizedDescription,
+              "Shortcuts reserved by Buffera are flagged before Apply")
+    reset.performClick(nil)
+    try check(apply.isEnabled && !hint.isHidden && hint.stringValue == ShortcutPreferences.defaults.usageHint,
+              "Reset clears invalid draft state and restores the default hint")
     capture(pause, kVK_ANSI_P, modifiers: [.command, .option])
     capture(skip, kVK_ANSI_O, modifiers: [.command, .option])
     apply.performClick(nil)

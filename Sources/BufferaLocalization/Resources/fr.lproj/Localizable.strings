@@ -726,7 +726,7 @@
 "Не назначено" = "Non attribué";
 "Приостановить / возобновить запись" = "Suspendre / reprendre l’enregistrement";
 "Пропустить следующее копирование" = "Ignorer la prochaine copie";
-"Для разных действий нужны разные сочетания." = "Utilisez des raccourcis différents pour chaque action.";
+"Сочетание %1$@ назначено нескольким действиям. Выберите разные сочетания." = "%1$@ est attribué à plusieurs actions. Choisissez des raccourcis différents.";
 "Сочетания сохранены." = "Raccourcis enregistrés.";
 "Запись приостановлена" = "Enregistrement suspendu";
 "Запись возобновлена" = "Enregistrement repris";

@@ -726,7 +726,7 @@
 "Не назначено" = "Nicht zugewiesen";
 "Приостановить / возобновить запись" = "Aufzeichnung pausieren / fortsetzen";
 "Пропустить следующее копирование" = "Nächsten Kopiervorgang überspringen";
-"Для разных действий нужны разные сочетания." = "Verwende unterschiedliche Tastenkürzel für unterschiedliche Aktionen.";
+"Сочетание %1$@ назначено нескольким действиям. Выберите разные сочетания." = "%1$@ ist mehreren Aktionen zugewiesen. Wähle unterschiedliche Tastenkürzel.";
 "Сочетания сохранены." = "Tastenkürzel gespeichert.";
 "Запись приостановлена" = "Aufzeichnung pausiert";
 "Запись возобновлена" = "Aufzeichnung fortgesetzt";

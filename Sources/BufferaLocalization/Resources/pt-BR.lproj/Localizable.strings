@@ -726,7 +726,7 @@
 "Не назначено" = "Não atribuído";
 "Приостановить / возобновить запись" = "Pausar / retomar o registro";
 "Пропустить следующее копирование" = "Ignorar a próxima cópia";
-"Для разных действий нужны разные сочетания." = "Use atalhos diferentes para cada ação.";
+"Сочетание %1$@ назначено нескольким действиям. Выберите разные сочетания." = "%1$@ está atribuído a mais de uma ação. Escolha atalhos diferentes.";
 "Сочетания сохранены." = "Atalhos salvos.";
 "Запись приостановлена" = "Registro pausado";
 "Запись возобновлена" = "Registro retomado";

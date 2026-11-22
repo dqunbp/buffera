@@ -100,7 +100,10 @@ struct ShortcutPreferences: Equatable, Codable {
 
     func validate() throws {
         let assigned = [next, previous] + [pause, skipNext].compactMap { $0 }
-        guard Set(assigned).count == assigned.count else { throw ShortcutPreferenceError.duplicate }
+        var seen = Set<ShortcutKey>()
+        if let repeated = assigned.first(where: { !seen.insert($0).inserted }) {
+            throw ShortcutPreferenceError.duplicate(title(for: repeated))
+        }
         // These exact combinations belong to existing Buffera/menu commands.
         let reserved: Set<Int>
         switch base {
@@ -139,10 +142,10 @@ struct ShortcutPreferences: Equatable, Codable {
 }
 
 enum ShortcutPreferenceError: LocalizedError {
-    case duplicate, reserved(String), unavailable
+    case duplicate(String), reserved(String), unavailable
     var errorDescription: String? {
         switch self {
-        case .duplicate: return L10n.text("Для разных действий нужны разные сочетания.")
+        case .duplicate(let shortcut): return L10n.text("Сочетание \(shortcut) назначено нескольким действиям. Выберите разные сочетания.")
         case .reserved(let shortcut): return L10n.text("\(shortcut) уже используется другой командой Buffera. Выберите другое сочетание.")
         case .unavailable: return L10n.text("Не удалось применить сочетания. Попробуйте открыть настройки снова.")
         }

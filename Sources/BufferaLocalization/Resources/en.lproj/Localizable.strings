@@ -747,7 +747,7 @@
 "Не назначено" = "Not assigned";
 "Приостановить / возобновить запись" = "Pause / resume recording";
 "Пропустить следующее копирование" = "Skip next copy";
-"Для разных действий нужны разные сочетания." = "Use different shortcuts for different actions.";
+"Сочетание %1$@ назначено нескольким действиям. Выберите разные сочетания." = "%1$@ is assigned to more than one action. Choose different shortcuts.";
 "Сочетания сохранены." = "Shortcuts saved.";
 "Запись приостановлена" = "Recording paused";
 "Запись возобновлена" = "Recording resumed";

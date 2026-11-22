@@ -21,6 +21,7 @@ final class ShortcutSettingsView: NSStackView {
     private var draft: ShortcutPreferences
     private var capturing: Command?
     private var rows: [Command: Row] = [:]
+    private let applyButton = NSButton()
     private let status = NSTextField(wrappingLabelWithString: "")
     private let hint = NSTextField(wrappingLabelWithString: "")
 
@@ -85,13 +86,15 @@ final class ShortcutSettingsView: NSStackView {
         grid.yPlacement = .center
         grid.column(at: 1).xPlacement = .trailing
         grid.clipsToBounds = false
-        let apply = NSButton(title: L10n.text("Применить"), target: self, action: #selector(applyDraft))
-        apply.identifier = .init("shortcuts.apply")
-        apply.bezelStyle = .rounded
+        applyButton.title = L10n.text("Применить")
+        applyButton.target = self
+        applyButton.action = #selector(applyDraft)
+        applyButton.identifier = .init("shortcuts.apply")
+        applyButton.bezelStyle = .rounded
         let reset = NSButton(title: L10n.text("Сбросить сочетания"), target: self, action: #selector(reset))
         reset.identifier = .init("shortcuts.reset")
         reset.bezelStyle = .rounded
-        let actions = NSStackView(views: [apply, reset])
+        let actions = NSStackView(views: [applyButton, reset])
         actions.spacing = 10
         let instruction = NSTextField(wrappingLabelWithString: L10n.text("Нажмите «Изменить» или «Назначить» и введите сочетание клавиш."))
         instruction.identifier = .init("shortcuts.instruction")
@@ -115,9 +118,7 @@ final class ShortcutSettingsView: NSStackView {
         applied = value
         draft = value
         capturing = nil
-        updateRows()
-        showStatus("")
-        hint.stringValue = value.usageHint
+        showDraft()
     }
 
     @objc private func beginCapture(_ sender: ShortcutCaptureButton) {
@@ -126,8 +127,7 @@ final class ShortcutSettingsView: NSStackView {
             cancelCapture()
         } else if sender.window?.makeFirstResponder(sender) == true {
             capturing = command
-            updateRows()
-            showStatus("")
+            showDraft()
         }
     }
 
@@ -183,7 +183,18 @@ final class ShortcutSettingsView: NSStackView {
 
     private func showDraft() {
         updateRows()
-        showStatus(draft == applied ? "" : L10n.text("Нажмите «Применить», чтобы сохранить новые сочетания."))
+        do {
+            try draft.validate()
+            applyButton.isEnabled = true
+            hint.stringValue = draft.usageHint
+            hint.isHidden = false
+            let pending = capturing == nil && draft != applied
+            showStatus(pending ? L10n.text("Нажмите «Применить», чтобы сохранить новые сочетания.") : "")
+        } catch {
+            applyButton.isEnabled = false
+            hint.isHidden = true
+            showStatus(error.localizedDescription, error: true)
+        }
     }
 
     private func updateRows() {
