@@ -645,12 +645,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func recordUse(id: Int64) {
         // A capture queued before this restore remains in history, but cannot reclaim selection.
         captureSelectionToken += 1
-        let isOnFirstScreen = panel.isOnFirstHistoryScreen(id: id)
+        let shouldDefer = HistoryPromotionPreferences.shouldDefer(isOnFirstScreen: panel.isOnFirstHistoryScreen(id: id))
         // Queue usage before closing so pruning and the next query see the successful copy.
         work.async {
             do {
-                try self.store.markUsed(id: id, promote: !isOnFirstScreen)
-                self.usePromotion.recordUse(id: id, isOnFirstScreen: isOnFirstScreen)
+                try self.store.markUsed(id: id, promote: !shouldDefer)
+                self.usePromotion.recordUse(id: id, deferred: shouldDefer)
             }
             catch { DispatchQueue.main.async { self.showError(error) } }
         }
@@ -900,6 +900,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         completion(result)
                     }
                 }
+            }
+            controller.onHistoryPromotionChange = { [weak self] enabled in
+                guard !enabled, let self else { return }
+                self.work.async { _ = self.usePromotion.takePending() }
             }
             controller.onAppearanceChange = { [weak self] value in self?.panel?.applyAppearance(value) }
             controller.onShowSetup = { [weak self] in self?.showSetup() }

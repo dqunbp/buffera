@@ -147,7 +147,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Lorsque vous copiez un élément du premier écran de l’historique, il garde sa place et reste sélectionné si vous rouvrez la fenêtre avant la réinitialisation de la fenêtre. À la réinitialisation, le dernier élément utilisé remonte en haut de la liste. Un élément situé plus bas remonte aussitôt. Avec la réinitialisation immédiate, l’ordre est mis à jour dès la fermeture.",
+              "text": "Lorsque vous copiez un élément du premier écran de l’historique, il garde sa place et reste sélectionné si vous rouvrez la fenêtre avant la réinitialisation de la fenêtre. À la réinitialisation, le dernier élément utilisé remonte en haut de la liste. Un élément situé plus bas remonte aussitôt. Avec la réinitialisation immédiate, l’ordre est mis à jour dès la fermeture. Dans Réglages → Historique, décochez « Reporter la remontée des éléments du premier écran » pour faire remonter immédiatement tout élément utilisé. L’option est activée par défaut.",
               "link": {
                 "label": "avant la réinitialisation de la fenêtre",
                 "target": "window-reset"

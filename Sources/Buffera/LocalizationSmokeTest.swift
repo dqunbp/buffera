@@ -210,7 +210,8 @@ func runLocalizationSmokeTest() throws {
     for (section, controls) in [
         ("storage", ["countLimit", "byteLimit", "saveTemporaryClips", "revealData"]),
         ("secrets", ["secretHistoryMode"]),
-        ("reopening", ["historyReset.enabled", "historyReset.immediately", "historyReset.afterDelay", "historyReset.minutes"])
+        ("reopening", ["historyReset.enabled", "historyReset.immediately", "historyReset.afterDelay",
+                       "historyReset.minutes", "historyPromotion.deferFirstScreen"])
     ] {
         guard let group = descendants(content).first(where: { $0.identifier?.rawValue == "settings.history.\(section)" }) else {
             throw HistoryError.database("History settings group missing: \(section)")
@@ -253,7 +254,8 @@ func runLocalizationSmokeTest() throws {
           let resetImmediately = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.immediately" }) as? NSButton,
           let resetAfterDelay = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.afterDelay" }) as? NSButton,
           let resetMinutes = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.minutes" }) as? NSTextField,
-          let resetStepper = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.stepper" }) as? NSStepper else {
+          let resetStepper = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyReset.stepper" }) as? NSStepper,
+          let deferPromotion = descendants(content).first(where: { $0.identifier?.rawValue == "settings.historyPromotion.deferFirstScreen" }) as? NSButton else {
         throw HistoryError.database("History reset controls missing")
     }
     try check(resetEnabled.state == .on && resetMinutes.integerValue == 1 && resetMinutes.isEnabled &&
@@ -261,6 +263,12 @@ func runLocalizationSmokeTest() throws {
               "History reset defaults must be visible in settings")
     try check(resetImmediately.superview === resetAfterDelay.superview && resetImmediately.action == resetAfterDelay.action,
               "Timing choices must form a native radio group for keyboard navigation")
+    try check(deferPromotion.state == .on && deferPromotion.isEnabled &&
+              deferPromotion.title == L10n.text("Откладывать поднятие карточек с первого экрана") &&
+              deferPromotion.fittingSize.width <= (deferPromotion.superview?.bounds.width ?? 0),
+              "Deferred promotion must be enabled by default and its translated label must fit")
+    var promotionChanges: [Bool] = []
+    controller.onHistoryPromotionChange = { promotionChanges.append($0) }
     try snapshot("history-reset-delay", view: resetEnabled.superview)
     resetStepper.integerValue = 7
     _ = resetStepper.sendAction(resetStepper.action, to: resetStepper.target)
@@ -281,6 +289,12 @@ func runLocalizationSmokeTest() throws {
     try check(!HistoryResetPreferences.load(from: defaults).isEnabled && !resetMinutes.isEnabled && !resetStepper.isEnabled &&
               !resetImmediately.isEnabled && !resetAfterDelay.isEnabled,
               "Disabling reset must persist and disable the mode and duration controls")
+    try check(deferPromotion.state == .on && deferPromotion.isEnabled,
+              "Disabling reset must leave the promotion preference available")
+    deferPromotion.performClick(nil)
+    try check(!HistoryPromotionPreferences.isEnabled(in: defaults) && promotionChanges == [false] &&
+              !HistoryResetPreferences.load(from: defaults).isEnabled,
+              "Disabling deferred promotion must persist independently and notify the app")
     let resetReopened = makeSettings()
     let resetRoot = resetReopened.window!.contentView!
     let resetTabs = descendants(resetRoot).compactMap { $0 as? SettingsNavigation }.first!
@@ -292,6 +306,14 @@ func runLocalizationSmokeTest() throws {
     try check(restoredReset?.state == .off && restoredMinutes?.integerValue == 12 && restoredMinutes?.isEnabled == false &&
               restoredImmediate?.state == .on && restoredImmediate?.isEnabled == false,
               "Reopened settings must retain enabled state, timing mode and custom delay")
+    let restoredPromotion = descendants(resetRoot).first {
+        $0.identifier?.rawValue == "settings.historyPromotion.deferFirstScreen"
+    } as? NSButton
+    try check(restoredPromotion?.state == .off && restoredPromotion?.isEnabled == true,
+              "Reopened settings must retain the promotion preference")
+    deferPromotion.performClick(nil)
+    try check(HistoryPromotionPreferences.isEnabled(in: defaults) && promotionChanges == [false, true],
+              "Re-enabling deferred promotion must persist and notify the app")
     resetEnabled.performClick(nil)
     try check(HistoryResetPreferences.load(from: defaults).resetsImmediately && resetImmediately.isEnabled && !resetMinutes.isEnabled,
               "Re-enabling reset must preserve immediate mode")

@@ -147,7 +147,7 @@
             },
             {
               "type": "paragraph",
-              "text": "When you copy a clip on the first screen of history, it stays in place and remains selected if you reopen history before the window resets. The most recently used clip moves to the top on reset. A clip deeper in history moves to the top immediately. If the window resets immediately after closing, the order updates on close.",
+              "text": "When you copy a clip on the first screen of history, it stays in place and remains selected if you reopen history before the window resets. The most recently used clip moves to the top on reset. A clip deeper in history moves to the top immediately. If the window resets immediately after closing, the order updates on close. In Settings → History, turn off “Defer moving first-screen clips to the top” to move every used clip to the top immediately. The option is on by default.",
               "link": {
                 "label": "before the window resets",
                 "target": "window-reset"

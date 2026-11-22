@@ -147,7 +147,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Ao copiar um item da primeira tela do histórico, ele fica no mesmo lugar e continua selecionado se você reabrir o histórico antes da redefinição da janela. Na redefinição, o último item usado sobe para o topo. Um item que está mais abaixo sobe imediatamente. Com a redefinição imediata, a ordem é atualizada ao fechar a janela.",
+              "text": "Ao copiar um item da primeira tela do histórico, ele fica no mesmo lugar e continua selecionado se você reabrir o histórico antes da redefinição da janela. Na redefinição, o último item usado sobe para o topo. Um item que está mais abaixo sobe imediatamente. Com a redefinição imediata, a ordem é atualizada ao fechar a janela. Em Ajustes → Histórico, desative “Adiar a subida dos itens da primeira tela” para mover qualquer item usado para o topo imediatamente. A opção vem ativada por padrão.",
               "link": {
                 "label": "antes da redefinição da janela",
                 "target": "window-reset"

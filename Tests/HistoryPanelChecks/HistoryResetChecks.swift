@@ -13,6 +13,17 @@ func historyResetChecks() {
         else { UserDefaults.standard.removeObject(forKey: "historyAppearance.mode") }
     }
     check(HistoryResetPreferences.load(from: defaults) == HistoryResetPreferences(), "reset defaults to enabled after one minute")
+    check(HistoryPromotionPreferences.shouldDefer(isOnFirstScreen: true, in: defaults)
+          && !HistoryPromotionPreferences.shouldDefer(isOnFirstScreen: false, in: defaults),
+          "default promotion defers first-screen clips and immediately promotes deep clips")
+    HistoryPromotionPreferences.setEnabled(false, in: defaults)
+    check(!HistoryPromotionPreferences.shouldDefer(isOnFirstScreen: true, in: defaults),
+          "turning off deferment immediately promotes first-screen clips too")
+    check(HistoryResetPreferences.load(from: defaults) == HistoryResetPreferences(),
+          "promotion preference does not change reset settings")
+    HistoryPromotionPreferences.setEnabled(true, in: defaults)
+    check(HistoryPromotionPreferences.isEnabled(in: defaults), "deferred promotion can be restored")
+
     for invalid: Any in [true, "5", 1.5] {
         defaults.set(invalid, forKey: "historyReset.minutes")
         check(HistoryResetPreferences.load(from: defaults).minutes == 1, "invalid reset duration falls back to one minute")
@@ -48,11 +59,11 @@ func historyResetChecks() {
     let harness = PanelHarness(rows: clips, resetDefaults: defaults, currentDate: { now })
     defer { harness.finish() }
     var promotion = HistoryUsePromotion()
-    promotion.recordUse(id: clips[1].id, isOnFirstScreen: true)
-    promotion.recordUse(id: clips[190].id, isOnFirstScreen: false)
+    promotion.recordUse(id: clips[1].id, deferred: true)
+    promotion.recordUse(id: clips[190].id, deferred: false)
     check(promotion.takePending() == nil, "immediate promotion supersedes an older pending clip")
-    promotion.recordUse(id: clips[1].id, isOnFirstScreen: true)
-    promotion.recordUse(id: clips[2].id, isOnFirstScreen: true)
+    promotion.recordUse(id: clips[1].id, deferred: true)
+    promotion.recordUse(id: clips[2].id, deferred: true)
     var promoted: [Int64] = []
     var requestCountAtReset: Int?
     harness.panel.onHistoryReset = { [unowned harness] in
@@ -107,7 +118,7 @@ func historyResetChecks() {
     harness.panel.receive(clips, total: clips.count, offset: 0)
     harness.panel.move(5)
     let customID = harness.panel.selected?.id
-    promotion.recordUse(id: clips[3].id, isOnFirstScreen: true)
+    promotion.recordUse(id: clips[3].id, deferred: true)
     harness.panel.close(restoreFocus: false)
     HistoryResetPreferences(isEnabled: false, minutes: 1).save(to: defaults)
     now.addTimeInterval(500)
@@ -165,7 +176,7 @@ private func immediateHistoryResetChecks(defaults: UserDefaults) {
     let immediate = PanelHarness(rows: clips, resetDefaults: defaults)
     defer { immediate.finish() }
     var promotion = HistoryUsePromotion()
-    promotion.recordUse(id: clips[2].id, isOnFirstScreen: true)
+    promotion.recordUse(id: clips[2].id, deferred: true)
     var promotedID: Int64?
     var requestCountAtReset: Int?
     immediate.panel.onHistoryReset = { [unowned immediate] in
