@@ -179,6 +179,11 @@ func runShortcutSmokeTest() throws {
     let previous = control("previous", as: NSButton.self)
     let pause = control("pause", as: NSButton.self)
     let skip = control("skipNext", as: NSButton.self)
+    let nextValue = control("value.next", as: NSTextField.self)
+    let previousValue = control("value.previous", as: NSTextField.self)
+    let pauseValue = control("value.pause", as: NSTextField.self)
+    let skipValue = control("value.skipNext", as: NSTextField.self)
+    let instruction = control("instruction", as: NSTextField.self)
     let clearPause = control("clear.pause", as: NSButton.self)
     let clearSkip = control("clear.skipNext", as: NSButton.self)
     let apply = control("apply", as: NSButton.self)
@@ -195,9 +200,19 @@ func runShortcutSmokeTest() throws {
         sendKey(code, modifiers: modifiers)
     }
     try check(reset.title == L10n.text("Сбросить сочетания"), "Reset action must name the shortcuts it restores")
-    try check(next.title == "⌘⌥V" && previous.title == "⌘⌥C", "Recorders display both configured combinations")
+    let changeTitle = L10n.text("Изменить")
+    let assignTitle = L10n.text("Назначить")
+    let unassignedTitle = L10n.text("Не назначено")
+    try check(next.title == changeTitle && previous.title == changeTitle && pause.title == assignTitle && skip.title == assignTitle,
+              "Recorder buttons name the available actions")
+    try check(nextValue.stringValue == "⌘⌥V" && previousValue.stringValue == "⌘⌥C"
+              && pauseValue.stringValue == unassignedTitle && skipValue.stringValue == unassignedTitle,
+              "The adjacent values show the current bindings")
+    try check(instruction.stringValue.contains(changeTitle) && instruction.stringValue.contains(assignTitle),
+              "The capture instruction names both actions")
     next.performClick(nil)
-    try check(next.title == L10n.text("Нажмите сочетание…"), "Click starts shortcut capture")
+    try check(next.title == L10n.text("Нажмите сочетание…") && nextValue.stringValue == "⌘⌥V",
+              "Recording prompts for keys while keeping the current value visible")
     sendKey(kVK_ANSI_Grave, modifiers: .control, repeat: true)
     try check(next.title == L10n.text("Нажмите сочетание…"), "Held-key repeats do not set the draft")
     sendKey(kVK_ANSI_Grave)
@@ -205,13 +220,15 @@ func runShortcutSmokeTest() throws {
     sendKey(kVK_F1, modifiers: .control)
     try check(status.stringValue == L10n.text("Выберите букву, цифру или клавишу с символом."), "Unsupported key shows an error")
     sendKey(kVK_Escape)
-    try check(next.title == "⌘⌥V" && status.isHidden, "Escape cancels capture and keeps the earlier value")
+    try check(next.title == changeTitle && nextValue.stringValue == "⌘⌥V" && status.isHidden,
+              "Escape cancels capture and keeps the earlier value")
     previous.performClick(nil)
     _ = window.makeFirstResponder(nil)
-    try check(previous.title == "⌘⌥C", "Focus loss stops capture")
+    try check(previous.title == changeTitle && previousValue.stringValue == "⌘⌥C", "Focus loss stops capture")
     next.performClick(nil)
     sendKey(kVK_ANSI_Grave, modifiers: .control, characters: "ё")
-    try check(next.title == "⌃`" && previous.title == "⌃C", "Physical keys are recorded independently of characters and share the modifiers")
+    try check(nextValue.stringValue == "⌃`" && previousValue.stringValue == "⌃C" && next.title == changeTitle,
+              "Physical keys are recorded independently of characters and share the modifiers")
     capture(previous, kVK_ANSI_0)
     try check(ShortcutPreferences.load(from: defaults) == .defaults, "Recording edits only the draft")
     apply.performClick(nil)
@@ -230,7 +247,7 @@ func runShortcutSmokeTest() throws {
     try check(ShortcutPreferences.load(from: defaults) == candidate, "Failed reset preserves preference")
     failRegistration = false; reset.performClick(nil)
     try check(hotKeys.preferences == .defaults && ShortcutPreferences.load(from: defaults) == .defaults, "Reset applies defaults")
-    try check(next.title == "⌘⌥V" && previous.title == "⌘⌥C", "Reset refreshes recorders")
+    try check(nextValue.stringValue == "⌘⌥V" && previousValue.stringValue == "⌘⌥C", "Reset refreshes the shortcut values")
     capture(pause, kVK_ANSI_P, modifiers: [.command, .option])
     capture(skip, kVK_ANSI_O, modifiers: [.command, .option])
     apply.performClick(nil)
@@ -239,14 +256,25 @@ func runShortcutSmokeTest() throws {
     apply.performClick(nil)
     try check(hotKeys.preferences.pause == nil && hotKeys.preferences.skipNext == key(kVK_ANSI_O), "Clearing an optional shortcut leaves the other assigned")
     reset.performClick(nil)
-    try check(!clearPause.isEnabled && !clearSkip.isEnabled, "Reset removes optional recording shortcuts")
+    try check(!clearPause.isEnabled && !clearSkip.isEnabled && pause.title == assignTitle && skip.title == assignTitle,
+              "Reset removes optional recording shortcuts and restores the assign actions")
     let reopened = settingsWindow()
     let reopenedTabs = descendants(reopened.window!.contentView!).compactMap { $0 as? SettingsNavigation }.first!
     reopenedTabs.selectedSegment = 2; _ = reopenedTabs.sendAction(reopenedTabs.action, to: reopenedTabs.target)
-    let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "shortcuts.next" } as? NSButton
-    try check(selected?.title == "⌘⌥V", "Reopened settings reflect saved value")
+    let selected = descendants(reopened.window!.contentView!).first { $0.identifier?.rawValue == "shortcuts.value.next" } as? NSTextField
+    try check(selected?.stringValue == "⌘⌥V", "Reopened settings reflect saved value")
     root.layoutSubtreeIfNeeded()
-    for view in [next, previous, pause, skip, clearPause, clearSkip, apply, reset] {
+    for (button, value) in [(next, nextValue), (previous, previousValue), (pause, pauseValue), (skip, skipValue)] {
+        let bezel = button.alignmentRect(forFrame: button.frame)
+        let ring = bezel.insetBy(dx: -4, dy: -4)
+        let parent = button.superview!
+        try check(parent.bounds.contains(ring), "Focus ring \(ring) fits its container \(parent.bounds)")
+        let buttonCenter = root.convert(bezel, from: parent).midY
+        let valueCenter = root.convert(value.bounds, from: value).midY
+        try check(abs(buttonCenter - valueCenter) <= 2, "The shortcut value and action are vertically aligned")
+    }
+    for view in [instruction, next, previous, pause, skip, nextValue, previousValue, pauseValue, skipValue,
+                 clearPause, clearSkip, apply, reset] as [NSView] {
         let frame = root.convert(view.bounds, from: view)
         try check(frame.width > 0 && frame.height > 0 && root.bounds.contains(frame), "Shortcut controls are visible inside settings")
         if let scroll = view.enclosingScrollView {

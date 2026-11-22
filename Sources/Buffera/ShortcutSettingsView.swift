@@ -9,12 +9,18 @@ final class ShortcutSettingsView: NSStackView {
         var canClear: Bool { self == .pause || self == .skipNext }
     }
 
+    private struct Row {
+        let title: String
+        let value: NSTextField
+        let action: ShortcutCaptureButton
+        let clear: NSButton?
+    }
+
     var onApply: ((ShortcutPreferences) throws -> Void)?
     private var applied: ShortcutPreferences
     private var draft: ShortcutPreferences
     private var capturing: Command?
-    private var buttons: [Command: ShortcutCaptureButton] = [:]
-    private var clearButtons: [Command: NSButton] = [:]
+    private var rows: [Command: Row] = [:]
     private let status = NSTextField(wrappingLabelWithString: "")
     private let hint = NSTextField(wrappingLabelWithString: "")
 
@@ -32,18 +38,32 @@ final class ShortcutSettingsView: NSStackView {
             (.skipNext, L10n.text("Пропустить следующее копирование"))
         ]
         let grid = NSGridView(views: fields.map { command, title in
+            let value = NSTextField(labelWithString: "")
+            value.identifier = .init("shortcuts.value." + command.rawValue)
+            value.alignment = .right
             let button = ShortcutCaptureButton(title: "", target: self, action: #selector(beginCapture(_:)))
             button.identifier = .init("shortcuts." + command.rawValue)
-            button.setAccessibilityLabel(title)
             button.bezelStyle = .rounded
             button.widthAnchor.constraint(equalToConstant: 176).isActive = true
             button.onResignFocus = { [weak self] in
                 guard let self, self.capturing == command else { return }
                 self.cancelCapture()
             }
-            buttons[command] = button
-            let row = NSStackView(views: [button])
-            row.spacing = 6
+            // The native focus ring needs space inside the stack's arranged view.
+            let focusArea = NSView()
+            focusArea.clipsToBounds = false
+            button.translatesAutoresizingMaskIntoConstraints = false
+            focusArea.addSubview(button)
+            NSLayoutConstraint.activate([
+                button.topAnchor.constraint(equalTo: focusArea.topAnchor, constant: 6),
+                button.bottomAnchor.constraint(equalTo: focusArea.bottomAnchor, constant: -6),
+                button.leadingAnchor.constraint(equalTo: focusArea.leadingAnchor, constant: 5),
+                button.trailingAnchor.constraint(equalTo: focusArea.trailingAnchor, constant: -5)
+            ])
+            let actions = NSStackView(views: [focusArea])
+            actions.clipsToBounds = false
+            actions.spacing = 6
+            var clearAction: NSButton?
             if command.canClear {
                 let clearTitle = L10n.text("Снять назначение")
                 let clear = NSButton(image: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil)!,
@@ -53,13 +73,18 @@ final class ShortcutSettingsView: NSStackView {
                 clear.toolTip = clearTitle
                 clear.bezelStyle = .regularSquare
                 clear.isBordered = false
-                clearButtons[command] = clear
-                row.addArrangedSubview(clear)
+                clearAction = clear
+                actions.addArrangedSubview(clear)
             }
-            return [NSTextField(labelWithString: title), row]
+            rows[command] = Row(title: title, value: value, action: button, clear: clearAction)
+            return [NSTextField(labelWithString: title), value, actions]
         })
-        grid.rowSpacing = 8
-        grid.columnSpacing = 18
+        grid.rowSpacing = 2
+        grid.columnSpacing = 14
+        grid.rowAlignment = .none
+        grid.yPlacement = .center
+        grid.column(at: 1).xPlacement = .trailing
+        grid.clipsToBounds = false
         let apply = NSButton(title: L10n.text("Применить"), target: self, action: #selector(applyDraft))
         apply.identifier = .init("shortcuts.apply")
         apply.bezelStyle = .rounded
@@ -68,6 +93,10 @@ final class ShortcutSettingsView: NSStackView {
         reset.bezelStyle = .rounded
         let actions = NSStackView(views: [apply, reset])
         actions.spacing = 10
+        let instruction = NSTextField(wrappingLabelWithString: L10n.text("Нажмите «Изменить» или «Назначить» и введите сочетание клавиш."))
+        instruction.identifier = .init("shortcuts.instruction")
+        instruction.font = .systemFont(ofSize: 12)
+        instruction.textColor = .secondaryLabelColor
         let note = NSTextField(wrappingLabelWithString: L10n.text("Модификаторы общие для всех команд. Сочетания привязаны к физическим клавишам."))
         for field in [note, status, hint] {
             field.font = .systemFont(ofSize: 11)
@@ -75,8 +104,8 @@ final class ShortcutSettingsView: NSStackView {
         }
         status.identifier = .init("shortcuts.status")
         hint.identifier = .init("shortcuts.hint")
-        for view in [grid, actions, note, status, hint] { addArrangedSubview(view) }
-        for view in [note, status, hint] { view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
+        for view in [instruction, grid, actions, note, status, hint] { addArrangedSubview(view) }
+        for view in [instruction, note, status, hint] { view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
         refresh(value)
     }
 
@@ -86,18 +115,18 @@ final class ShortcutSettingsView: NSStackView {
         applied = value
         draft = value
         capturing = nil
-        updateButtons()
+        updateRows()
         showStatus("")
         hint.stringValue = value.usageHint
     }
 
     @objc private func beginCapture(_ sender: ShortcutCaptureButton) {
-        guard let command = buttons.first(where: { $0.value === sender })?.key else { return }
+        guard let command = rows.first(where: { $0.value.action === sender })?.key else { return }
         if capturing == command {
             cancelCapture()
         } else if sender.window?.makeFirstResponder(sender) == true {
             capturing = command
-            updateButtons()
+            updateRows()
             showStatus("")
         }
     }
@@ -119,7 +148,7 @@ final class ShortcutSettingsView: NSStackView {
     }
 
     func capture(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
-        guard let command = capturing, let button = buttons[command],
+        guard let command = capturing, let button = rows[command]?.action,
               !button.isHiddenOrHasHiddenAncestor, button.window?.firstResponder === button else { return false }
         if keyCode == kVK_Escape {
             cancelCapture()
@@ -146,27 +175,32 @@ final class ShortcutSettingsView: NSStackView {
     }
 
     @objc private func clearBinding(_ sender: NSButton) {
-        if sender === clearButtons[.pause] { draft.pause = nil }
-        if sender === clearButtons[.skipNext] { draft.skipNext = nil }
+        if sender === rows[.pause]?.clear { draft.pause = nil }
+        if sender === rows[.skipNext]?.clear { draft.skipNext = nil }
         capturing = nil
         showDraft()
     }
 
     private func showDraft() {
-        updateButtons()
+        updateRows()
         showStatus(draft == applied ? "" : L10n.text("Нажмите «Применить», чтобы сохранить новые сочетания."))
     }
 
-    private func updateButtons() {
+    private func updateRows() {
         let keys: [Command: ShortcutKey] = [
             .next: draft.next, .previous: draft.previous, .pause: draft.pause, .skipNext: draft.skipNext
         ].compactMapValues { $0 }
-        for (command, button) in buttons {
+        for (command, row) in rows {
+            let shortcut = keys[command].map { draft.title(for: $0) }
+            let value = shortcut ?? L10n.text("Не назначено")
+            row.value.stringValue = value
+            row.value.textColor = shortcut == nil ? .secondaryLabelColor : .labelColor
             let title = command == capturing ? L10n.text("Нажмите сочетание…")
-                : keys[command].map { draft.title(for: $0) } ?? L10n.text("Не назначено")
-            button.title = title
-            button.setAccessibilityValue(title)
-            clearButtons[command]?.isEnabled = keys[command] != nil
+                : shortcut == nil ? L10n.text("Назначить") : L10n.text("Изменить")
+            row.action.title = title
+            row.action.setAccessibilityLabel(title + " — " + row.title)
+            row.action.setAccessibilityValue(value)
+            row.clear?.isEnabled = shortcut != nil
         }
     }
 
