@@ -517,15 +517,15 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Shortcuts, click a command’s button and press your shortcut. For example, use Control with the backtick key to open history. Letters, digits, and symbol keys are supported. All commands share the same modifiers. Click Apply; no restart is needed. Reset shortcuts restores ⌘⌥V / ⌘⌥C."
+              "text": "In Shortcuts, click Change or Assign beside a command and press your shortcut. For example, press Control and the backtick key to open history. You can use letters, digits, and symbol keys. All commands share the same modifiers. Click Apply to save without restarting. Reset shortcuts restores ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Shortcuts use physical keys, so they keep working when you switch input languages. If registration fails, the previous pair stays in place."
+              "text": "Shortcuts follow physical keys when you switch input languages. The quick-selection hint updates as soon as you enter a valid pair. If two commands share a shortcut, a warning appears immediately and Apply is disabled. If registration fails, your previous shortcuts stay active."
             },
             {
               "type": "note",
-              "text": "Releasing the keys after opening leaves history open. To cycle quickly, keep holding ⌘⌥, press V or C again, then release the modifiers to copy the selected clip."
+              "text": "Release the keys after opening to leave history open. To cycle quickly, keep holding the modifiers from the moment you open history, press the next or previous key again, and release the modifiers to copy the selected clip."
             }
           ]
         },
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Settings → Shortcuts, click a recording command’s button and press a shortcut with the shared modifiers. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden."
+              "text": "In Settings → Shortcuts, click Assign or Change beside a recording command and press a shortcut with the shared modifiers. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden."
             }
           ]
         }

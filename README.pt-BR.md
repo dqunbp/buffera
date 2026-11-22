@@ -33,7 +33,7 @@ A barra lateral compacta começa com Geral e IA. Escolha o idioma da interface e
 
 Antes de copiar uma senha, escolha “Ignorar a próxima cópia” no menu do Buffera. Essa cópia não será salva no histórico e o registro será retomado automaticamente. Para várias cópias, use “Pausar registro” e, ao terminar, “Retomar registro”.
 
-Em Ajustes → Atalhos, clique no botão de um comando de registro e pressione um atalho com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto.
+Em Ajustes → Atalhos, clique em “Atribuir” ou “Alterar” ao lado de um comando de registro e pressione um atalho com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto.
 
 ## Copie. Encontre. Reutilize.
 

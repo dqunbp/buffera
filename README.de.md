@@ -33,7 +33,7 @@ Die kompakte Seitenleiste beginnt mit Allgemein und KI. Die Oberflächensprache 
 
 Wähle vor dem Kopieren eines Passworts im Buffera-Menü „Nächsten Kopiervorgang überspringen“. Diese Kopie wird nicht im Verlauf gespeichert; danach wird die Aufzeichnung automatisch fortgesetzt. Für mehrere Kopiervorgänge wähle „Aufzeichnung pausieren“ und anschließend „Aufzeichnung fortsetzen“.
 
-Klicke unter Einstellungen → Tastenkürzel auf die Taste neben einem Aufzeichnungsbefehl und drücke ein Tastenkürzel mit den gemeinsamen Sondertasten. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol.
+Klicke unter Einstellungen → Kurzbefehle neben einem Aufzeichnungsbefehl auf „Zuweisen“ oder „Ändern“ und drücke ein Tastenkürzel mit den gemeinsamen Sondertasten. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol.
 
 ## Kopieren. Finden. Wiederverwenden.
 

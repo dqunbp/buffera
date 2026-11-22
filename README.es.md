@@ -33,7 +33,7 @@ La barra lateral compacta comienza con General e IA. El idioma de la interfaz se
 
 Antes de copiar una contraseña, elige «Omitir la próxima copia» en el menú de Buffera. Esa copia no se guardará en el historial y la grabación se reanudará automáticamente. Para varias copias, usa «Pausar grabación» y, al terminar, «Reanudar grabación».
 
-En Ajustes → Atajos, haz clic en el botón de un comando de grabación y pulsa una combinación con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto.
+En Ajustes → Atajos, haz clic en «Asignar» o «Cambiar» junto al comando de grabación y pulsa una combinación con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto.
 
 ## Copia. Encuentra. Reutiliza.
 

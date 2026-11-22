@@ -33,7 +33,7 @@ The compact sidebar starts with General and AI. Choose the interface language in
 
 Before copying a password, choose Skip Next Copy in the Buffera menu. That copy stays out of history, then recording resumes automatically. For several copies, use Pause Recording and choose Resume Recording when you are done.
 
-In Settings → Shortcuts, click a recording command’s button and press a shortcut with the shared modifiers. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden.
+In Settings → Shortcuts, click Assign or Change beside a recording command and press a shortcut with the shared modifiers. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden.
 
 ## Copy. Find. Reuse.
 

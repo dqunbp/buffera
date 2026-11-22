@@ -517,15 +517,15 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Klicke unter „Kurzbefehle“ auf die Taste neben einem Befehl und drücke dein Tastenkürzel. Zum Öffnen des Verlaufs kannst du beispielsweise Ctrl und den Gravis drücken. Buchstaben, Ziffern und Symboltasten sind zulässig. Für alle Befehle gelten dieselben Sondertasten. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Kurzbefehle zurücksetzen“ stellt ⌘⌥V / ⌘⌥C wieder her."
+              "text": "Klicke unter „Kurzbefehle“ neben einem Befehl auf „Ändern“ oder „Zuweisen“ und drücke dein Tastenkürzel. Den Verlauf kannst du etwa mit Ctrl und dem Gravis öffnen. Buchstaben, Ziffern und Symboltasten sind zulässig. Für alle Befehle gelten dieselben Sondertasten. „Anwenden“ speichert ohne Neustart. „Kurzbefehle zurücksetzen“ stellt ⌘⌥V / ⌘⌥C wieder her."
             },
             {
               "type": "paragraph",
-              "text": "Kurzbefehle verwenden physische Tasten und funktionieren daher auch beim Wechsel der Eingabesprache. Schlägt die Registrierung fehl, bleibt das vorherige Paar erhalten."
+              "text": "Die Kurzbefehle sind an physische Tasten gebunden und funktionieren auch nach einem Wechsel der Eingabesprache. Der Hinweis zur Schnellauswahl aktualisiert sich nach der Eingabe eines gültigen Paars. Haben zwei Befehle dasselbe Kürzel, erscheint sofort eine Warnung und „Anwenden“ ist deaktiviert. Schlägt die Registrierung fehl, bleiben die bisherigen Kurzbefehle aktiv."
             },
             {
               "type": "note",
-              "text": "Lässt du die Tasten nach dem Öffnen los, bleibt der Verlauf geöffnet. Zum schnellen Durchschalten hältst du ⌘⌥ gedrückt, drückst erneut V oder C und lässt dann die Sondertasten los, um den ausgewählten Eintrag zu kopieren."
+              "text": "Lasse die Tasten nach dem Öffnen los, damit der Verlauf offen bleibt. Halte zur Schnellauswahl die Sondertasten vom Öffnen an gedrückt, drücke die Taste für den nächsten oder vorherigen Eintrag erneut und lasse die Sondertasten los, um den gewählten Eintrag zu kopieren."
             }
           ]
         },
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Klicke unter Einstellungen → Tastenkürzel auf die Taste neben einem Aufzeichnungsbefehl und drücke ein Tastenkürzel mit den gemeinsamen Sondertasten. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol."
+              "text": "Klicke unter Einstellungen → Kurzbefehle neben einem Aufzeichnungsbefehl auf „Zuweisen“ oder „Ändern“ und drücke ein Tastenkürzel mit den gemeinsamen Sondertasten. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol."
             }
           ]
         }

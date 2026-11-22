@@ -517,15 +517,15 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "En Atajos, haz clic en el botón de un comando y pulsa la combinación. Por ejemplo, usa Control y la tecla del acento grave para abrir el historial. Puedes usar letras, números y teclas de símbolos. Todos los comandos comparten los modificadores. Pulsa Aplicar; no hace falta reiniciar. Restablecer atajos recupera ⌘⌥V / ⌘⌥C."
+              "text": "En Atajos, haz clic en «Cambiar» o «Asignar» junto al comando y pulsa la combinación. Por ejemplo, usa Control y la tecla del acento grave para abrir el historial. Puedes usar letras, números y teclas de símbolos. Todos los comandos comparten los modificadores. Aplicar guarda los cambios sin reiniciar. Restablecer atajos recupera ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Los atajos usan las teclas físicas, por lo que siguen funcionando al cambiar el idioma de entrada. Si el registro falla, se conserva la pareja anterior."
+              "text": "Los atajos siguen las teclas físicas aunque cambies el idioma de entrada. La ayuda para la selección rápida se actualiza al introducir una pareja válida. Si dos comandos comparten un atajo, aparece un aviso de inmediato y se desactiva Aplicar. Si falla el registro, los atajos anteriores siguen activos."
             },
             {
               "type": "note",
-              "text": "Soltar las teclas después de abrir deja el historial abierto. Para recorrerlo rápidamente, mantén ⌘⌥ pulsado, vuelve a pulsar V o C y suelta los modificadores para copiar el elemento seleccionado."
+              "text": "Suelta las teclas justo después de abrir para dejar abierto el historial. Para recorrerlo rápidamente, mantén pulsados los modificadores desde que lo abres, vuelve a pulsar la tecla del elemento siguiente o anterior y suelta los modificadores para copiar el elemento seleccionado."
             }
           ]
         },
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "En Ajustes → Atajos, haz clic en el botón de un comando de grabación y pulsa una combinación con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto."
+              "text": "En Ajustes → Atajos, haz clic en «Asignar» o «Cambiar» junto al comando de grabación y pulsa una combinación con los modificadores compartidos. Por defecto no tienen atajos; los comandos siguen disponibles en el menú. Todas las combinaciones deben ser distintas. Restablecer los atajos recupera ⌘⌥V / ⌘⌥C y elimina los atajos de grabación. Mantener pulsada una tecla no vuelve a cambiar el modo, ni siquiera tras cerrar el historial. Una breve confirmación aparece sin quitar el foco, incluso si el icono de la barra de menús está oculto."
             }
           ]
         }
