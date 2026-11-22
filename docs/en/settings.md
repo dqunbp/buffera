@@ -28,7 +28,7 @@ History offers limits of 10, 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000
 
 The **Reset window state** checkbox enables two modes: **Immediately after closing** and **After the specified number of minutes** (1–1,440). In the first mode, the minute field is disabled; the selected delay is retained when returning to the second mode. Reset after one minute remains enabled by default. The interface explains: “Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).” Reset does not delete saved clips or favorites. Immediate mode resets state before background preparation. In this mode, a first-screen clip you used moves to the top on close and is already first when the window opens again. With delayed reset, quick reopenings preserve its position. An open window does not reset automatically.
 
-**Defer moving first-screen clips to the top** is on by default and works independently of automatic reset. Turn it off to move every used clip to the top immediately. Turning it off cancels any pending promotion.
+**Defer moving first-screen clips to the top** is on by default and works independently of automatic reset. Turn it off to move every used clip to the top immediately. Turning it off cancels any pending promotion. The question-mark button beside the checkbox explains both modes and when a reset affects promotion.
 
 Shortcut reset behavior is described under Recording controls below.
 

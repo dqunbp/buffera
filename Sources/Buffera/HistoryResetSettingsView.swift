@@ -66,7 +66,21 @@ final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
         deferPromotion.identifier = NSUserInterfaceItemIdentifier("settings.historyPromotion.deferFirstScreen")
         deferPromotion.target = self; deferPromotion.action = #selector(togglePromotion)
         deferPromotion.font = .systemFont(ofSize: 12)
-        for child in [enabled, modes, note, deferPromotion] { addArrangedSubview(child) }
+        let promotionTitle = deferPromotion.title
+        let promotionHelp = SettingsHelpButton(id: "settings.historyPromotion.help", title: promotionTitle) {
+            let detail = L10n.text("""
+                При включённой галочке карточки с первого экрана общей истории сохраняют своё место до сброса окна. \
+                При сбросе наверх поднимается последняя использованная карточка, если её поднятие было отложено. \
+                Карточки из глубины поднимаются сразу. Если окно сбрасывается сразу после закрытия, \
+                отложенная карточка поднимется при закрытии.
+
+                При выключенной галочке любая использованная карточка поднимается сразу.
+                """)
+            return SettingsHelpView(id: "historyPromotion.help", title: promotionTitle, detail: detail)
+        }
+        let promotion = NSStackView(views: [deferPromotion, promotionHelp])
+        promotion.orientation = .horizontal; promotion.alignment = .centerY; promotion.spacing = 6
+        for child in [enabled, modes, note, promotion] { addArrangedSubview(child) }
         modes.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         note.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         refresh()

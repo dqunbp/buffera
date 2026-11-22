@@ -639,6 +639,7 @@
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "In an entry’s menu, choose “Copy Differently”, then “As .txt file” or “As .md file”. Buffera creates a file with the full text to paste into Finder or use as an attachment.";
 "Сбрасывать состояние окна" = "Reset window state";
 "Откладывать поднятие карточек с первого экрана" = "Defer moving first-screen clips to the top";
+"При включённой галочке карточки с первого экрана общей истории сохраняют своё место до сброса окна. При сбросе наверх поднимается последняя использованная карточка, если её поднятие было отложено. Карточки из глубины поднимаются сразу. Если окно сбрасывается сразу после закрытия, отложенная карточка поднимется при закрытии.\n\nПри выключенной галочке любая использованная карточка поднимается сразу." = "When this option is on, clips on the first screen of unfiltered history stay in place until the window resets. On reset, the last used clip moves to the top if its move was deferred. Clips farther down move to the top immediately. If the window resets on close, a deferred clip moves to the top on close.\n\nWhen this option is off, every used clip moves to the top immediately.";
 "Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)." = "Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).";
 
 "Пояснение: %1$@" = "Help: %1$@";

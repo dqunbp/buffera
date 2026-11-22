@@ -24,72 +24,22 @@ enum AppearanceHelpTopic: String, CaseIterable {
     }
 }
 
-/// Read-only help anchored to the setting it explains.
-final class AppearanceHelpButton: NSButton {
+final class AppearanceHelpButton: SettingsHelpButton {
     let topic: AppearanceHelpTopic
-    let helpPopover = NSPopover()
 
     init(topic: AppearanceHelpTopic) {
         self.topic = topic
-        super.init(frame: .zero)
-        bezelStyle = .helpButton
-        title = ""
-        identifier = .init("settings.appearanceHelp." + topic.rawValue)
-        toolTip = L10n.text("Пояснение: \(topic.title)")
-        setAccessibilityLabel(toolTip)
-        target = self
-        action = #selector(toggleHelp)
-        helpPopover.behavior = .transient
-        helpPopover.animates = false
-        setContentHuggingPriority(.required, for: .horizontal)
-        setContentCompressionResistancePriority(.required, for: .horizontal)
+        super.init(id: "settings.appearanceHelp." + topic.rawValue, title: topic.title) {
+            AppearanceHelpView(topic: topic)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil { helpPopover.close() }
-    }
-
-    @objc private func toggleHelp() {
-        if helpPopover.isShown { helpPopover.close(); return }
-        guard window?.isVisible == true else { return }
-        let content = AppearanceHelpView(topic: topic)
-        content.onDismiss = { [weak self] in self?.helpPopover.close() }
-        let controller = NSViewController()
-        controller.view = content
-        helpPopover.contentViewController = controller
-        helpPopover.contentSize = content.fittingSize
-        helpPopover.show(relativeTo: bounds, of: self, preferredEdge: .maxX)
-        content.window?.makeKey()
-        content.window?.makeFirstResponder(content)
-    }
 }
 
 /// Schematic examples, independent of the user's history and saved preferences.
-final class AppearanceHelpView: NSView {
-    var onDismiss: (() -> Void)?
-    override var acceptsFirstResponder: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { cancelOperation(nil) }
-        else { super.keyDown(with: event) }
-    }
-
-    override func cancelOperation(_ sender: Any?) { onDismiss?() }
-
+final class AppearanceHelpView: SettingsHelpView {
     init(topic: AppearanceHelpTopic) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 420, height: 260))
-        identifier = .init("appearanceHelp." + topic.rawValue)
-        let title = SetupUI.text(topic.title, size: 15, bold: true)
-        title.identifier = .init("appearanceHelp.title")
-        let detail = SetupUI.text(topic.detail, size: 12)
-        detail.identifier = .init("appearanceHelp.detail")
-        detail.textColor = .secondaryLabelColor
-        title.preferredMaxLayoutWidth = 384
-        detail.preferredMaxLayoutWidth = 384
-
         let examples: [(AppearanceHelpDiagram.Kind, String)]
         switch topic {
         case .placement:
@@ -118,18 +68,7 @@ final class AppearanceHelpView: NSView {
         row.orientation = .horizontal
         row.alignment = .top
         row.spacing = 12
-        let stack = SetupUI.column([title, row, detail], spacing: 14)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 420),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 18),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -18)
-        ])
-        setFrameSize(fittingSize)
-        layoutSubtreeIfNeeded()
+        super.init(id: "appearanceHelp." + topic.rawValue, title: topic.title, detail: topic.detail, examples: row)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

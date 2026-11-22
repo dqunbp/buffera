@@ -211,7 +211,7 @@ func runLocalizationSmokeTest() throws {
         ("storage", ["countLimit", "byteLimit", "saveTemporaryClips", "revealData"]),
         ("secrets", ["secretHistoryMode"]),
         ("reopening", ["historyReset.enabled", "historyReset.immediately", "historyReset.afterDelay",
-                       "historyReset.minutes", "historyPromotion.deferFirstScreen"])
+                       "historyReset.minutes", "historyPromotion.deferFirstScreen", "historyPromotion.help"])
     ] {
         guard let group = descendants(content).first(where: { $0.identifier?.rawValue == "settings.history.\(section)" }) else {
             throw HistoryError.database("History settings group missing: \(section)")
@@ -267,6 +267,70 @@ func runLocalizationSmokeTest() throws {
               deferPromotion.title == L10n.text("Откладывать поднятие карточек с первого экрана") &&
               deferPromotion.fittingSize.width <= (deferPromotion.superview?.bounds.width ?? 0),
               "Deferred promotion must be enabled by default and its translated label must fit")
+    guard let promotionHelp = descendants(content).first(where: {
+        $0.identifier?.rawValue == "settings.historyPromotion.help"
+    }) as? SettingsHelpButton, let promotionRow = promotionHelp.superview else {
+        throw HistoryError.database("History promotion help missing")
+    }
+    try check(promotionHelp.bezelStyle == .helpButton &&
+              promotionHelp.accessibilityLabel() == L10n.text("Пояснение: \(deferPromotion.title)") &&
+              promotionHelp.superview === deferPromotion.superview &&
+              promotionHelp.frame.minX >= deferPromotion.frame.maxX &&
+              promotionRow.bounds.insetBy(dx: -1, dy: -1).contains(promotionHelp.frame),
+              "The accessible help button must fit beside the promotion checkbox")
+    do {
+        let wasVisible = window.isVisible
+        let alpha = window.alphaValue
+        window.alphaValue = 0
+        window.orderFront(nil)
+        let observers = [NSPopover.willShowNotification, NSPopover.didShowNotification].map { name in
+            NotificationCenter.default.addObserver(forName: name, object: promotionHelp.helpPopover, queue: nil) { _ in
+                promotionHelp.helpPopover.contentViewController?.view.window?.alphaValue = 0
+            }
+        }
+        defer {
+            observers.forEach(NotificationCenter.default.removeObserver)
+            promotionHelp.helpPopover.close()
+            if !wasVisible { window.orderOut(nil) }
+            window.alphaValue = alpha
+        }
+        promotionHelp.scrollToVisible(promotionHelp.bounds)
+        content.layoutSubtreeIfNeeded()
+        try check(!promotionHelp.visibleRect.isEmpty, "The history help button must be reachable by scrolling")
+        promotionHelp.performClick(nil)
+        guard let help = promotionHelp.helpPopover.contentViewController?.view,
+              let popup = help.window,
+              let detail = descendants(help).first(where: {
+                  $0.identifier?.rawValue == "settingsHelp.detail"
+              }) as? NSTextField else { throw HistoryError.database("History promotion help did not open") }
+        help.layoutSubtreeIfNeeded()
+        let measured = detail.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: detail.bounds.width, height: 10_000))
+        try check(promotionHelp.helpPopover.isShown && help.identifier?.rawValue == "historyPromotion.help" &&
+                  detail.stringValue.components(separatedBy: "\n\n").count == 2 &&
+                  measured != nil && detail.bounds.height >= measured!.height - 1 &&
+                  help.bounds.insetBy(dx: -1, dy: -1).contains(help.convert(detail.bounds, from: detail)),
+                  "Help must show both modes without clipping")
+        help.wantsLayer = true
+        help.effectiveAppearance.performAsCurrentDrawingAppearance {
+            help.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        }
+        try snapshot("history-promotion-help", view: help)
+        guard let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+              timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: popup.windowNumber,
+              context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)
+        else { throw HistoryError.database("Cannot construct the history help Escape interaction") }
+        popup.makeKey()
+        NSApp.sendEvent(escape)
+        try check(!promotionHelp.helpPopover.isShown && window.isVisible,
+                  "Escape must close history help without closing settings")
+        promotionHelp.performClick(nil)
+        try check(promotionHelp.helpPopover.isShown, "History help must reopen after Escape")
+        controller.selectSection(0)
+        try check(!promotionHelp.helpPopover.isShown, "Leaving history settings must close the help")
+        controller.selectSection(1)
+        try check(deferPromotion.state == .on && HistoryPromotionPreferences.isEnabled(in: defaults),
+                  "Reading help must not change the checkbox")
+    }
     var promotionChanges: [Bool] = []
     controller.onHistoryPromotionChange = { promotionChanges.append($0) }
     try snapshot("history-reset-delay", view: resetEnabled.superview)
