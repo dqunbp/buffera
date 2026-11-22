@@ -28,9 +28,10 @@ Previously downloaded Buffera-owned weights are retained.
 When an external file fails, its card shows “Model file unavailable”, the original path, “Locate file…” and “Use Buffera model”. This renders an error detected by the manager; the original folder is not continuously monitored. The selection window shows supported variants first, then automatically discovered files with their paths, then manual file selection.
 
 Supported exact weight variants are listed in `ExternalModels.supported`:
-the two GGUF files above, Foresight EmbeddingGemma 2 (474,120,192 bytes), and
-Foresight Gemma 4 E4B (3,659,530,240 bytes). Other quantizations, versions, and
-speech models are currently rejected. Filenames may differ: compatibility is
+the two GGUF files above and three Foresight files: EmbeddingGemma 2 (474,120,192 bytes),
+Gemma 4 E4B (3,659,530,240 bytes), and Gemma 4 12B (6,883,278,368 bytes).
+Other quantizations, versions, and speech models are currently rejected.
+Filenames may differ: compatibility is
 verified against the full SHA-256, not a name or extension.
 
 Discovery reads `~/.ai-edge/models/.manifest.json` (schema 1). This is Google's
