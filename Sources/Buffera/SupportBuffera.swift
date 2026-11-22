@@ -4,13 +4,14 @@ import BufferaLocalization
 /// Settings and menu actions share external-link handling and browser failure UI.
 final class SupportBuffera: NSObject {
     enum Destination {
-        case donation, githubStar, reportIssue
+        case donation, githubStar, reportIssue, documentation
 
         var url: URL {
             switch self {
             case .donation: URL(string: "https://web.tribute.tg/d/SHI")!
             case .githubStar: URL(string: "https://github.com/dqunbp/buffera")!
             case .reportIssue: IssueReport.url()
+            case .documentation: URL(string: "https://buffera.app/\(L10n.language)/docs/")!
             }
         }
 
@@ -19,6 +20,7 @@ final class SupportBuffera: NSObject {
             case .donation: L10n.text("Поддержать Buffera 💜")
             case .githubStar: "☆ " + L10n.text("Поставить звезду на GitHub")
             case .reportIssue: L10n.text("Сообщить о проблеме…")
+            case .documentation: L10n.text("Документация") + " ↗"
             }
         }
 
@@ -27,6 +29,7 @@ final class SupportBuffera: NSObject {
             case .donation: L10n.text("Поддержать разработку через Tribute — откроется в браузере")
             case .githubStar: L10n.text("Нравится Buffera? Поставьте звезду на GitHub — откроется в браузере")
             case .reportIssue: L10n.text("Открыть черновик GitHub Issue в браузере")
+            case .documentation: L10n.text("Открыть документацию Buffera в браузере")
             }
         }
 
@@ -35,6 +38,7 @@ final class SupportBuffera: NSObject {
             case .donation: "settings.support"
             case .githubStar: "settings.githubStar"
             case .reportIssue: "settings.reportIssue"
+            case .documentation: "settings.documentation"
             }
         }
     }
@@ -42,6 +46,7 @@ final class SupportBuffera: NSObject {
     static let shared = SupportBuffera(destination: .donation)
     static let reportIssue = SupportBuffera(destination: .reportIssue)
     static let githubStar = SupportBuffera(destination: .githubStar)
+    static let documentation = SupportBuffera(destination: .documentation)
     let destination: Destination
     private let openURL: (URL) -> Bool
     private let presentAlert: (NSAlert) -> Void

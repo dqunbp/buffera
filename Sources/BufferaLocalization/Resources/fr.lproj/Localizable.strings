@@ -730,3 +730,5 @@
 "Пропуск отменён" = "Ignorer la copie : annulé";
 "Возобновить запись" = "Reprendre l’enregistrement";
 "Отменить пропуск копирования" = "Annuler l’omission de la prochaine copie";
+"Документация" = "Documentation";
+"Открыть документацию Buffera в браузере" = "Ouvrir la documentation de Buffera dans le navigateur";

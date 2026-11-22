@@ -77,6 +77,23 @@ func runGeneralSettingsChecks() throws {
               body.contains("macOS:") && body.contains("Architecture:") && !body.contains(NSHomeDirectory()),
               "Issue draft must include only allowlisted diagnostics at the intended destination")
     try check(button("settings.reportIssue").target === SupportBuffera.reportIssue, "Issue action disconnected")
+    let documentation = button("settings.documentation")
+    try check(documentation.target === SupportBuffera.documentation &&
+              documentation.action == #selector(SupportBuffera.openPage(_:)),
+              "Documentation action disconnected")
+    try check(documentation.title == L10n.text("Документация") + " ↗" &&
+              documentation.toolTip == L10n.text("Открыть документацию Buffera в браузере"),
+              "Documentation action must use localized text")
+    var openedDocumentation: [URL] = []
+    let documentationAction = SupportBuffera(destination: .documentation, openURL: {
+        openedDocumentation.append($0)
+        return true
+    })
+    documentation.target = documentationAction
+    documentation.performClick(nil)
+    documentation.target = SupportBuffera.documentation
+    try check(openedDocumentation.map(\.absoluteString) == ["https://buffera.app/\(L10n.language)/docs/"],
+              "Documentation must open the matching language on the Buffera website")
     for appearance in [NSAppearance.Name.aqua, .darkAqua] {
         root.appearance = NSAppearance(named: appearance)
         root.layoutSubtreeIfNeeded()
