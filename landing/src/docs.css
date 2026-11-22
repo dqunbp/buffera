@@ -66,6 +66,8 @@
 .docs-prose h2 a>span { color:var(--purple); opacity:0; margin-left:10px; font-size:20px; }
 .docs-prose h2 a:hover>span,.docs-prose h2 a:focus-visible>span { opacity:1; }
 .docs-prose p { line-height:1.85; margin-top:16px; overflow-wrap:anywhere; }
+.docs-prose p[id] { scroll-margin-top:30px; }
+.docs-prose p a { color:var(--docs-accent); text-decoration:underline; }
 .docs-prose ul { padding-left:22px; }
 .docs-prose li { padding-left:5px; margin:12px 0; }
 .docs-steps { list-style:none; counter-reset:steps; padding:0; margin:24px 0; }

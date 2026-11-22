@@ -142,11 +142,16 @@
             },
             {
               "type": "paragraph",
+              "id": "window-reset",
               "text": "Em Ajustes → Histórico, «Redefinir o estado da janela» permite escolher a redefinição imediatamente após fechar ou após um intervalo de 1–1440 minutos. O padrão é um minuto: reabrir antes do fim do intervalo preserva a consulta, os filtros, a visualização de Favoritos e o item selecionado. Após a redefinição, a próxima abertura mostra todo o histórico sem busca nem filtros, com o primeiro item selecionado. Você pode desativar a redefinição. Uma janela aberta nunca é redefinida; os itens salvos e os favoritos não são apagados."
             },
             {
               "type": "paragraph",
-              "text": "Ao copiar um item da primeira tela do histórico, ele fica no mesmo lugar e continua selecionado se você reabrir o histórico antes da redefinição. Na redefinição, o último item usado sobe para o topo. Um item que está mais abaixo sobe imediatamente. Com a redefinição imediata, a ordem é atualizada ao fechar a janela."
+              "text": "Ao copiar um item da primeira tela do histórico, ele fica no mesmo lugar e continua selecionado se você reabrir o histórico antes da redefinição da janela. Na redefinição, o último item usado sobe para o topo. Um item que está mais abaixo sobe imediatamente. Com a redefinição imediata, a ordem é atualizada ao fechar a janela.",
+              "link": {
+                "label": "antes da redefinição da janela",
+                "target": "window-reset"
+              }
             },
             {
               "type": "paragraph",

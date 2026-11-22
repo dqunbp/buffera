@@ -142,11 +142,16 @@
             },
             {
               "type": "paragraph",
+              "id": "window-reset",
               "text": "In Settings → History, Reset window state lets you choose an immediate reset after closing or a delay of 1–1440 minutes. The default is one minute: reopening before the delay expires preserves the query, filters, Favorites view and selected clip. After a reset, the next opening shows all history without search or filters, with the first clip selected. You can turn resetting off. An open window is never reset; saved clips and favorites are not deleted."
             },
             {
               "type": "paragraph",
-              "text": "When you copy a clip on the first screen of history, it stays in place and remains selected if you reopen history before the reset. The most recently used clip moves to the top on reset. A clip deeper in history moves to the top immediately. If the window resets immediately after closing, the order updates on close."
+              "text": "When you copy a clip on the first screen of history, it stays in place and remains selected if you reopen history before the window resets. The most recently used clip moves to the top on reset. A clip deeper in history moves to the top immediately. If the window resets immediately after closing, the order updates on close.",
+              "link": {
+                "label": "before the window resets",
+                "target": "window-reset"
+              }
             },
             {
               "type": "paragraph",
