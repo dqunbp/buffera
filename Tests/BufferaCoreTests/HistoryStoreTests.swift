@@ -88,7 +88,7 @@ final class HistoryStoreTests {
             _ = try store.imageText(id: empty)
             throw CheckFailure(description: "Expected missing image text record")
         } catch HistoryError.missing { }
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 10)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 11)
     }
 
     func testDuplicateMovesToTopWithoutNewRecord() throws {
@@ -185,6 +185,39 @@ final class HistoryStoreTests {
         let latest = try insert("latest", time: 4, maxBytes: 1000)
         try checkEqual(try store.search(SearchFilter()).map(\.id), [latest, reused])
         try checkThrows(try store.payload(id: unused))
+    }
+
+    func testDeferredUsePreservesPositionAndSurvivesPruning() throws {
+        var initial: [Int64] = []
+        for index in 1...10 { initial.append(try insert("clip \(index)", time: Double(index))) }
+        let reused = initial[4]
+        try store.markUsed(id: reused, date: Date(timeIntervalSince1970: 11), promote: false)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), Array(initial.reversed()))
+        store = nil
+        store = try makeTestHistoryStore(url: directory.appendingPathComponent("history.sqlite"))
+        for index in 12...16 { _ = try insert("clip \(index)", time: Double(index), maxCount: 10) }
+        try checkEqual(try store.count(), 10)
+        try checkEqual(try store.payload(id: reused), payload("clip 5"))
+        try checkEqual(try store.search(SearchFilter()).last?.id, reused)
+        try store.promoteUsedClip(id: reused, date: Date(timeIntervalSince1970: 17))
+        try checkEqual(try store.search(SearchFilter()).first?.id, reused)
+        try checkEqual(try store.summary(id: reused).date, Date(timeIntervalSince1970: 5))
+    }
+
+    func testVersionTenBackfillsRetentionFromUsageOrder() throws {
+        let old = try insert("reused before migration", time: 1)
+        let newer = try insert("newer but unused", time: 2)
+        try store.markUsed(id: old, date: Date(timeIntervalSince1970: 3))
+        let url = directory.appendingPathComponent("history.sqlite")
+        store = nil
+        try withRawDatabase(at: url) { db in
+            try checkEqual(sqlite3_exec(db, "ALTER TABLE clips DROP COLUMN retention_date; PRAGMA user_version=10", nil, nil, nil), SQLITE_OK)
+        }
+        store = try makeTestHistoryStore(url: url)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [old, newer])
+        let latest = try insert("after migration", time: 4, maxCount: 2)
+        try checkEqual(try store.search(SearchFilter()).map(\.id), [latest, old])
     }
 
     func testRepeatCaptureAfterUseUpdatesRecencyAndSource() throws {
@@ -416,11 +449,11 @@ final class HistoryStoreTests {
         try checkEqual(records.map(\.title), (1...8).reversed().map { "legacy \($0)" })
         try check(records.allSatisfy { !$0.isConcealed && !$0.isFavorite && !$0.isRemote })
         for index in 1...8 { try checkEqual(try store.payload(id: Int64(index)), payload("legacy \(index)")) }
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         store = nil; store = try makeTestHistoryStore(url: url)
         try checkEqual(try store.count(), 8)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
     }
 
     func testVersionTwoMigrationPreservesConcealmentAndPayloads() throws {
@@ -452,7 +485,7 @@ final class HistoryStoreTests {
         try checkEqual(record.source, "Old App"); try checkEqual(record.byteCount, encoded.count + 28)
         try check(record.isConcealed && !record.isFavorite && !record.isRemote)
         try checkEqual(try store.payload(id: 42), original)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress())
         try store.setFavorite(id: 42, isFavorite: true)
         store = nil; store = try makeTestHistoryStore(url: url)
@@ -463,7 +496,7 @@ final class HistoryStoreTests {
     func testFavoriteSurvivesRepeatSetReopenDeduplicationAndConcealment() throws {
         let id = try insert("favorite-fixture", time: 100)
         try check(!store.search(SearchFilter())[0].isFavorite)
-        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 10)
+        try checkEqual(try rawSchemaVersion(at: directory.appendingPathComponent("history.sqlite")), 11)
         try store.setFavorite(id: id, isFavorite: true)
         try store.setFavorite(id: id, isFavorite: true)
         try checkEqual(try store.search(SearchFilter())[0].date, Date(timeIntervalSince1970: 100))
@@ -595,10 +628,10 @@ final class HistoryStoreTests {
     func testNewerSchemaIsNotDowngraded() throws {
         let url = directory.appendingPathComponent("future.sqlite")
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=10", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=12", nil, nil, nil), SQLITE_OK)
         }
         try checkThrows(try makeTestHistoryStore(url: url))
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 12)
     }
 
     func testVersionThreeMigrationBackfillsOnlyVisibleImagesWithoutChangingHistory() throws {
@@ -631,7 +664,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         try checkEqual(try store.count(), 4)
         let records = try store.search(SearchFilter())
         for entry in entries {
@@ -717,7 +750,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         let records = try store.search(SearchFilter())
         try checkEqual(records.count, entries.count)
         for entry in entries {
@@ -737,7 +770,7 @@ final class HistoryStoreTests {
         filter.query = ""
         try checkEqual(try store.count(filter), 0)
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         try checkEqual(try store.imageTextProgress(), ImageTextProgress(pending: 1, complete: 1, failed: 1))
         try withRawDatabase(at: url) { db in
             try checkEqual(sqlite3_exec(db, "UPDATE clips SET is_remote=2 WHERE id=21", nil, nil, nil), SQLITE_CONSTRAINT)
@@ -787,7 +820,7 @@ final class HistoryStoreTests {
             }
         }
         store = nil; store = try makeTestHistoryStore(url: url)
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         let records = try store.search(SearchFilter())
         try checkEqual(records.map(\.id), [34, 33, 31, 32])
         for entry in entries {
@@ -1108,7 +1141,7 @@ final class HistoryStoreTests {
 
         let url = directory.appendingPathComponent("history.sqlite")
         let id = try insert("read-only version fixture")
-        for version in [0, 5, 6, 7, 8, 9, 11] {
+        for version in [0, 5, 6, 7, 8, 9, 10, 12] {
             try withRawDatabase(at: url) { db in
                 try checkEqual(sqlite3_exec(db, "PRAGMA user_version=\(version)", nil, nil, nil), SQLITE_OK)
             }
@@ -1117,7 +1150,7 @@ final class HistoryStoreTests {
             try checkEqual(try store.payload(id: id), payload("read-only version fixture"))
         }
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=10", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "PRAGMA user_version=11", nil, nil, nil), SQLITE_OK)
         }
         let reader = try makeTestHistoryStore(url: url, mode: .readOnly)
         try checkEqual(try reader.summary(id: id).text, "read-only version fixture")
@@ -1305,7 +1338,7 @@ final class HistoryStoreTests {
         let url = directory.appendingPathComponent("history.sqlite")
         store = nil
         try withRawDatabase(at: url) { db in
-            try checkEqual(sqlite3_exec(db, "ALTER TABLE clips DROP COLUMN label; PRAGMA user_version=9", nil, nil, nil), SQLITE_OK)
+            try checkEqual(sqlite3_exec(db, "ALTER TABLE clips DROP COLUMN label; ALTER TABLE clips DROP COLUMN retention_date; PRAGMA user_version=9", nil, nil, nil), SQLITE_OK)
         }
         try checkThrows(try makeTestHistoryStore(url: url, mode: .readOnly))
         store = try makeTestHistoryStore(url: url)
@@ -1314,7 +1347,7 @@ final class HistoryStoreTests {
         try check(clip.isFavorite)
         try checkEqual(clip.date, Date(timeIntervalSince1970: 10))
         try checkEqual(try store.payload(id: id), payload("migration payload"))
-        try checkEqual(try rawSchemaVersion(at: url), 10)
+        try checkEqual(try rawSchemaVersion(at: url), 11)
         try store.setLabel(id: id, label: "Migrated")
         store = nil; store = try makeTestHistoryStore(url: url)
         try checkEqual(try store.summary(id: id).label, "Migrated")

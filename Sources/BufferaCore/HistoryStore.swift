@@ -9,7 +9,7 @@ public final class HistoryStore {
 
     var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    private static let schemaVersion = 10
+    private static let schemaVersion = 11
     let secretCipher: SecretPayloadCipher?
     static let summaryColumns = "id,date,kind,title,text,source,bytes,is_concealed,is_favorite,is_remote,label"
     // Storage/search sentinel: presentation translates it through ClipSummary.displayTitle.
@@ -157,6 +157,13 @@ public final class HistoryStore {
                 PRAGMA user_version=10;
                 """)
             }
+            if version < 11 {
+                try execute("""
+                ALTER TABLE clips ADD COLUMN retention_date REAL NOT NULL DEFAULT 0;
+                UPDATE clips SET retention_date=sort_date;
+                PRAGMA user_version=11;
+                """)
+            }
             try execute("COMMIT")
         } catch { try? execute("ROLLBACK"); throw error }
     }
@@ -202,8 +209,9 @@ public final class HistoryStore {
             let concealedSearch = Self.concealedSearch(source: source)
             let storedSearch = effectiveConcealed ? concealedSearch : SearchFilter.normalize(title + " " + text + " " + source)
             let statement = try prepare("""
-                INSERT INTO clips(fingerprint,date,sort_date,kind,title,text,source,search,bytes,is_concealed,is_remote) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO clips(fingerprint,date,sort_date,retention_date,kind,title,text,source,search,bytes,is_concealed,is_remote) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(fingerprint) DO UPDATE SET date=excluded.date, sort_date=excluded.sort_date,
+                    retention_date=excluded.retention_date,
                     source=excluded.source, is_remote=excluded.is_remote, bytes=excluded.bytes,
                     is_concealed=MAX(clips.is_concealed,excluded.is_concealed),
                     title=CASE WHEN clips.is_concealed OR excluded.is_concealed THEN ? ELSE clips.title END,
@@ -212,7 +220,8 @@ public final class HistoryStore {
                 RETURNING id
                 """)
             defer { sqlite3_finalize(statement) }
-            try bind([.text(fingerprint), .number(date.timeIntervalSince1970), .number(date.timeIntervalSince1970), .text(kind.rawValue),
+            let timestamp = Value.number(date.timeIntervalSince1970)
+            try bind([.text(fingerprint), timestamp, timestamp, timestamp, .text(kind.rawValue),
                       .text(storedTitle), .text(storedText), .text(source), .text(storedSearch),
                       .integer(Int64(storedData.count)), .integer(effectiveConcealed ? 1 : 0), .integer(isRemote ? 1 : 0),
                       .text(Self.concealedTitle), .text(concealedSearch)], to: statement)
@@ -395,9 +404,18 @@ public final class HistoryStore {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
     }
 
-    /// Call after a successful copy or drop. Usage changes ordering, never the capture date or metadata.
-    public func markUsed(id: Int64, date: Date = Date()) throws {
-        let statement = try prepare("UPDATE clips SET sort_date=? WHERE id=? RETURNING id")
+    /// Record successful use for pruning, optionally reflecting it immediately in the display order.
+    public func markUsed(id: Int64, date: Date = Date(), promote: Bool = true) throws {
+        try updateUsage(id: id, date: date,
+                        columns: promote ? "retention_date=?1,sort_date=?1" : "retention_date=?1")
+    }
+
+    public func promoteUsedClip(id: Int64, date: Date = Date()) throws {
+        try updateUsage(id: id, date: date, columns: "sort_date=?1")
+    }
+
+    private func updateUsage(id: Int64, date: Date, columns: String) throws {
+        let statement = try prepare("UPDATE clips SET \(columns) WHERE id=?2 RETURNING id")
         defer { sqlite3_finalize(statement) }
         try bind([.number(date.timeIntervalSince1970), .integer(id)], to: statement)
         let status = sqlite3_step(statement)
@@ -575,8 +593,8 @@ public final class HistoryStore {
         let statement = try prepare("""
             DELETE FROM clips WHERE id IN (
                 SELECT id FROM (
-                    SELECT id, ROW_NUMBER() OVER (ORDER BY sort_date DESC,id DESC) AS position,
-                    SUM(bytes) OVER (ORDER BY sort_date DESC,id DESC) AS total FROM clips WHERE is_favorite=0
+                    SELECT id, ROW_NUMBER() OVER (ORDER BY retention_date DESC,id DESC) AS position,
+                    SUM(bytes) OVER (ORDER BY retention_date DESC,id DESC) AS total FROM clips WHERE is_favorite=0
                 ) WHERE position > ? OR total > ?
             )
             """)

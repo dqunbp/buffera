@@ -146,6 +146,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Lorsque vous copiez un élément du premier écran de l’historique, il garde sa place et reste sélectionné si vous rouvrez la fenêtre avant la réinitialisation. À la réinitialisation, le dernier élément utilisé remonte en haut de la liste. Un élément situé plus bas remonte aussitôt. Avec la réinitialisation immédiate, l’ordre est mis à jour dès la fermeture."
+            },
+            {
+              "type": "paragraph",
               "text": "Les miniatures sont stockées dans ~/Library/Caches/Buffera/Thumbnails (jusqu’à 64 Mo et 512 fichiers). L’ouverture de l’historique utilise le cache ou les données d’image enregistrées sans lire les fichiers d’origine. Un fichier sans miniature en cache affiche une icône. Un aperçu demandé avec Espace ou ⌘Y peut lire l’original et demander l’accès au dossier, puis mettre sa miniature en cache. Les éléments masqués ne sont pas mis en cache ; masquer ou supprimer un élément retire sa miniature."
             }
           ]

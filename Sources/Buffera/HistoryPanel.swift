@@ -102,6 +102,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var lastSelectedID: Int64?
     private var confirming = false
     private var rows: [ClipSummary] = []
+    var unfilteredHistoryPrefix: [ClipSummary] = []
     private var total = 0
     private var loading = false
     // Retained cards are a visual snapshot until the replacement query completes.
@@ -132,6 +133,23 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var onCopyTransformed: ((Int64, CopyTransformOperation, String, @escaping (Error?) -> Void) -> Void)?
     var onCancelCopyTransformed: (() -> Void)?
     var onClose: (() -> Void)?
+    var onHistoryReset: (() -> Void)?
+    var isShowingUnfilteredHistory: Bool {
+        !isShowingNearby && search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !filters.hasActiveFilters && scope.selectedSegment == 0
+    }
+
+    func isOnFirstHistoryScreen(id: Int64) -> Bool {
+        if isShowingUnfilteredHistory, !awaitingSearchResult,
+           let index = rows.firstIndex(where: { $0.id == id }) {
+            return cards.isOnFirstScreen(at: index)
+        }
+        guard let index = unfilteredHistoryPrefix.firstIndex(where: { $0.id == id }) else { return false }
+        return cards.isOnFirstScreen(at: index, count: unfilteredHistoryPrefix.count) { index, width, maximumHeight in
+            ClipCardView.preferredHeight(for: self.unfilteredHistoryPrefix[index], revealedText: nil,
+                                         width: width, maximumHeight: maximumHeight)
+        }
+    }
     var onShortcutGestureEnd: (() -> Void)?
     var onShowSettings: (() -> Void)?
     var onShowFeatures: (() -> Void)?
@@ -516,12 +534,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         requestNearby?(anchorID, nearbyToken)
     }
 
-    func receiveNearby(_ result: [ClipSummary], anchorID: Int64, token: Int) {
+    func receiveNearby(_ result: [ClipSummary], anchorID: Int64, token: Int, historyPrefix: [ClipSummary]? = nil) {
         guard isAvailableForShortcut, token == nearbyToken, nearbyState?.anchorID == anchorID else { return }
         guard let anchor = result.first(where: { $0.id == anchorID }) else {
             nearbyFailed(HistoryError.missing, token: token); return
         }
         nearbyState?.anchorDate = anchor.date
+        if let historyPrefix { unfilteredHistoryPrefix = historyPrefix }
         rows = result; total = result.count; loading = false; awaitingSearchResult = false
         let base = result.firstIndex(where: { $0.id == pendingSelectionID })
             ?? result.firstIndex(where: { $0.id == anchorID }) ?? 0
@@ -677,6 +696,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
 
     func concealFinished(id: Int64) {
         dismissPreview()
+        unfilteredHistoryPrefix.removeAll { $0.id == id }
         pendingVisibility.remove(id)
         nearbyState?.needsReload = true
         thumbnails.removeObject(forKey: NSNumber(value: id))
@@ -1028,6 +1048,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func resetNavigationState() {
+        onHistoryReset?()
         restoreSearchFromNearby(reloadIfNeeded: false, render: false)
         search.stringValue = ""; filters.reset(); scope.selectedSegment = 0
         retainedSelectionID = nil; pendingSelectionID = nil; recentCaptureID = nil

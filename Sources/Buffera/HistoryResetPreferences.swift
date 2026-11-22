@@ -43,3 +43,17 @@ struct HistoryResetPreferences: Equatable {
         defaults.set(timing.rawValue, forKey: "historyReset.timing")
     }
 }
+
+/// The latest successful use supersedes any promotion waiting for a reset.
+struct HistoryUsePromotion {
+    private var pendingID: Int64?
+
+    mutating func recordUse(id: Int64, isOnFirstScreen: Bool) {
+        pendingID = isOnFirstScreen ? id : nil
+    }
+
+    mutating func takePending() -> Int64? {
+        defer { pendingID = nil }
+        return pendingID
+    }
+}

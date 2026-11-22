@@ -146,6 +146,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Ao copiar um item da primeira tela do histórico, ele fica no mesmo lugar e continua selecionado se você reabrir o histórico antes da redefinição. Na redefinição, o último item usado sobe para o topo. Um item que está mais abaixo sobe imediatamente. Com a redefinição imediata, a ordem é atualizada ao fechar a janela."
+            },
+            {
+              "type": "paragraph",
               "text": "As miniaturas são armazenadas em ~/Library/Caches/Buffera/Thumbnails (até 64 MB e 512 arquivos). Abrir o histórico usa o cache ou os dados salvos da imagem, sem ler os arquivos originais. Um arquivo sem miniatura em cache mostra um ícone. Uma prévia explícita com Espaço ou ⌘Y pode ler o original e solicitar acesso à pasta, depois armazenar sua miniatura em cache. Itens ocultos não entram nesse cache; ocultar ou apagar um item remove sua miniatura."
             }
           ]

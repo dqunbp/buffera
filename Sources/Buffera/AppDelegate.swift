@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var store: HistoryStore!
     private let secretKeys = KeychainSecretKeyProvider()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
+    // Accessed on work alongside capture and history ordering writes.
+    private var usePromotion = HistoryUsePromotion()
     private let thumbnailCache = ThumbnailCache()
     private let clipboard = ClipboardService()
     private let clipboardSession = ClipboardSessionMonitor()
@@ -261,10 +263,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         panel.requestNearby = { [weak self] anchorID, token in
             guard let self else { return }
             self.work.async {
-                let result = Result { try self.store.nearby(anchorID: anchorID) }
+                let result = Result {
+                    try (self.store.nearby(anchorID: anchorID), self.store.search(SearchFilter()))
+                }
                 DispatchQueue.main.async {
                     switch result {
-                    case .success(let rows): self.panel.receiveNearby(rows, anchorID: anchorID, token: token)
+                    case .success(let (rows, prefix)):
+                        self.panel.receiveNearby(rows, anchorID: anchorID, token: token, historyPrefix: prefix)
                     case .failure(let error): self.panel.nearbyFailed(error, token: token)
                     }
                 }
@@ -281,6 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard let self else { return }
             let isIndexRefresh = self.panel.isRefreshingSearchIndex
             let refreshSources = offset == 0 && !isIndexRefresh
+            let isUnfiltered = self.panel.isShowingUnfilteredHistory
             if offset == 0 {
                 self.searchGeneration += 1
                 // OCR refreshes the same view: its existing thumbnail/action requests remain valid.
@@ -301,13 +307,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         try await Task.sleep(nanoseconds: delay)
                     }
                     // The store queue drains prior capture/usage writes before searching its database.
-                    let sources: [String]? = refreshSources
-                        ? try await self.historySources() : nil
+                    let context = refreshSources
+                        ? try await self.historyContext(includePrefix: !isUnfiltered) : nil
                     let response = try await self.searchService.search(databaseURL: databaseURL,
                         filter: filter, mode: mode, limit: limit, offset: offset)
                     try Task.checkCancellation()
                     guard searchGeneration == self.searchGeneration, self.panel.acceptsHistoryResults else { return }
-                    if let sources { self.panel.setSources(sources) }
+                    if let context {
+                        self.panel.setSources(context.sources)
+                        self.panel.unfilteredHistoryPrefix = context.prefix ?? response.rows
+                    }
                     self.panel.updateSearchMode(response.mode, reason: response.fallbackReason)
                     self.panel.receive(response.rows, total: response.total, offset: offset)
                 } catch is CancellationError {
@@ -510,6 +519,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         panel.onShortcutGestureEnd = { [weak self] in self?.hotKeys.resetNavigationPressedKeys() }
+        panel.onHistoryReset = { [weak self] in self?.promoteAtHistoryReset() }
         panel.onClose = { [weak self] in
             self?.generation += 1
             self?.searchGeneration += 1
@@ -527,9 +537,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    private func historySources() async throws -> [String] {
+    private func historyContext(includePrefix: Bool) async throws -> (sources: [String], prefix: [ClipSummary]?) {
         try await withCheckedThrowingContinuation { continuation in
-            work.async { continuation.resume(with: Result { try self.store.sources() }) }
+            work.async {
+                continuation.resume(with: Result {
+                    try (self.store.sources(), includePrefix ? self.store.search(SearchFilter()) : nil)
+                })
+            }
         }
     }
 
@@ -631,14 +645,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func recordUse(id: Int64) {
         // A capture queued before this restore remains in history, but cannot reclaim selection.
         captureSelectionToken += 1
-        // Queue usage before closing so an immediate reopen observes the successful copy.
+        let isOnFirstScreen = panel.isOnFirstHistoryScreen(id: id)
+        // Queue usage before closing so pruning and the next query see the successful copy.
         work.async {
             do {
-                try self.store.markUsed(id: id)
-                DispatchQueue.main.async {
-                    if !self.panel.isPresenting { self.panel.refresh(preservingSelection: true, retainingCards: true) }
-                }
+                try self.store.markUsed(id: id, promote: !isOnFirstScreen)
+                self.usePromotion.recordUse(id: id, isOnFirstScreen: isOnFirstScreen)
             }
+            catch { DispatchQueue.main.async { self.showError(error) } }
+        }
+    }
+
+    private func promoteAtHistoryReset() {
+        // Reset queues this before requesting unfiltered results on the same queue.
+        work.async {
+            guard let id = self.usePromotion.takePending() else { return }
+            do { try self.store.promoteUsedClip(id: id) }
+            catch HistoryError.missing { return }
             catch { DispatchQueue.main.async { self.showError(error) } }
         }
     }

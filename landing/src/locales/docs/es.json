@@ -146,6 +146,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Cuando copias un elemento de la primera pantalla del historial, se queda en su sitio y sigue seleccionado si vuelves a abrir la ventana antes del restablecimiento. Al restablecer la ventana, el último elemento utilizado sube al principio. Un elemento situado más abajo sube de inmediato. Con el restablecimiento inmediato, el orden se actualiza al cerrar la ventana."
+            },
+            {
+              "type": "paragraph",
               "text": "Las miniaturas se guardan en ~/Library/Caches/Buffera/Thumbnails (hasta 64 MB y 512 archivos). Al abrir el historial se usan la caché o los datos de imagen guardados, sin leer los archivos originales. Un archivo sin miniatura en caché muestra un icono. Una vista previa explícita con Espacio o ⌘Y puede leer el original y solicitar acceso a la carpeta, y después guardar su miniatura en caché. Los elementos ocultos no se almacenan en esta caché; al ocultar o eliminar un elemento, se elimina su miniatura."
             }
           ]

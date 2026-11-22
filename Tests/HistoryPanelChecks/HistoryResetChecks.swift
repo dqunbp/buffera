@@ -47,6 +47,18 @@ func historyResetChecks() {
     let clips = (1...320).map(fixture)
     let harness = PanelHarness(rows: clips, resetDefaults: defaults, currentDate: { now })
     defer { harness.finish() }
+    var promotion = HistoryUsePromotion()
+    promotion.recordUse(id: clips[1].id, isOnFirstScreen: true)
+    promotion.recordUse(id: clips[190].id, isOnFirstScreen: false)
+    check(promotion.takePending() == nil, "immediate promotion supersedes an older pending clip")
+    promotion.recordUse(id: clips[1].id, isOnFirstScreen: true)
+    promotion.recordUse(id: clips[2].id, isOnFirstScreen: true)
+    var promoted: [Int64] = []
+    var requestCountAtReset: Int?
+    harness.panel.onHistoryReset = { [unowned harness] in
+        requestCountAtReset = harness.requests.count
+        if let id = promotion.takePending() { promoted.append(id) }
+    }
     let views = descendants(of: harness.panel.window.contentView!)
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
@@ -68,6 +80,7 @@ func historyResetChecks() {
           "reopening before the deadline retains search, filters, favorites and deep pagination")
     harness.panel.receive(clips, total: clips.count, offset: 0)
     check(harness.panel.selected?.id == selectedID, "reopening before the deadline retains the selected record")
+    check(promoted.isEmpty, "reopening before the deadline leaves the promotion pending")
     now.addTimeInterval(1000)
     harness.panel.open()
     check(harness.requests.last?.query == "fixture", "an open window does not expire after its earlier close")
@@ -78,6 +91,8 @@ func historyResetChecks() {
     let requestsBefore = harness.requests.count
     harness.panel.open(fromShortcut: true)
     let reset = harness.requests.last!
+    check(promoted == [clips[2].id] && requestCountAtReset == requestsBefore,
+          "delayed reset promotes the latest pending clip before requesting the default list")
     check(harness.requests.count == requestsBefore + 1 && reset.query.isEmpty && !reset.filter.favoritesOnly
           && reset.filter.kind == nil && reset.filter.source == nil && reset.filter.from == nil
           && reset.filter.until == nil && reset.limit == 150,
@@ -92,6 +107,7 @@ func historyResetChecks() {
     harness.panel.receive(clips, total: clips.count, offset: 0)
     harness.panel.move(5)
     let customID = harness.panel.selected?.id
+    promotion.recordUse(id: clips[3].id, isOnFirstScreen: true)
     harness.panel.close(restoreFocus: false)
     HistoryResetPreferences(isEnabled: false, minutes: 1).save(to: defaults)
     now.addTimeInterval(500)
@@ -99,6 +115,18 @@ func historyResetChecks() {
     harness.panel.receive(clips, total: clips.count, offset: 0)
     check(harness.search.stringValue == "keep me" && harness.panel.selected?.id == customID,
           "disabling reset while hidden preserves state beyond the old deadline")
+    check(promoted == [clips[2].id], "disabled automatic reset keeps promotion pending")
+    let resetButton = views.compactMap { $0 as? NSButton }.first {
+        $0.toolTip == L10n.text("Вся история · ⌘0")
+    }!
+    let requestsBeforeManualReset = harness.requests.count
+    resetButton.performClick(nil)
+    check(promoted == [clips[2].id, clips[3].id] && requestCountAtReset == requestsBeforeManualReset,
+          "manual reset promotes before requesting history even with automatic reset disabled")
+    harness.panel.receive(clips, total: clips.count, offset: 0)
+    harness.search.stringValue = "custom delay"
+    harness.panel.refresh()
+    harness.panel.receive(clips, total: clips.count, offset: 0)
     HistoryResetPreferences(minutes: 3).save(to: defaults)
     harness.panel.close(restoreFocus: false)
     now.addTimeInterval(179)
@@ -136,6 +164,14 @@ private func immediateHistoryResetChecks(defaults: UserDefaults) {
     HistoryResetPreferences(minutes: 12, timing: .immediately).save(to: defaults)
     let immediate = PanelHarness(rows: clips, resetDefaults: defaults)
     defer { immediate.finish() }
+    var promotion = HistoryUsePromotion()
+    promotion.recordUse(id: clips[2].id, isOnFirstScreen: true)
+    var promotedID: Int64?
+    var requestCountAtReset: Int?
+    immediate.panel.onHistoryReset = { [unowned immediate] in
+        requestCountAtReset = immediate.requests.count
+        promotedID = promotion.takePending()
+    }
     let views = descendants(of: immediate.panel.window.contentView!)
     let filters = views.compactMap { $0 as? HistoryFilters }.first!
     let scope = views.compactMap { $0 as? NSSegmentedControl }.first!
@@ -153,7 +189,10 @@ private func immediateHistoryResetChecks(defaults: UserDefaults) {
     immediate.panel.receive(clips, total: clips.count, offset: 0)
     check(immediate.panel.selected?.id == selectedID, "opening an already visible window retains its selection")
 
+    let requestsBeforeClose = immediate.requests.count
     immediate.panel.close(restoreFocus: false)
+    check(promotedID == clips[2].id && requestCountAtReset == requestsBeforeClose,
+          "immediate reset promotes the pending clip before preparing hidden history")
     let request = immediate.requests.last!
     check(request.query.isEmpty && !request.filter.favoritesOnly && request.filter.kind == nil
           && request.filter.source == nil && request.limit == 150 && scope.selectedSegment == 0

@@ -146,6 +146,10 @@
             },
             {
               "type": "paragraph",
+              "text": "Wenn du einen Eintrag auf der ersten Bildschirmseite des Verlaufs kopierst, bleibt er an seinem Platz. Wenn du den Verlauf vor dem Zurücksetzen erneut öffnest, bleibt der Eintrag ausgewählt. Beim Zurücksetzen rückt der zuletzt verwendete Eintrag nach oben. Ein weiter unten liegender Eintrag rückt sofort nach oben. Beim sofortigen Zurücksetzen ändert sich die Reihenfolge schon beim Schließen."
+            },
+            {
+              "type": "paragraph",
               "text": "Vorschaubilder werden unter ~/Library/Caches/Buffera/Thumbnails gespeichert (bis zu 64 MB und 512 Dateien). Beim Öffnen des Verlaufs werden der Cache oder gespeicherte Bilddaten verwendet, keine Originaldateien gelesen. Dateien ohne zwischengespeichertes Vorschaubild zeigen ein Symbol. Eine ausdrücklich mit Leertaste oder ⌘Y geöffnete Vorschau kann das Original lesen, Ordnerzugriff anfordern und das Vorschaubild speichern. Verborgene Einträge werden nicht zwischengespeichert; Verbergen oder Löschen entfernt ihr Vorschaubild."
             }
           ]

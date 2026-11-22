@@ -146,6 +146,10 @@
             },
             {
               "type": "paragraph",
+              "text": "When you copy a clip on the first screen of history, it stays in place and remains selected if you reopen history before the reset. The most recently used clip moves to the top on reset. A clip deeper in history moves to the top immediately. If the window resets immediately after closing, the order updates on close."
+            },
+            {
+              "type": "paragraph",
               "text": "Thumbnails are stored in ~/Library/Caches/Buffera/Thumbnails (up to 64 MB and 512 files). Opening history uses the cache or saved image bytes and does not read original files. A file without a cached thumbnail shows an icon. An explicit preview with Space or ⌘Y may read the original and request folder access, then cache its thumbnail. Concealed clips are not cached; hiding or deleting a clip removes its thumbnail."
             }
           ]
