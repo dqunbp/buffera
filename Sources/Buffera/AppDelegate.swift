@@ -208,6 +208,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         clipboard.discardPendingChanges()
         clipboard.start()
         panel.applyShortcuts(hotKeys.preferences)
+        hotKeys.onCapture = { [weak self] keyCode, modifiers in
+            self?.settings?.captureRegisteredShortcut(keyCode: keyCode, modifiers: modifiers) ?? false
+        }
         hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
             if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat, fromGlobalShortcut: true) }
@@ -935,7 +938,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func updateRecordingMenu() {
         guard pauseItem != nil, skipNextItem != nil else { return }
         let preferences = hotKeys.preferences
-        func suffix(_ letter: String?) -> String { letter.map { "    " + preferences.base.title + $0 } ?? "" }
+        func suffix(_ key: ShortcutKey?) -> String { key.map { "    " + preferences.title(for: $0) } ?? "" }
         pauseItem.title = (clipboard.paused ? L10n.text("Возобновить запись") : L10n.text("Приостановить запись")) + suffix(preferences.pause)
         pauseItem.state = clipboard.paused ? .on : .off
         skipNextItem.title = (clipboard.skipsNextCopy ? L10n.text("Отменить пропуск копирования") : L10n.text("Пропустить следующее копирование")) + suffix(preferences.skipNext)

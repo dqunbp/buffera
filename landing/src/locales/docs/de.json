@@ -517,11 +517,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Wähle unter „Kurzbefehle“ gemeinsame Sondertasten und zwei unterschiedliche Buchstaben: einen zum Öffnen / Vorwärtsgehen und einen zum Zurückgehen. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Kurzbefehle zurücksetzen“ stellt ⌘⌥V / ⌘⌥C wieder her."
+              "text": "Klicke unter „Kurzbefehle“ auf die Taste neben einem Befehl und drücke dein Tastenkürzel. Zum Öffnen des Verlaufs kannst du beispielsweise Ctrl und den Gravis drücken. Buchstaben, Ziffern und Symboltasten sind zulässig. Für alle Befehle gelten dieselben Sondertasten. Klicke auf „Anwenden“; ein Neustart ist nicht nötig. „Kurzbefehle zurücksetzen“ stellt ⌘⌥V / ⌘⌥C wieder her."
             },
             {
               "type": "paragraph",
-              "text": "Kurzbefehle verwenden physische Tasten der lateinischen Belegung und funktionieren daher auch beim Wechsel der Eingabesprache. Schlägt die Registrierung fehl, bleibt das vorherige Paar erhalten."
+              "text": "Kurzbefehle verwenden physische Tasten und funktionieren daher auch beim Wechsel der Eingabesprache. Schlägt die Registrierung fehl, bleibt das vorherige Paar erhalten."
             },
             {
               "type": "note",
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Unter Einstellungen → Tastenkürzel kannst du „Aufzeichnung pausieren / fortsetzen“ und „Nächsten Kopiervorgang überspringen“ jeweils eine Taste A–Z mit den gemeinsamen Modifikatortasten zuweisen. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol."
+              "text": "Klicke unter Einstellungen → Tastenkürzel auf die Taste neben einem Aufzeichnungsbefehl und drücke ein Tastenkürzel mit den gemeinsamen Sondertasten. Standardmäßig sind beide nicht zugewiesen; die Menübefehle bleiben verfügbar. Alle Kombinationen müssen unterschiedlich sein. Das Zurücksetzen stellt ⌘⌥V / ⌘⌥C wieder her und entfernt die Aufzeichnungskürzel. Gedrückthalten schaltet den Modus nicht erneut um, auch nicht nach dem Schließen des Verlaufs. Eine kurze Bestätigung übernimmt keinen Fokus und erscheint auch bei ausgeblendetem Menüleistensymbol."
             }
           ]
         }

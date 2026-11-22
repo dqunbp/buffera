@@ -517,11 +517,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Atalhos, escolha teclas modificadoras compartilhadas e duas letras diferentes: uma para abrir ou avançar e outra para voltar. Clique em Aplicar; não é necessário reiniciar. Redefinir atalhos recupera ⌘⌥V / ⌘⌥C."
+              "text": "Em Atalhos, clique no botão ao lado de um comando e pressione a combinação desejada. Por exemplo, pressione Control e a tecla do acento grave para abrir o histórico. Você pode usar letras, números e teclas de símbolos. Os modificadores são compartilhados por todos os comandos. Clique em Aplicar; não é necessário reiniciar. Redefinir atalhos recupera ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Os atalhos usam teclas físicas do layout latino, então continuam funcionando quando você muda o idioma de entrada. Se o registro falhar, o par anterior é mantido."
+              "text": "Os atalhos usam teclas físicas, então continuam funcionando quando você muda o idioma de entrada. Se o registro falhar, o par anterior é mantido."
             },
             {
               "type": "note",
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Ajustes → Atalhos, atribua uma letra A–Z a “Pausar / retomar o registro” e outra a “Ignorar a próxima cópia”, com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto."
+              "text": "Em Ajustes → Atalhos, clique no botão de um comando de registro e pressione um atalho com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto."
             }
           ]
         }

@@ -33,7 +33,7 @@ La barre latérale compacte commence par Général et IA. La langue de l’inter
 
 Avant de copier un mot de passe, choisissez « Ignorer la prochaine copie » dans le menu Buffera. Cette copie ne sera pas enregistrée dans l’historique, puis l’enregistrement reprendra automatiquement. Pour plusieurs copies, choisissez « Suspendre l’enregistrement », puis « Reprendre l’enregistrement » une fois terminé.
 
-Dans Réglages → Raccourcis, attribuez une lettre A–Z à « Suspendre / reprendre l’enregistrement » et une autre à « Ignorer la prochaine copie », avec les touches de modification communes. Aucun raccourci n’est attribué par défaut ; les commandes restent accessibles dans le menu. Toutes les combinaisons doivent être différentes. Réinitialiser les raccourcis rétablit ⌘⌥V / ⌘⌥C et supprime les raccourcis d’enregistrement. Maintenir une touche n’active pas de nouveau la commande, même après la fermeture de l’historique. Une brève confirmation apparaît sans prendre le focus, même si l’icône de la barre des menus est masquée.
+Dans Réglages → Raccourcis, cliquez sur le bouton d’une commande d’enregistrement et appuyez sur un raccourci avec les modificateurs communs. Aucun raccourci n’est attribué par défaut ; les commandes restent accessibles dans le menu. Toutes les combinaisons doivent être différentes. Réinitialiser les raccourcis rétablit ⌘⌥V / ⌘⌥C et supprime les raccourcis d’enregistrement. Maintenir une touche n’active pas de nouveau la commande, même après la fermeture de l’historique. Une brève confirmation apparaît sans prendre le focus, même si l’icône de la barre des menus est masquée.
 
 ## Copiez. Retrouvez. Réutilisez.
 

@@ -517,11 +517,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Shortcuts, choose shared modifier keys and two different letters: one for opening / moving forward and one for moving backward. Click Apply; no restart is needed. Reset shortcuts restores ⌘⌥V / ⌘⌥C."
+              "text": "In Shortcuts, click a command’s button and press your shortcut. For example, use Control with the backtick key to open history. Letters, digits, and symbol keys are supported. All commands share the same modifiers. Click Apply; no restart is needed. Reset shortcuts restores ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Shortcuts use physical Latin-layout keys, so they keep working when you switch input languages. If registration fails, the previous pair stays in place."
+              "text": "Shortcuts use physical keys, so they keep working when you switch input languages. If registration fails, the previous pair stays in place."
             },
             {
               "type": "note",
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "In Settings → Shortcuts, assign a separate A–Z key to Pause / resume recording and Skip next copy using the shared modifier base. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden."
+              "text": "In Settings → Shortcuts, click a recording command’s button and press a shortcut with the shared modifiers. Both are unassigned by default; the menu commands remain available. All assigned combinations must differ. Reset shortcuts restores ⌘⌥V / ⌘⌥C and removes the recording bindings. Holding a key does not toggle again, including after closing history. Brief feedback does not take focus and appears even when the menu bar icon is hidden."
             }
           ]
         }
