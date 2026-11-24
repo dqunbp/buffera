@@ -69,12 +69,10 @@ final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
         let promotionTitle = deferPromotion.title
         let promotionHelp = SettingsHelpButton(id: "settings.historyPromotion.help", title: promotionTitle) {
             let detail = L10n.text("""
-                При включённой галочке карточки с первого экрана общей истории сохраняют своё место до сброса окна. \
-                При сбросе наверх поднимается последняя использованная карточка, если её поднятие было отложено. \
-                Карточки из глубины поднимаются сразу. Если окно сбрасывается сразу после закрытия, \
-                отложенная карточка поднимется при закрытии.
+                Выключено. Выбранная карточка становится первой после копирования.
 
-                При выключенной галочке любая использованная карточка поднимается сразу.
+                Включено. Карточки вверху списка остаются на своих местах, когда вы быстро открываете историю снова. \
+                Карточка из глубины сразу становится первой.
                 """)
             return SettingsHelpView(id: "historyPromotion.help", title: promotionTitle, detail: detail)
         }
