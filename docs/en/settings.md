@@ -1,5 +1,7 @@
 # Application settings
 
+In Settings → General, enable “Paste the selected item on Enter” to send ⌘V to the previous app after focus returns. When prompted, grant Buffera access under Accessibility. If paste still doesn’t work, click “Restart Buffera”. By default, Enter only copies the item.
+
 The **Documentation ↗** link at the bottom of Settings opens the Buffera user guide in your browser. The guide opens in the app's interface language.
 
 Settings use a compact sidebar with navigation aligned at the top: General, AI, Appearance, History, Shortcuts, MCP, and Updates. Icons and labels have inset spacing. Appearance and history options are grouped into cards; AI brings together semantic search and the assistant. Existing actions and model checks are retained.

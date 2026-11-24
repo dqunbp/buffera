@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera fügt nicht automatisch ein. Falls macOS nach dem Zugriff auf die Zwischenablage fragt, erlaube ihn, damit Buffera deinen Verlauf speichern kann."
+              "text": "In Einstellungen → Allgemein kannst du das Einfügen mit Enter aktivieren. Erlaube Buffera dazu den Zugriff unter Bedienungshilfen in macOS. Falls macOS nach dem Zugriff auf die Zwischenablage fragt, erlaube ihn, damit Buffera deinen Verlauf speichern kann. Wenn der Zugriff erlaubt ist und das Einfügen weiterhin fehlschlägt, starte Buffera neu."
             }
           ]
         },

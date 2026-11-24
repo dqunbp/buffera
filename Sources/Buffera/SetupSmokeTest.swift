@@ -228,7 +228,7 @@ func runSetupSmokeTest() throws {
     panel.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: searchField))
     panel.receive([sample], total: 1, offset: 0)
     var copies = 0, nearbyRequests = 0
-    panel.onConfirm = { _ in copies += 1 }
+    panel.onConfirm = { _, _ in copies += 1 }
     panel.requestNearby = { id, token in
         nearbyRequests += 1
         panel.receiveNearby([sample], anchorID: id, token: token)

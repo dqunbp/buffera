@@ -30,11 +30,14 @@ func runGeneralSettingsChecks() throws {
     var changes: [Bool] = []
     var failure = false
     var approvals = 0
+    var pasteRequests = 0
+    var pasteAllowed = false
+    var pasteRestarts = 0
     let preferences = AppPreferences(defaults: defaults, loginStatus: { state }, setLoginEnabled: { enabled in
         requests.append(enabled)
         if failure { throw HistoryError.database("fixture login failure") }
         state = enabled ? .enabled : .notRegistered
-    }, openLoginSettings: { approvals += 1 })
+    }, canPostPaste: { pasteAllowed }, requestPasteAccess: { pasteRequests += 1 }, openLoginSettings: { approvals += 1 })
     preferences.onMenuBarChange = { changes.append($0) }
     let window = SettingsWindow(appPreferences: preferences, languageDefaults: defaults, limitsDefaults: defaults,
                                 themeDefaults: defaults, shortcutDefaults: defaults, frameAutosaveName: nil)
@@ -42,9 +45,28 @@ func runGeneralSettingsChecks() throws {
     func button(_ id: String) -> NSButton { descendants(root).first { $0.identifier?.rawValue == id } as! NSButton }
     let login = button("settings.launchAtLogin")
     let menu = button("settings.menuBarIcon")
+    let paste = button("settings.pasteOnEnter")
+    try check(paste.state == .off && !preferences.pasteOnEnter, "Paste on Enter must be opt-in")
+    let access = descendants(root).first { $0.identifier?.rawValue == "settings.pasteAccessHelp" }!
+    let restart = button("settings.pasteRestart")
+    window.onRestart = { pasteRestarts += 1 }
+    try check(access.isHidden && restart.isHidden, "Disabled paste must hide permission controls")
+    paste.performClick(nil)
+    try check(pasteRequests == 1 && !access.isHidden && !restart.isHidden, "Enabling paste requests missing access and offers recovery")
     let approval = button("settings.loginApproval")
     let status = descendants(root).first { $0.identifier?.rawValue == "settings.loginStatus" } as! NSTextField
     let general = descendants(root).compactMap { $0 as? GeneralSettingsView }.first!
+    pasteAllowed = true
+    NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+    try check(access.isHidden && !restart.isHidden, "Returning from macOS must refresh access and preserve restart")
+    restart.performClick(nil)
+    try check(pasteRestarts == 1 && pasteRequests == 1, "Recovery must use the app restart action")
+    pasteAllowed = false
+    general.refresh()
+    try check(paste.state == .on && AppPreferences(defaults: defaults).pasteOnEnter, "Paste preference must persist")
+    paste.performClick(nil)
+    try check(pasteRequests == 1 && restart.isHidden && access.isHidden, "Disabling paste must never request access")
+    try check(!preferences.pasteOnEnter && paste.state == .off, "Disabling paste must restore copy-only behavior")
     try check(requests.isEmpty && changes.isEmpty && menu.state == .on && login.state == .off,
               "Opening settings must not register login or change menu visibility")
     login.performClick(nil)

@@ -2,12 +2,14 @@ import AppKit
 import ServiceManagement
 import Carbon
 
-/// The system owns login registration; only menu visibility is an app preference.
+/// The system owns login registration.
 final class AppPreferences {
     static let menuBarKey = "showMenuBarIcon"
     let defaults: UserDefaults
     let loginStatus: () -> SMAppService.Status
     let setLoginEnabled: (Bool) throws -> Void
+    let canPostPaste: () -> Bool
+    let requestPasteAccess: () -> Void
     let openLoginSettings: () -> Void
     var onMenuBarChange: ((Bool) -> Void)?
 
@@ -17,11 +19,20 @@ final class AppPreferences {
              if enabled { try SMAppService.mainApp.register() }
              else { try SMAppService.mainApp.unregister() }
          },
+         canPostPaste: @escaping () -> Bool = CGPreflightPostEventAccess,
+         requestPasteAccess: @escaping () -> Void = { _ = CGRequestPostEventAccess() },
          openLoginSettings: @escaping () -> Void = { SMAppService.openSystemSettingsLoginItems() }) {
+        self.canPostPaste = canPostPaste
+        self.requestPasteAccess = requestPasteAccess
         self.defaults = defaults
         self.loginStatus = loginStatus
         self.setLoginEnabled = setLoginEnabled
         self.openLoginSettings = openLoginSettings
+    }
+
+    var pasteOnEnter: Bool {
+        get { defaults.bool(forKey: "pasteOnEnter") }
+        set { defaults.set(newValue, forKey: "pasteOnEnter") }
     }
 
     var showsMenuBarIcon: Bool {

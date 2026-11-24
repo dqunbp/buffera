@@ -358,7 +358,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         panel.onDragCompleted = { [weak self] id in self?.recordUse(id: id) }
-        panel.onConfirm = { [weak self] id in
+        panel.onConfirm = { [weak self] id, confirmation in
             guard let self else { return }
             self.confirmationToken += 1
             let token = self.confirmationToken
@@ -374,9 +374,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         self.logger.notice("Confirm cancelled"); return
                     }
                     do {
-                        try self.restoreClipboard(result.get(), id: id)
+                        let version = try self.restoreClipboard(result.get(), id: id)
                         self.logger.notice("Confirm completed")
-                        self.panel.closeAfterConfirmation()
+                        if case let .enter(target?) = confirmation, self.appPreferences.pasteOnEnter {
+                            self.panel.closeAfterConfirmation(paste: PasteOnEnter(target: target, clipboardVersion: version))
+                        } else {
+                            self.panel.closeAfterConfirmation()
+                        }
                     } catch {
                         self.logger.error("Confirm failed")
                         self.panel.failed(error); self.showError(error)
@@ -654,9 +658,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// Normal and transformed copies share suppression and usage ordering.
-    private func restoreClipboard(_ payload: ClipPayload, id: Int64) throws {
-        try clipboard.restore(payload)
+    @discardableResult
+    private func restoreClipboard(_ payload: ClipPayload, id: Int64) throws -> Int {
+        let version = try clipboard.restore(payload)
         recordUse(id: id)
+        return version
     }
 
     /// Only successful clipboard writes and accepted copy drops count as use.
@@ -1050,7 +1056,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         Текст на новых и ранее сохранённых картинках распознаётся на Mac в фоне и участвует в обычном поиске. Поддерживаются русский и английский. Прогресс и повтор неудачных попыток доступны через значок \(BrandIdentity.name) в строке меню. Скрытые записи не распознаются.
 
-        Enter копирует запись, поднимает её наверх и закрывает окно. Дата копирования сохраняется. Escape и переход в другое приложение закрывают без выбора. Вставку выполняете сами (на Mac обычно ⌘V).
+        Enter копирует запись, поднимает её наверх и закрывает окно. Дата копирования сохраняется. Escape и переход в другое приложение закрывают без выбора. По умолчанию вставка выполняется через ⌘V. Вставку по Enter можно включить в основных настройках.
 
         «Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.
 

@@ -111,14 +111,20 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     private var searchIndexDirty = false
     private var searchIndexTimer: Timer?
     private var silentSearchRefresh = false
-    private var commitWhenLoaded = false
+    enum Confirmation {
+        case copy
+        case enter(NSRunningApplication?)
+    }
+
+    private var pendingConfirmation: Confirmation?
+    private var commitWhenLoaded: Bool { pendingConfirmation != nil }
     private var pendingMoveDelta = 0
     private var previousApp: NSRunningApplication?
     private var appActivationObserver: NSObjectProtocol?
     var request: ((SearchFilter, Int, Int) -> Void)?
     var requestNearby: ((Int64, Int) -> Void)?
     var onNavigate: (() -> Void)?
-    var onConfirm: ((Int64) -> Void)?
+    var onConfirm: ((Int64, Confirmation) -> Void)?
     var requestGroupTiles: ((Int64, @escaping ([GroupTile]) -> Void) -> Void)?
     var requestDragPayload: ((Int64, Int?, @escaping (Result<ClipDragPayload, Error>) -> Void) -> Void)?
     var onDragCompleted: ((Int64) -> Void)?
@@ -209,7 +215,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             self?.commandHeld = NSEvent.modifierFlags.contains(.command)
             self?.updateVisibleCards(); self?.closeIfUnfocused()
         }
-        preview.onConfirm = { [weak self] in self?.confirm() }
+        preview.onConfirm = { [weak self] in self?.confirmEnter() }
         preview.onMove = { [weak self] delta in self?.move(delta) }
         cards.makeCard = { [unowned self] index in self.makeCard(at: index) }
         cards.heightForCard = { [weak self] index, width, maximumHeight in
@@ -257,13 +263,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if let nearbyIntroduction { nearbyIntroduction.show(); return false }
         cancelCopyTransform(refreshHistory: false)
         cancelShortcutGesture()
-        rememberPreviousApp()
         let wasClosed = !window.isVisible || isClosing
+        if wasClosed { previousApp = nil }
+        rememberPreviousApp()
         if isClosing { window.orderOut(nil) }
         presentationToken += 1; isClosing = false
         window.permitsOffscreenFrame = false
         let token = presentationToken
-        commitWhenLoaded = false; pendingMoveDelta = 0; confirming = false
+        pendingConfirmation = nil; pendingMoveDelta = 0; confirming = false
         let resetOnOpening = !resetAppliedWhileClosed &&
             HistoryResetPreferences.load(from: resetDefaults).shouldReset(closedAt: closedAt, now: currentDate())
         let reset = resetAppliedWhileClosed || resetOnOpening
@@ -295,7 +302,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
 
     private func rememberPreviousApp() {
-        if let frontmost = NSWorkspace.shared.frontmostApplication,
+        if let frontmost = currentFrontmostApplication(),
            frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = frontmost }
     }
 
@@ -416,7 +423,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.contentView?.layoutSubtreeIfNeeded()
         cards.layoutSubtreeIfNeeded()
         presentLoadedHistory()
-        if commitWhenLoaded { commitWhenLoaded = false; confirm() }
+        if let pendingConfirmation {
+            self.pendingConfirmation = nil
+            confirm(pendingConfirmation)
+        }
     }
 
     /// Called only after an external copy has committed to history. A filtered
@@ -441,10 +451,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         pendingMoveDelta = moves
     }
 
-    func closeAfterConfirmation() {
+    func closeAfterConfirmation(paste: PasteOnEnter? = nil) {
         // Confirmation supersedes copies received while its payload was loading.
         recentCaptureID = nil
-        close()
+        close(paste: paste)
     }
 
     private func requestShowNearby(id: Int64) {
@@ -554,7 +564,10 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cards.scrollToSelection(centered: true)
         updateSelection(); updateCount()
         presentLoadedHistory()
-        if commitWhenLoaded { commitWhenLoaded = false; confirm() }
+        if let pendingConfirmation {
+            self.pendingConfirmation = nil
+            confirm(pendingConfirmation)
+        }
     }
 
     func nearbyFailed(_ error: Error, token: Int) {
@@ -571,7 +584,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cancelShortcutGesture(); cancelSearchIndexRefresh(); dismissPreview()
         nearbyToken += 1; onNavigate?()
         nearbyState = nil
-        loading = false; awaitingSearchResult = false; confirming = false; commitWhenLoaded = false
+        loading = false; awaitingSearchResult = false; confirming = false; pendingConfirmation = nil
         pendingSelectionID = nil; pendingMoveDelta = 0; pendingViewport = nil; recentCaptureID = nil
         retainedSelectionID = context.returnPoint.selectedID
         retainedRowCount = max(150, context.returnPoint.rows.count)
@@ -669,7 +682,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     func failed(_ error: Error) {
         preparingHiddenHistory = false; historyPrepared = false
         cancelShortcutGesture()
-        loading = false; commitWhenLoaded = false; confirming = false
+        loading = false; pendingConfirmation = nil; confirming = false
         if awaitingSearchResult {
             awaitingSearchResult = false
             rows = []; total = 0
@@ -764,7 +777,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if loading { request?(currentFilter, 0, limit) }
     }
 
-    func close(restoreFocus: Bool = true) {
+    func close(restoreFocus: Bool = true, paste: PasteOnEnter? = nil) {
         nearbyIntroduction?.onDismiss = nil
         nearbyIntroduction?.close(); nearbyIntroduction = nil
         if dragSourceID != nil {
@@ -788,7 +801,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         if !rows.isEmpty { retainedRowCount = rows.count }
         presentationToken += 1; let token = presentationToken; isClosing = true
         dismissPreview(); commandHeld = false
-        commitWhenLoaded = false; confirming = false
+        pendingConfirmation = nil; confirming = false
         filters.dismiss(); saveFloatingFrame()
         onClose?()
         let finish = { [weak self] in
@@ -803,7 +816,16 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
                 self.resetAppliedWhileClosed = true
             }
             self.refresh(preservingSelection: !resetImmediately, retainingCards: true)
-            if restoreFocus, self.previousApp?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            if let paste {
+                let target = paste.target
+                guard self.previousApp == target, !target.isTerminated,
+                      target.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                      let front = self.currentFrontmostApplication(), front == .current || front == target,
+                      target.activate(options: []) else { return }
+                paste.afterActivation() { [weak self] in
+                    self?.presentationToken == token && NSPasteboard.general.changeCount == paste.clipboardVersion
+                }
+            } else if restoreFocus, self.previousApp?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                 self.previousApp?.activate(options: [])
             }
         }
@@ -961,7 +983,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             shortcutPressed(delta, isRepeat: event.isARepeat)
             return nil
         }
-        if event.keyCode == 36 || event.keyCode == 76 { dismissPreview(); confirm(); return nil }
+        if event.keyCode == 36 || event.keyCode == 76 { dismissPreview(); confirmEnter(); return nil }
         if event.keyCode == 125 { move(cards.effectiveColumns); return nil }
         if event.keyCode == 126 { move(-cards.effectiveColumns); return nil }
         if !editingSearch, event.keyCode == 124 { move(1); return nil }
@@ -1017,11 +1039,15 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         window.firstResponder === search || (search.currentEditor() != nil && window.firstResponder === search.currentEditor())
     }
 
-    private func confirm() {
+    private func confirmEnter() {
+        confirm(.enter(previousApp))
+    }
+
+    private func confirm(_ confirmation: Confirmation = .copy) {
         cancelShortcutGesture()
         guard !isClosing, nearbyIntroduction == nil, !confirming, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return }
         if loading && (awaitingSearchResult || rows.isEmpty) {
-            commitWhenLoaded = true; search.isEnabled = false; filters.setInteractionEnabled(false)
+            pendingConfirmation = confirmation; search.isEnabled = false; filters.setInteractionEnabled(false)
             scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
             status.stringValue = L10n.text("Ожидаем историю…"); logger.notice("Confirm waiting for history")
             return
@@ -1031,13 +1057,13 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         scope.isEnabled = false; semanticSearch.isEnabled = false; updateVisibleCards()
         status.stringValue = L10n.text("Копируем в буфер…")
         logger.notice("Confirm requested")
-        onConfirm?(selected.id)
+        onConfirm?(selected.id, confirmation)
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         guard control === search, !filters.isPresenting, !cardMenuTracking, window.attachedSheet == nil else { return false }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) || commandSelector == #selector(NSResponder.insertLineBreak(_:)) {
-            confirm(); return true
+            confirmEnter(); return true
         }
         return false
     }

@@ -228,6 +228,7 @@ private final class SettingsContentController: NSViewController {
         mcp = MCPSettingsView(access: mcpAccess, bundleURL: bundleURL)
         models = ModelSettingsView(manager: modelManager, unavailableMessage: modelError)
         super.init(nibName: nil, bundle: nil)
+        general.onRestart = { [weak self] in self?.onRestart?() }
         secrets.onApply = { [weak self] mode, completion in
             guard let apply = self?.onSecretHistoryChange else { completion(.failure(SecretStorageError.keyUnavailable)); return }
             apply(mode, completion)
