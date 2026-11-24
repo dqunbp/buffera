@@ -1,5 +1,7 @@
 # Application settings
 
+The **Documentation ↗** link at the bottom of Settings opens the Buffera user guide in your browser. The guide opens in the app's interface language.
+
 Settings use a compact sidebar with navigation aligned at the top: General, AI, Appearance, History, Shortcuts, MCP, and Updates. Icons and labels have inset spacing. Appearance and history options are grouped into cards; AI brings together semantic search and the assistant. Existing actions and model checks are retained.
 
 The selected section name appears only in the sidebar. Each AI feature card has a “Connect your model” button that opens an explanation and a guided compatible-file selection flow.
@@ -38,4 +40,4 @@ Verification: `--localization-ui-smoke-test` checks the new controls and light/d
 
 The Buffera menu offers Pause / Resume Recording and Skip Next Copy. Invoking skip again cancels it. Skip is unavailable during a pause; starting a pause cancels a pending skip. A skip covers the entire next clipboard group before reading its contents. Empty clears, transient service writes and copies restored from history do not consume it. Recording resumes automatically after the skip, with no timer. Resuming discards changes accumulated during a pause. Recording state resets when the app restarts.
 
-In Shortcuts, each command accepts an A–Z key with the shared modifier base, or Not assigned (the default). Closing history or ending navigation preserves held recording keys: toggling again requires releasing the key first. All assigned combinations must differ; a registration error preserves the previous settings. Reset shortcuts restores `⌘⌥V` / `⌘⌥C` navigation and removes both recording bindings. Commands show brief feedback without taking focus, including when the menu bar icon is hidden. Encryption behavior is unchanged.
+In Shortcuts, click Change or Assign beside a command and press a shortcut with the shared modifiers. Both commands are unassigned by default. Use Clear shortcut to remove an individual binding. To repeat a command after closing history or ending navigation, release the key first. All assigned shortcuts must differ. A registration error preserves the previous settings. Reset shortcuts restores `⌘⌥V` / `⌘⌥C` navigation and removes both recording bindings. Commands show brief feedback without taking focus, including when the menu bar icon is hidden. [Supported keys and modifiers](guide.md).

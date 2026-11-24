@@ -517,15 +517,15 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Dans Raccourcis, choisissez des touches de modification communes et deux lettres différentes : une pour ouvrir / avancer, une pour reculer. Cliquez sur Appliquer ; aucun redémarrage n’est nécessaire. Réinitialiser les raccourcis restaure ⌘⌥V / ⌘⌥C."
+              "text": "Dans Raccourcis, cliquez sur « Modifier » ou « Attribuer » à côté d’une commande, puis appuyez sur les touches du raccourci. Vous pouvez par exemple utiliser Contrôle et la touche de l’accent grave pour ouvrir l’historique. Les touches de lettres, de chiffres et de symboles sont prises en charge. Les modificateurs sont communs à toutes les commandes. « Appliquer » enregistre les changements sans redémarrage. Réinitialiser les raccourcis restaure ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Les raccourcis utilisent les touches physiques de la disposition latine et continuent donc à fonctionner lorsque vous changez de langue de saisie. Si l’enregistrement échoue, la paire précédente reste active."
+              "text": "Les raccourcis restent associés aux touches physiques quand vous changez de langue de saisie. L’aide à la sélection rapide s’actualise dès que vous saisissez deux raccourcis valides. Si deux commandes partagent un raccourci, un avertissement apparaît aussitôt et « Appliquer » est désactivé. En cas d’échec de l’enregistrement, les raccourcis précédents restent actifs."
             },
             {
               "type": "note",
-              "text": "Relâcher les touches après l’ouverture laisse l’historique ouvert. Pour parcourir rapidement les éléments, maintenez ⌘⌥, appuyez à nouveau sur V ou C, puis relâchez les touches de modification pour copier l’élément sélectionné."
+              "text": "Relâchez les touches juste après l’ouverture pour laisser l’historique ouvert. Pour parcourir l’historique rapidement, maintenez les modificateurs enfoncés dès l’ouverture, appuyez à nouveau sur la touche de l’élément suivant ou précédent, puis relâchez les modificateurs pour copier l’élément sélectionné."
             }
           ]
         },
@@ -535,7 +535,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Dans Réglages → Raccourcis, attribuez une lettre A–Z à « Suspendre / reprendre l’enregistrement » et une autre à « Ignorer la prochaine copie », avec les touches de modification communes. Aucun raccourci n’est attribué par défaut ; les commandes restent accessibles dans le menu. Toutes les combinaisons doivent être différentes. Réinitialiser les raccourcis rétablit ⌘⌥V / ⌘⌥C et supprime les raccourcis d’enregistrement. Maintenir une touche n’active pas de nouveau la commande, même après la fermeture de l’historique. Une brève confirmation apparaît sans prendre le focus, même si l’icône de la barre des menus est masquée."
+              "text": "Dans Réglages → Raccourcis, cliquez sur « Attribuer » ou « Modifier » à côté d’une commande d’enregistrement, puis appuyez sur un raccourci avec les modificateurs communs. Aucun raccourci n’est attribué par défaut ; les commandes restent accessibles dans le menu. Toutes les combinaisons doivent être différentes. Réinitialiser les raccourcis rétablit ⌘⌥V / ⌘⌥C et supprime les raccourcis d’enregistrement. Maintenir une touche n’active pas de nouveau la commande, même après la fermeture de l’historique. Une brève confirmation apparaît sans prendre le focus, même si l’icône de la barre des menus est masquée."
             }
           ]
         }
