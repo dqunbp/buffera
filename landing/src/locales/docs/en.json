@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "To paste directly with Enter, enable the option in Settings → General and grant Buffera Accessibility access in macOS. If macOS asks for clipboard access, allow it so Buffera can save your history."
+              "text": "To paste directly with Enter, enable the option in Settings → General and grant Buffera Accessibility access in macOS. If macOS asks for clipboard access, allow it so Buffera can save your history. If access is granted and paste still doesn’t work, restart Buffera."
             }
           ]
         },

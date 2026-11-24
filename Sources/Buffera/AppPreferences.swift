@@ -8,6 +8,8 @@ final class AppPreferences {
     let defaults: UserDefaults
     let loginStatus: () -> SMAppService.Status
     let setLoginEnabled: (Bool) throws -> Void
+    let canPostPaste: () -> Bool
+    let requestPasteAccess: () -> Void
     let openLoginSettings: () -> Void
     var onMenuBarChange: ((Bool) -> Void)?
 
@@ -17,7 +19,11 @@ final class AppPreferences {
              if enabled { try SMAppService.mainApp.register() }
              else { try SMAppService.mainApp.unregister() }
          },
+         canPostPaste: @escaping () -> Bool = CGPreflightPostEventAccess,
+         requestPasteAccess: @escaping () -> Void = { _ = CGRequestPostEventAccess() },
          openLoginSettings: @escaping () -> Void = { SMAppService.openSystemSettingsLoginItems() }) {
+        self.canPostPaste = canPostPaste
+        self.requestPasteAccess = requestPasteAccess
         self.defaults = defaults
         self.loginStatus = loginStatus
         self.setLoginEnabled = setLoginEnabled

@@ -745,3 +745,4 @@
 
 "Вставлять выбранную запись по Enter" = "Ausgewählten Eintrag mit Enter einfügen";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Erlaube Buffera in den macOS-Einstellungen für Bedienungshilfen, deinen Computer zu steuern. Verwende bis dahin ⌘V.";
+"Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Wenn der Zugriff erlaubt ist und das Einfügen weiterhin fehlschlägt, starte Buffera neu.";

@@ -1,6 +1,6 @@
 # Application settings
 
-In Settings → General, enable “Paste the selected item on Enter” to send ⌘V to the previous app after focus returns. Allow Buffera to control your computer in macOS Accessibility settings. By default, Enter only copies the item.
+In Settings → General, enable “Paste the selected item on Enter” to send ⌘V to the previous app after focus returns. When prompted, grant Buffera access under Accessibility. If paste still doesn’t work, click “Restart Buffera”. By default, Enter only copies the item.
 
 The **Documentation ↗** link at the bottom of Settings opens the Buffera user guide in your browser. The guide opens in the app's interface language.
 

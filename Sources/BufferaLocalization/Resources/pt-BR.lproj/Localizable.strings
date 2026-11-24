@@ -745,3 +745,4 @@
 
 "Вставлять выбранную запись по Enter" = "Colar o item selecionado com Enter";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Para colar, permita que o Buffera controle o computador nos ajustes de Acessibilidade do macOS. Até lá, use ⌘V.";
+"Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera.";

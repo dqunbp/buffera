@@ -9,6 +9,10 @@ if CommandLine.arguments.contains("--secret-keychain-smoke-test") {
 } else if CommandLine.arguments.contains("--setup-ui-smoke-test") {
     do { try runSetupSmokeTest() }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--general-settings-smoke-test") {
+    NSApplication.shared.setActivationPolicy(.prohibited)
+    do { try runGeneralSettingsChecks(); print("PASS: General settings controls and permission recovery") }
+    catch { fputs("FAIL: \(error)\n", stderr); exit(1) }
 } else if CommandLine.arguments.contains("--localization-ui-smoke-test") {
     do { try runLocalizationSmokeTest() }
     catch { fputs("FAIL: \(error)\n", stderr); exit(1) }

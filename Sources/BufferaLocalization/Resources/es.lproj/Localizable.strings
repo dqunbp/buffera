@@ -745,3 +745,4 @@
 
 "Вставлять выбранную запись по Enter" = "Pegar el elemento seleccionado con Intro";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Para pegar, permite que Buffera controle el ordenador en los ajustes de Accesibilidad de macOS. Mientras tanto, usa ⌘V.";
+"Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Si ya has concedido el acceso y aún no puedes pegar, reinicia Buffera.";
