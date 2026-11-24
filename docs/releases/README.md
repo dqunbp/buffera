@@ -2,6 +2,14 @@
 
 [Documentation](../README.md) · [Документация](../README.ru.md)
 
+## 1.5.0
+
+[Buffera 1.5.0](1.5.0.md) — Русский · English · Español · Deutsch · Français · Português (Brasil) · 简体中文 · 日本語.
+
+## 1.4.0
+
+[Buffera 1.4.0](1.4.0.md) — Русский · English · Español · Deutsch · Français · Português (Brasil) · 简体中文 · 日本語.
+
 ## 1.3.0
 
 [Buffera 1.3.0](1.3.0.md) — Русский · English · Español · Deutsch · Français · Português (Brasil) · 简体中文 · 日本語.
