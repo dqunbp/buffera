@@ -767,3 +767,8 @@
 "Вставлять выбранную запись по Enter" = "Paste the selected item on Enter";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "To paste, allow Buffera to control your computer in macOS Accessibility settings. Until then, use ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "If access is granted and paste still doesn’t work, restart Buffera.";
+
+"Скопировать — я вставлю через ⌘V" = "Copy it — I’ll paste with ⌘V";
+"Вставить сразу в предыдущее приложение" = "Paste it directly into the previous app";
+"После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V." = "After setup, macOS will ask for permission to paste. Enable Buffera under Accessibility. Until then, use ⌘V to paste.";
+"Выберите запись стрелками ↑ ↓. Что сделает Enter?" = "Select an item with ↑ ↓. What should Enter do?";

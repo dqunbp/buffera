@@ -22,11 +22,15 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     private let back = NSButton()
     private let next = NSButton()
     private let skip = NSButton()
+    private weak var pasteAccessHint: NSTextField?
+    private let canPostPaste: () -> Bool
     private weak var storageValue: NSTextField?
     private var capturePage: (() -> Void)?
 
     init(initial: SetupPreferences, modelsAvailable: Bool, modelError: String? = nil,
-         access: MCPAccess, bundleURL: URL = Bundle.main.bundleURL, shortcuts: ShortcutPreferences = .load()) {
+         access: MCPAccess, bundleURL: URL = Bundle.main.bundleURL, shortcuts: ShortcutPreferences = .load(),
+         canPostPaste: @escaping () -> Bool = CGPreflightPostEventAccess) {
+        self.canPostPaste = canPostPaste
         self.shortcuts = shortcuts
         self.initial = initial; draft = initial; self.modelsAvailable = modelsAvailable
         self.modelError = modelError; self.access = access; self.bundleURL = bundleURL
@@ -177,19 +181,33 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     }
 
     private func shortcutsPage() -> NSView {
-        let paste = toggle(L10n.text("Вставлять выбранную запись по Enter"), value: draft.pasteOnEnter, id: "pasteOnEnter")
-        let accessHelp = SetupUI.text(L10n.text("Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V."), size: 12)
-        capturePage = { [weak self] in self?.draft.pasteOnEnter = paste.state == .on }
+        let action = #selector(selectEnterAction(_:))
+        let copy = NSButton(radioButtonWithTitle: L10n.text("Скопировать — я вставлю через ⌘V"), target: self, action: action)
+        let paste = NSButton(radioButtonWithTitle: L10n.text("Вставить сразу в предыдущее приложение"), target: self, action: action)
+        copy.identifier = .init("setup.copyOnEnter")
+        paste.identifier = .init("setup.pasteOnEnter")
+        copy.state = draft.pasteOnEnter ? .off : .on
+        paste.state = draft.pasteOnEnter ? .on : .off
+        let hint = SetupUI.text(L10n.text("После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V."), size: 12)
+        hint.identifier = .init("setup.pasteAccessHint")
+        hint.isHidden = !draft.pasteOnEnter || canPostPaste()
+        pasteAccessHint = hint
         let quick = SetupUI.card([
             SetupUI.text(L10n.text("Быстро выбрать запись"), bold: true),
             SetupUI.text(L10n.text("\(shortcuts.nextTitle) — следующая     \(shortcuts.previousTitle) — предыдущая"), size: 16, bold: true),
             SetupUI.text(L10n.text("Нажмите \(shortcuts.nextTitle) несколько раз, не отпуская \(shortcuts.base.title). Для движения назад — \(shortcuts.previousTitle). Когда выбрали запись, отпустите \(shortcuts.base.title) — она скопируется."), size: 12)
         ], tinted: true)
         return SetupUI.column([
-            SetupUI.card([SetupUI.text(L10n.text("Открыть историю"), bold: true), SetupUI.text(shortcuts.nextTitle, size: 30, bold: true), quick]),
-            SetupUI.card([SetupUI.text(L10n.text("Выбрать запись"), bold: true), SetupUI.text("↑ ↓  →  Enter", size: 27, bold: true), paste, accessHelp]),
+            SetupUI.card([SetupUI.text(L10n.text("Открыть историю"), bold: true), SetupUI.text(shortcuts.nextTitle, size: 30, bold: true)]),
+            SetupUI.card([SetupUI.text(L10n.text("Выберите запись стрелками ↑ ↓. Что сделает Enter?"), bold: true), copy, paste, hint]),
+            quick,
             SetupUI.card([SetupUI.text(L10n.text("Посмотреть подробно"), bold: true), SetupUI.text(L10n.text("Пробел"), size: 27, bold: true)])
         ], spacing: 12)
+    }
+
+    @objc private func selectEnterAction(_ sender: NSButton) {
+        draft.pasteOnEnter = sender.identifier?.rawValue == "setup.pasteOnEnter"
+        pasteAccessHint?.isHidden = !draft.pasteOnEnter || canPostPaste()
     }
 
     private func storagePage() -> NSView {

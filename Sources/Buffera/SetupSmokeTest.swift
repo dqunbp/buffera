@@ -47,7 +47,7 @@ func runSetupSmokeTest() throws {
     bounded.maxCount = -1
     try check(bounded.maxCount == 10, "Mutating the count must enforce the same lower bound")
     let controller = SetupWindow(initial: initial, modelsAvailable: true, access: access,
-                                 bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults)
+                                 bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults, canPostPaste: { false })
     let root = controller.window!.contentView!
     func click(_ id: String) throws { try control(root, id, NSButton.self).performClick(nil) }
     func checkStep(_ expected: SetupStep) throws {
@@ -88,7 +88,15 @@ func runSetupSmokeTest() throws {
     try click("setup.skip")
     try check(controller.draft.language == initial.language, "Skipping must discard page edits")
     try checkStep(.shortcuts)
-    try check(try control(root, "setup.pasteOnEnter", NSButton.self).state == .off, "Paste starts disabled")
+    let copy = try control(root, "setup.copyOnEnter", NSButton.self)
+    let paste = try control(root, "setup.pasteOnEnter", NSButton.self)
+    let hint = try control(root, "setup.pasteAccessHint", NSTextField.self)
+    try check(copy.state == .on && paste.state == .off && hint.isHidden, "Copy is the initial choice without an access prompt")
+    try capture("setup-keys-default")
+    try click("setup.pasteOnEnter")
+    try check(copy.state == .off && paste.state == .on && !hint.isHidden, "Paste selects one action and explains access")
+    try click("setup.copyOnEnter")
+    try check(copy.state == .on && paste.state == .off && hint.isHidden, "Returning to copy hides the permission hint")
     try click("setup.pasteOnEnter")
     try click("setup.back")
     try checkStep(.language)

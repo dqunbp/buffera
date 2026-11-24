@@ -746,3 +746,8 @@
 "Вставлять выбранную запись по Enter" = "Coller l’élément sélectionné avec Entrée";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Pour coller, autorisez Buffera à contrôler votre ordinateur dans les réglages Accessibilité de macOS. En attendant, utilisez ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Si l’accès est autorisé et que le collage ne fonctionne toujours pas, redémarrez Buffera.";
+
+"Скопировать — я вставлю через ⌘V" = "Copier — je collerai avec ⌘V";
+"Вставить сразу в предыдущее приложение" = "Coller directement dans l’application précédente";
+"После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V." = "À la fin de la configuration, macOS demandera une autorisation pour coller. Activez Buffera dans Accessibilité. En attendant, utilisez ⌘V pour coller.";
+"Выберите запись стрелками ↑ ↓. Что сделает Enter?" = "Sélectionnez un élément avec ↑ ↓. Que doit faire la touche Entrée ?";
