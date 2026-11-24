@@ -22,11 +22,17 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     private let back = NSButton()
     private let next = NSButton()
     private let skip = NSButton()
+    private lazy var login = toggle(L10n.text("Запускать Buffera при входе в систему"), value: draft.launchAtLogin, id: "launchAtLogin")
+    private lazy var loginCard = SetupUI.card([login])
+    private weak var pasteAccessHint: NSTextField?
+    private let canPostPaste: () -> Bool
     private weak var storageValue: NSTextField?
     private var capturePage: (() -> Void)?
 
     init(initial: SetupPreferences, modelsAvailable: Bool, modelError: String? = nil,
-         access: MCPAccess, bundleURL: URL = Bundle.main.bundleURL, shortcuts: ShortcutPreferences = .load()) {
+         access: MCPAccess, bundleURL: URL = Bundle.main.bundleURL, shortcuts: ShortcutPreferences = .load(),
+         canPostPaste: @escaping () -> Bool = CGPreflightPostEventAccess) {
+        self.canPostPaste = canPostPaste
         self.shortcuts = shortcuts
         self.initial = initial; draft = initial; self.modelsAvailable = modelsAvailable
         self.modelError = modelError; self.access = access; self.bundleURL = bundleURL
@@ -65,7 +71,10 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
         }
         let footer = NSStackView(views: [back, NSView(), skip, next])
         errorLabel.textColor = .systemRed; errorLabel.isHidden = true
-        let stack = SetupUI.column([top, progress, titleLabel, page, errorLabel, footer], spacing: 18)
+        let loginHeight = loginCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 50)
+        loginHeight.priority = .defaultHigh
+        loginHeight.isActive = true
+        let stack = SetupUI.column([top, progress, titleLabel, loginCard, page, errorLabel, footer], spacing: 18)
         stack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -82,6 +91,8 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
         applyDraftTheme()
         titleLabel.stringValue = step.title
         progress.stringValue = L10n.text("Шаг \(step.rawValue + 1) из \(SetupStep.allCases.count)")
+        loginCard.isHidden = step != .models
+        login.state = draft.launchAtLogin ? .on : .off
         back.isEnabled = step.rawValue > 0
         next.title = step == SetupStep.allCases.last ? L10n.text("Применить и начать") : L10n.text("Далее")
         errorLabel.isHidden = true
@@ -177,16 +188,44 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     }
 
     private func shortcutsPage() -> NSView {
+        let action = #selector(selectEnterAction(_:))
+        let copy = NSButton(radioButtonWithTitle: L10n.text("Поместить в буфер обмена — затем вставьте через ⌘V"), target: self, action: action)
+        let paste = NSButton(radioButtonWithTitle: L10n.text("Сразу вставить в активное приложение"), target: self, action: action)
+        copy.identifier = .init("setup.copyOnEnter")
+        paste.identifier = .init("setup.pasteOnEnter")
+        copy.state = draft.pasteOnEnter ? .off : .on
+        paste.state = draft.pasteOnEnter ? .on : .off
+        let hint = SetupUI.text(L10n.text("После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас."), size: 12)
+        hint.identifier = .init("setup.pasteAccessHint")
+        hint.isHidden = !draft.pasteOnEnter || canPostPaste()
+        pasteAccessHint = hint
+        func note(_ value: String) -> NSTextField {
+            let label = SetupUI.text(value, size: 13)
+            label.textColor = .secondaryLabelColor
+            return label
+        }
+        let rows = [
+            SetupUI.instruction(1, title: L10n.text("Откройте историю"), keys: [shortcuts.nextTitle], details: [
+                note(L10n.text("Сочетание клавиш можно будет изменить в «Настройки → Клавиши»."))
+            ]),
+            SetupUI.instruction(2, title: L10n.text("Выберите запись"), keys: ["↑", "↓"], details: [
+                note(L10n.text("Перемещайтесь стрелками. Нажмите пробел для просмотра записи."))
+            ]),
+            SetupUI.instruction(3, title: L10n.text("Нажмите Enter"), keys: ["↩ Enter"], details: [
+                SetupUI.text(L10n.text("Что делать с выбранной записью?")), copy, paste, hint
+            ])
+        ]
         let quick = SetupUI.card([
-            SetupUI.text(L10n.text("Быстро выбрать запись"), bold: true),
-            SetupUI.text(L10n.text("\(shortcuts.nextTitle) — следующая     \(shortcuts.previousTitle) — предыдущая"), size: 16, bold: true),
-            SetupUI.text(L10n.text("Нажмите \(shortcuts.nextTitle) несколько раз, не отпуская \(shortcuts.base.title). Для движения назад — \(shortcuts.previousTitle). Когда выбрали запись, отпустите \(shortcuts.base.title) — она скопируется."), size: 12)
+            SetupUI.text(L10n.text("Быстрый выбор с клавиатуры"), bold: true),
+            SetupUI.text(L10n.text("\(shortcuts.nextTitle) — следующая     \(shortcuts.previousTitle) — предыдущая"), bold: true),
+            note(L10n.text("Нажмите \(shortcuts.nextTitle) несколько раз, не отпуская \(shortcuts.base.title). Для движения назад — \(shortcuts.previousTitle). Когда выбрали запись, отпустите \(shortcuts.base.title) — она скопируется."))
         ], tinted: true)
-        return SetupUI.column([
-            SetupUI.card([SetupUI.text(L10n.text("Открыть историю"), bold: true), SetupUI.text(shortcuts.nextTitle, size: 30, bold: true), quick]),
-            SetupUI.card([SetupUI.text(L10n.text("Выбрать и скопировать"), bold: true), SetupUI.text("↑ ↓  →  Enter", size: 27, bold: true)]),
-            SetupUI.card([SetupUI.text(L10n.text("Посмотреть подробно"), bold: true), SetupUI.text(L10n.text("Пробел"), size: 27, bold: true)])
-        ], spacing: 12)
+        return SetupUI.column([SetupUI.column(rows, spacing: 0), quick], spacing: 12)
+    }
+
+    @objc private func selectEnterAction(_ sender: NSButton) {
+        draft.pasteOnEnter = sender.identifier?.rawValue == "setup.pasteOnEnter"
+        pasteAccessHint?.isHidden = !draft.pasteOnEnter || canPostPaste()
     }
 
     private func storagePage() -> NSView {
@@ -234,6 +273,7 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
         let power = toggle(L10n.text("Готовить поиск только от внешнего питания"), value: draft.onlyOnExternalPower, id: "power")
         search.isEnabled = modelsAvailable; assistant.isEnabled = modelsAvailable
         capturePage = { [weak self] in
+            self?.draft.launchAtLogin = self?.login.state == .on
             self?.draft.embeddingEnabled = search.state == .on
             self?.draft.assistantEnabled = assistant.state == .on
             self?.draft.onlyOnExternalPower = power.state == .on
@@ -246,7 +286,7 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
             return SetupUI.card([descriptor.role == .embedding ? search : assistant,
                 SetupUI.text(purpose), SetupUI.text("\(descriptor.title) · \(size)", size: 12)])
         }
-        var views: [NSView] = cards + [power, SetupUI.text(L10n.text("Недостающие модели скачаются после «Применить и начать». Затем всё работает локально. Подготовка поиска может занять время и расходует заряд."), size: 12)]
+        var views: [NSView] = [SetupUI.text(L10n.text("Поиск и ответы"), size: 16, bold: true)] + cards + [power, SetupUI.text(L10n.text("Недостающие модели скачаются после «Применить и начать». Затем всё работает локально. Подготовка поиска может занять время и расходует заряд."), size: 12)]
         if !modelsAvailable {
             views.append(SetupUI.text(modelError ?? L10n.text("Локальные модели доступны на Mac с Apple Silicon."), size: 12))
         }

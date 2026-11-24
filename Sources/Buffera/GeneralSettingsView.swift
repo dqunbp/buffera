@@ -86,8 +86,7 @@ final class GeneralSettingsView: NSStackView {
     }
 
     @objc private func changeLogin() {
-        let current = preferences.loginStatus()
-        let enabled = current != .enabled && current != .requiresApproval
+        let enabled = !preferences.loginRequested
         do {
             try preferences.setLoginEnabled(enabled)
             refresh()
@@ -100,11 +99,7 @@ final class GeneralSettingsView: NSStackView {
     }
 
     @objc private func changePaste() {
-        preferences.pasteOnEnter = paste.state == .on
-        if preferences.pasteOnEnter && !preferences.canPostPaste() {
-            sawMissingPasteAccess = true
-            preferences.requestPasteAccess()
-        }
+        if preferences.setPasteOnEnter(paste.state == .on) { sawMissingPasteAccess = true }
         refresh()
     }
 

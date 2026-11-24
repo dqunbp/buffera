@@ -39,6 +39,8 @@ Dans Réglages → Raccourcis, cliquez sur « Attribuer » ou « Modifier » à 
 
 Buffera conserve l’historique de votre presse-papiers sur votre Mac. Appuyez sur <kbd>⌘⌥V</kbd>, trouvez un élément et appuyez sur <kbd>Entrée</kbd> : il revient dans le presse-papiers, prêt à être collé avec <kbd>⌘V</kbd>. Vous pouvez aussi faire glisser les éléments directement dans d’autres apps.
 
+À l’étape « Utiliser Buffera », vous pouvez activer le collage direct avec Entrée. À la dernière étape, vous pouvez choisir de lancer Buffera à l’ouverture de session.
+
 | Fonction | Ce qu’elle permet |
 | :--- | :--- |
 | **Recherche dans l’historique** | Retrouver du texte, des liens ou des fichiers. Filtrer par app et par date. |

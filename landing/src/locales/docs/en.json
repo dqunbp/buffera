@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "To paste directly with Enter, enable the option in Settings → General and grant Buffera Accessibility access in macOS. If macOS asks for clipboard access, allow it so Buffera can save your history. If access is granted and paste still doesn’t work, restart Buffera."
+              "text": "To paste directly with Enter, enable the option on the “How to use Buffera” step during setup or in Settings → General and grant Buffera Accessibility access in macOS. If macOS asks for clipboard access, allow it so Buffera can save your history. If access is granted and paste still doesn’t work, restart Buffera."
             }
           ]
         },
@@ -116,7 +116,7 @@
             },
             {
               "type": "paragraph",
-              "text": "To launch Buffera with your Mac, turn on Launch at login in Settings → General. You can download search and assistant models later; ordinary clipboard history works without them."
+              "text": "Enable launch at login on the final setup step or in Settings → General. You can download search and assistant models later; ordinary clipboard history works without them."
             }
           ]
         }

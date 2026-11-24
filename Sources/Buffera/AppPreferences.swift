@@ -31,8 +31,21 @@ final class AppPreferences {
     }
 
     var pasteOnEnter: Bool {
-        get { defaults.bool(forKey: "pasteOnEnter") }
-        set { defaults.set(newValue, forKey: "pasteOnEnter") }
+        defaults.bool(forKey: "pasteOnEnter")
+    }
+
+    /// Returns whether enabling paste required a macOS permission request.
+    @discardableResult
+    func setPasteOnEnter(_ enabled: Bool) -> Bool {
+        defaults.set(enabled, forKey: "pasteOnEnter")
+        guard enabled, !canPostPaste() else { return false }
+        requestPasteAccess()
+        return true
+    }
+
+    var loginRequested: Bool {
+        let status = loginStatus()
+        return status == .enabled || status == .requiresApproval
     }
 
     var showsMenuBarIcon: Bool {

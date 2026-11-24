@@ -778,7 +778,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard panel?.window.attachedSheet == nil else { return }
         if setup?.window?.isVisible == true { setup?.show(); return }
         let access = MCPAccess(directory: folder)
-        let initial = SetupPreferences(mcpEnabled: access.isEnabled(), snapshots: modelManager?.snapshots ?? [])
+        let initial = SetupPreferences(mcpEnabled: access.isEnabled(), snapshots: modelManager?.snapshots ?? [],
+                                       launchAtLogin: appPreferences.loginRequested)
         #if arch(arm64)
         let modelsAvailable = modelManager != nil
         #else
@@ -796,8 +797,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         controller.onFinish = { [weak self] draft, initial in
             guard let self else { return }
-            // Persist the only throwing permission write first. No downloads start on failure.
-            if draft.mcpEnabled != initial.mcpEnabled { try access.setEnabled(draft.mcpEnabled) }
+            let changeLogin = draft.launchAtLogin != initial.launchAtLogin && draft.launchAtLogin != self.appPreferences.loginRequested
+            if changeLogin { try self.appPreferences.setLoginEnabled(draft.launchAtLogin) }
+            do {
+                if draft.mcpEnabled != initial.mcpEnabled { try access.setEnabled(draft.mcpEnabled) }
+            } catch {
+                if changeLogin { try self.appPreferences.setLoginEnabled(initial.launchAtLogin) }
+                throw error
+            }
+            if draft.pasteOnEnter != initial.pasteOnEnter { self.appPreferences.setPasteOnEnter(draft.pasteOnEnter) }
             if draft.language != initial.language { draft.language.save() }
             if draft.theme != initial.theme { draft.theme.save(); draft.theme.apply() }
             if draft.limits != initial.limits { draft.limits.save() }

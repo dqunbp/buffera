@@ -746,3 +746,17 @@
 "Вставлять выбранную запись по Enter" = "Coller l’élément sélectionné avec Entrée";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Pour coller, autorisez Buffera à contrôler votre ordinateur dans les réglages Accessibilité de macOS. En attendant, utilisez ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Si l’accès est autorisé et que le collage ne fonctionne toujours pas, redémarrez Buffera.";
+
+"Запускать Buffera при входе в систему" = "Lancer Buffera à l’ouverture de session";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "Copier dans le presse-papiers, puis coller avec ⌘V";
+"Сразу вставить в активное приложение" = "Coller directement dans l’application active";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "À la fin de la configuration, macOS vous demandera d’autoriser Buffera à appuyer sur ⌘V pour vous.";
+"Откройте историю" = "Ouvrez l’historique";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "Vous pourrez modifier ce raccourci dans Réglages → Raccourcis.";
+"Выберите запись" = "Sélectionnez un élément";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Utilisez les flèches pour naviguer. Appuyez sur Espace pour afficher un aperçu.";
+"Нажмите Enter" = "Appuyez sur Entrée";
+"Что делать с выбранной записью?" = "Que faire de l’élément sélectionné ?";
+"Быстрый выбор с клавиатуры" = "Sélection rapide au clavier";
+"Как пользоваться" = "Utiliser Buffera";
+"Завершение настройки" = "Terminer la configuration";

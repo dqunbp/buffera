@@ -746,3 +746,17 @@
 "Вставлять выбранную запись по Enter" = "Pegar el elemento seleccionado con Intro";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Para pegar, permite que Buffera controle el ordenador en los ajustes de Accesibilidad de macOS. Mientras tanto, usa ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Si ya has concedido el acceso y aún no puedes pegar, reinicia Buffera.";
+
+"Запускать Buffera при входе в систему" = "Abrir Buffera al iniciar sesión";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "Copiar al portapapeles y pegar después con ⌘V";
+"Сразу вставить в активное приложение" = "Pegar directamente en la aplicación activa";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "Al terminar la configuración, macOS te pedirá permiso para que Buffera pueda pulsar ⌘V por ti.";
+"Откройте историю" = "Abre el historial";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "Podrás cambiar el atajo en Ajustes → Atajos.";
+"Выберите запись" = "Selecciona un elemento";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Usa las flechas para desplazarte. Pulsa la barra espaciadora para ver una vista previa.";
+"Нажмите Enter" = "Pulsa Intro";
+"Что делать с выбранной записью?" = "¿Qué quieres hacer con el elemento seleccionado?";
+"Быстрый выбор с клавиатуры" = "Selección rápida con el teclado";
+"Как пользоваться" = "Cómo usar Buffera";
+"Завершение настройки" = "Finalizar la configuración";

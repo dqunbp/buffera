@@ -34,6 +34,60 @@ enum SetupUI {
         return box
     }
 
+    static func instruction(_ number: Int, title: String, keys: [String], details: [NSView]) -> NSView {
+        let row = NSView()
+        let rail = NSBox()
+        rail.boxType = .custom
+        rail.borderWidth = 0
+        rail.fillColor = BrandIdentity.accentColor.withAlphaComponent(0.38)
+        let badge = NSBox()
+        badge.boxType = .custom
+        badge.cornerRadius = 14
+        badge.borderWidth = 1
+        badge.borderColor = BrandIdentity.accentColor.withAlphaComponent(0.7)
+        badge.fillColor = BrandIdentity.accentColor.withAlphaComponent(0.18)
+        let digit = text(String(number), size: 14, bold: true)
+        digit.textColor = BrandIdentity.accentColor
+        badge.contentView!.addSubview(digit)
+        digit.translatesAutoresizingMaskIntoConstraints = false
+        let caps = keys.map { key -> NSView in
+            let cap = NSBox()
+            cap.boxType = .custom
+            cap.cornerRadius = 6
+            cap.fillColor = .controlBackgroundColor
+            cap.borderColor = .separatorColor
+            cap.borderWidth = 1
+            let label = text(key, size: 15, bold: true)
+            cap.contentView!.addSubview(label)
+            label.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: cap.centerXAnchor), label.centerYAnchor.constraint(equalTo: cap.centerYAnchor),
+                cap.widthAnchor.constraint(equalTo: label.widthAnchor, constant: 18), cap.heightAnchor.constraint(equalToConstant: 29)
+            ])
+            return cap
+        }
+        let header = NSStackView(views: [text(title, size: 17, bold: true), NSView()] + caps)
+        header.spacing = 5
+        let content = column([header] + details, spacing: 8)
+        for view in [rail, badge, content] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            badge.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 4), badge.topAnchor.constraint(equalTo: row.topAnchor),
+            badge.widthAnchor.constraint(equalToConstant: 28), badge.heightAnchor.constraint(equalToConstant: 28),
+            digit.centerXAnchor.constraint(equalTo: badge.centerXAnchor), digit.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+            rail.centerXAnchor.constraint(equalTo: badge.centerXAnchor), rail.widthAnchor.constraint(equalToConstant: 1),
+            rail.topAnchor.constraint(equalTo: badge.bottomAnchor),
+            rail.bottomAnchor.constraint(equalTo: number == 3 ? badge.bottomAnchor : row.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: badge.trailingAnchor, constant: 14),
+            content.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -4),
+            content.topAnchor.constraint(equalTo: row.topAnchor),
+            content.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -24)
+        ])
+        return row
+    }
+
     static func scroll(_ content: NSView) -> NSScrollView {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true; scroll.drawsBackground = false

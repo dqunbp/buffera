@@ -15,7 +15,7 @@ func runSetupSmokeTest() throws {
         try? FileManager.default.removeItem(at: directory)
     }
     let access = MCPAccess(directory: directory)
-    var initial = SetupPreferences(defaults: defaults, mcpEnabled: false, snapshots: [])
+    var initial = SetupPreferences(defaults: defaults, mcpEnabled: false, snapshots: [], launchAtLogin: false)
     initial.limits = HistoryLimits(maxCount: 42_000, maxBytes: 3_500_000_000)
     func check(_ value: @autoclosure () throws -> Bool, _ message: String) throws {
         if try !value() { throw HistoryError.database(message) }
@@ -47,7 +47,7 @@ func runSetupSmokeTest() throws {
     bounded.maxCount = -1
     try check(bounded.maxCount == 10, "Mutating the count must enforce the same lower bound")
     let controller = SetupWindow(initial: initial, modelsAvailable: true, access: access,
-                                 bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults)
+                                 bundleURL: URL(fileURLWithPath: "/Applications/Fixture's Buffera.app"), shortcuts: .defaults, canPostPaste: { false })
     let root = controller.window!.contentView!
     func click(_ id: String) throws { try control(root, id, NSButton.self).performClick(nil) }
     func checkStep(_ expected: SetupStep) throws {
@@ -88,10 +88,25 @@ func runSetupSmokeTest() throws {
     try click("setup.skip")
     try check(controller.draft.language == initial.language, "Skipping must discard page edits")
     try checkStep(.shortcuts)
+    let copy = try control(root, "setup.copyOnEnter", NSButton.self)
+    let paste = try control(root, "setup.pasteOnEnter", NSButton.self)
+    let hint = try control(root, "setup.pasteAccessHint", NSTextField.self)
+    try check(copy.state == .on && paste.state == .off && hint.isHidden, "Copy is the initial choice without an access prompt")
+    try capture("setup-keys-default")
+    try click("setup.pasteOnEnter")
+    try check(copy.state == .off && paste.state == .on && !hint.isHidden, "Paste selects one action and explains access")
+    try click("setup.copyOnEnter")
+    try check(copy.state == .on && paste.state == .off && hint.isHidden, "Returning to copy hides the permission hint")
+    try click("setup.pasteOnEnter")
     try click("setup.back")
     try checkStep(.language)
     try click("setup.next")
     try checkStep(.shortcuts)
+    try check(try control(root, "setup.pasteOnEnter", NSButton.self).state == .on, "Back retains the paste draft")
+    try click("setup.skip")
+    try check(!controller.draft.pasteOnEnter, "Skipping shortcuts restores the saved paste preference")
+    try click("setup.back")
+    try click("setup.pasteOnEnter")
     try capture("setup-keys")
     let keyFields = views(root).compactMap { $0 as? NSTextField }.filter { !$0.isHiddenOrHasHiddenAncestor }
     for (index, field) in keyFields.enumerated() {
@@ -103,7 +118,7 @@ func runSetupSmokeTest() throws {
     }
     let keyTexts = keyFields.map(\.stringValue)
     try check(keyTexts.contains { $0.contains("⌘⌥C") && $0.contains("⌘⌥V") }, "Quick selection must show complete combinations")
-    try check(!keyTexts.contains { $0.contains("Esc") || $0.contains("⌘V") }, "No redundant shortcuts in the setup reminder")
+    try check(keyTexts.contains { $0.contains("⌘V") }, "Setup explains manual paste when Accessibility access is missing")
     try click("setup.next")
     try checkStep(.storage)
     try capture("setup-storage")
@@ -152,22 +167,28 @@ func runSetupSmokeTest() throws {
     try check(try control(root, "mcp.status", NSTextField.self).textColor == .systemRed, "Failed copy must not report success")
     try click("setup.next")
     try checkStep(.models)
+    let login = try control(root, "setup.launchAtLogin", NSButton.self)
+    try check(login.state == .off && !login.isHiddenOrHasHiddenAncestor, "Show login registration on the last page")
     try capture("setup-models")
+    try click("setup.launchAtLogin")
     try control(root, "setup.embedding", NSButton.self).performClick(nil)
     try check(!access.isEnabled() && defaults.persistentDomain(forName: suite)?.isEmpty != false,
               "Walking through setup must not persist settings or permissions")
     try click("setup.next")
     try check(applied == nil && controller.step == .models, "A failed finish must keep the draft and current page")
     try click("setup.next")
-    try check(applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
+    try check(applied?.launchAtLogin == true && applied?.pasteOnEnter == true && applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
               "Retry must apply the retained draft")
 
-    let skippedModels = SetupWindow(initial: initial, modelsAvailable: true, access: access)
+    var registered = initial
+    registered.launchAtLogin = true
+    let skippedModels = SetupWindow(initial: registered, modelsAvailable: true, access: access)
     let skippedRoot = skippedModels.window!.contentView!
     var skippedDraft: SetupPreferences?
     skippedModels.onFinish = { value, _ in skippedDraft = value }
     for _ in 0..<4 { try control(skippedRoot, "setup.next", NSButton.self).performClick(nil) }
-    for id in ["embedding", "assistant", "power"] {
+    try check(try control(skippedRoot, "setup.launchAtLogin", NSButton.self).state == .on, "Reopened setup reflects login registration")
+    for id in ["embedding", "assistant", "power", "launchAtLogin"] {
         try control(skippedRoot, "setup." + id, NSButton.self).performClick(nil)
     }
     try control(skippedRoot, "setup.back", NSButton.self).performClick(nil)
@@ -176,7 +197,7 @@ func runSetupSmokeTest() throws {
               "Leaving the models page must retain its edits in the draft")
     try control(skippedRoot, "setup.next", NSButton.self).performClick(nil)
     try control(skippedRoot, "setup.skip", NSButton.self).performClick(nil)
-    try check(skippedDraft?.embeddingEnabled == initial.embeddingEnabled &&
+    try check(skippedDraft?.launchAtLogin == true && skippedDraft?.embeddingEnabled == initial.embeddingEnabled &&
               skippedDraft?.assistantEnabled == initial.assistantEnabled &&
               skippedDraft?.onlyOnExternalPower == initial.onlyOnExternalPower,
               "Skipping the final step must restore model and power settings before finishing")

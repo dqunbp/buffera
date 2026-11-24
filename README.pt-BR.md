@@ -39,6 +39,8 @@ Em Ajustes → Atalhos, clique em “Atribuir” ou “Alterar” ao lado de um 
 
 O Buffera mantém o histórico da área de transferência no seu Mac. Pressione <kbd>⌘⌥V</kbd>, encontre um item e pressione <kbd>Enter</kbd>: ele volta à área de transferência, pronto para colar com <kbd>⌘V</kbd>. Você também pode arrastar os itens diretamente para outros apps.
 
+Na etapa “Como usar o Buffera”, você pode ativar a colagem direta com Enter. Na última etapa, pode escolher se o Buffera abre ao iniciar sessão.
+
 | Recurso | O que você pode fazer |
 | :--- | :--- |
 | **Busca no histórico** | Encontre textos, links ou arquivos. Filtre por app e data. |

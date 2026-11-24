@@ -767,3 +767,17 @@
 "Вставлять выбранную запись по Enter" = "Paste the selected item on Enter";
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "To paste, allow Buffera to control your computer in macOS Accessibility settings. Until then, use ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "If access is granted and paste still doesn’t work, restart Buffera.";
+
+"Запускать Buffera при входе в систему" = "Launch Buffera at login";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "Copy to the clipboard, then paste with ⌘V";
+"Сразу вставить в активное приложение" = "Paste directly into the active app";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "After setup, macOS will ask for permission to let Buffera press ⌘V for you.";
+"Откройте историю" = "Open history";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "You can change this shortcut later in Settings → Shortcuts.";
+"Выберите запись" = "Select an item";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Use the arrow keys to move. Press Space to preview an item.";
+"Нажмите Enter" = "Press Enter";
+"Что делать с выбранной записью?" = "What should happen to the selected item?";
+"Быстрый выбор с клавиатуры" = "Quick selection with the keyboard";
+"Как пользоваться" = "How to use Buffera";
+"Завершение настройки" = "Finish setup";

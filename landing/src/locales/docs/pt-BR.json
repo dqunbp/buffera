@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Para colar diretamente com Enter, ative a opção em Ajustes → Geral e conceda ao Buffera a permissão de Acessibilidade do macOS. Se o macOS solicitar acesso à área de transferência, permita para que o Buffera possa salvar seu histórico. Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera."
+              "text": "Para colar diretamente com Enter, ative a opção na etapa “Como usar o Buffera” da configuração inicial ou em Ajustes → Geral e conceda ao Buffera a permissão de Acessibilidade do macOS. Se o macOS solicitar acesso à área de transferência, permita para que o Buffera possa salvar seu histórico. Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera."
             }
           ]
         },
@@ -116,7 +116,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Para iniciar o Buffera com seu Mac, ative «Iniciar ao entrar no sistema» em Ajustes → Geral. Você pode baixar os modelos de busca e do assistente depois; o histórico comum da área de transferência funciona sem eles."
+              "text": "Ative o início automático ao iniciar sessão na última etapa da configuração ou em Ajustes → Geral. Você pode baixar os modelos de busca e do assistente depois; o histórico comum da área de transferência funciona sem eles."
             }
           ]
         }

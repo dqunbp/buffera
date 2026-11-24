@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Pour coller directement avec Entrée, activez l’option dans Réglages → Général et accordez à Buffera l’accès Accessibilité de macOS. Si macOS demande l’accès au presse-papiers, autorisez-le pour que Buffera puisse enregistrer votre historique. Si l’accès est autorisé et que le collage ne fonctionne toujours pas, redémarrez Buffera."
+              "text": "Pour coller directement avec Entrée, activez l’option à l’étape « Utiliser Buffera » lors de la configuration initiale ou dans Réglages → Général et accordez à Buffera l’accès Accessibilité de macOS. Si macOS demande l’accès au presse-papiers, autorisez-le pour que Buffera puisse enregistrer votre historique. Si l’accès est autorisé et que le collage ne fonctionne toujours pas, redémarrez Buffera."
             }
           ]
         },
@@ -116,7 +116,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Pour lancer Buffera avec votre Mac, activez « Lancer à l’ouverture de session » dans Réglages → Général. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
+              "text": "Activez le lancement à l’ouverture de session à la dernière étape de la configuration ou dans Réglages → Général. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
             }
           ]
         }
