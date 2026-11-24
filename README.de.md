@@ -39,6 +39,8 @@ Klicke unter Einstellungen → Kurzbefehle neben einem Aufzeichnungsbefehl auf �
 
 Buffera speichert den Verlauf deiner Zwischenablage auf deinem Mac. Drücke <kbd>⌘⌥V</kbd>, suche einen Eintrag und drücke <kbd>Enter</kbd> — schon liegt er wieder in der Zwischenablage, bereit zum Einfügen mit <kbd>⌘V</kbd>. Du kannst Einträge auch direkt in andere Apps ziehen.
 
+Im Schritt „So verwendest du Buffera“ kannst du direktes Einfügen mit der Eingabetaste aktivieren. Im letzten Schritt kannst du festlegen, ob Buffera bei der Anmeldung startet.
+
 | Funktion | Das kannst du damit machen |
 | :--- | :--- |
 | **Verlauf durchsuchen** | Texte, Links oder Dateien finden und nach App und Datum filtern. |

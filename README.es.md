@@ -39,6 +39,8 @@ En Ajustes → Atajos, haz clic en «Asignar» o «Cambiar» junto al comando de
 
 Buffera guarda el historial del portapapeles en tu Mac. Pulsa <kbd>⌘⌥V</kbd>, busca una entrada y pulsa <kbd>Enter</kbd>: vuelve al portapapeles, lista para pegarla con <kbd>⌘V</kbd>. También puedes arrastrar las entradas directamente a otras aplicaciones.
 
+En el paso «Cómo usar Buffera» puedes activar el pegado directo con Intro. En el último paso puedes elegir si Buffera se abre al iniciar sesión.
+
 | Función | Qué puedes hacer |
 | :--- | :--- |
 | **Búsqueda en el historial** | Encuentra texto, enlaces o archivos. Filtra por aplicación y fecha. |

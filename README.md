@@ -39,6 +39,8 @@ In Settings → Shortcuts, click Assign or Change beside a recording command and
 
 Buffera keeps your clipboard history on your Mac. Press <kbd>⌘⌥V</kbd>, find a clip and hit <kbd>Enter</kbd> — it's back on your clipboard, ready to paste with <kbd>⌘V</kbd>. You can also drag clips straight into other apps.
 
+On the “How to use Buffera” step, you can enable direct paste with Enter. On the final step, choose whether Buffera launches at login.
+
 | Feature | What you can do |
 | :--- | :--- |
 | **History search** | Find text, links or files. Narrow results by app and date. |

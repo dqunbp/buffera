@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Para colar diretamente com Enter, ative a opção na etapa de atalhos da configuração inicial ou em Ajustes → Geral e conceda ao Buffera a permissão de Acessibilidade do macOS. Se o macOS solicitar acesso à área de transferência, permita para que o Buffera possa salvar seu histórico. Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera."
+              "text": "Para colar diretamente com Enter, ative a opção na etapa “Como usar o Buffera” da configuração inicial ou em Ajustes → Geral e conceda ao Buffera a permissão de Acessibilidade do macOS. Se o macOS solicitar acesso à área de transferência, permita para que o Buffera possa salvar seu histórico. Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera."
             }
           ]
         },
