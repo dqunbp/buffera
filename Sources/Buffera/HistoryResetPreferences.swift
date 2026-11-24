@@ -43,3 +43,35 @@ struct HistoryResetPreferences: Equatable {
         defaults.set(timing.rawValue, forKey: "historyReset.timing")
     }
 }
+
+enum HistoryPromotionPreferences {
+    private static let key = "historyPromotion.deferFirstScreen"
+
+    static func isEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        guard let value = defaults.object(forKey: key) as? NSNumber,
+              CFGetTypeID(value) == CFBooleanGetTypeID() else { return true }
+        return value.boolValue
+    }
+
+    static func shouldDefer(isOnFirstScreen: @autoclosure () -> Bool, in defaults: UserDefaults = .standard) -> Bool {
+        isEnabled(in: defaults) && isOnFirstScreen()
+    }
+
+    static func setEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: key)
+    }
+}
+
+/// The latest successful use supersedes any promotion waiting for a reset.
+struct HistoryUsePromotion {
+    private var pendingID: Int64?
+
+    mutating func recordUse(id: Int64, deferred: Bool) {
+        pendingID = deferred ? id : nil
+    }
+
+    mutating func takePending() -> Int64? {
+        defer { pendingID = nil }
+        return pendingID
+    }
+}

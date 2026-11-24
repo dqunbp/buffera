@@ -29,17 +29,35 @@ export async function loadDocs() {
         throw new Error(`Invalid documentation identity: ${lang}.${article.id}`);
       }
       used.add(article.id);
-      const sectionIds = new Set();
+      const anchorIds = new Set();
+      const linkTargets = new Set();
       article.sections.forEach((section, i) => {
-        if (!/^[a-z][a-z-]+$/.test(section.id) || sectionIds.has(section.id) || section.id !== reference.sections[i].id) {
+        if (!/^[a-z][a-z-]+$/.test(section.id) || anchorIds.has(section.id) || section.id !== reference.sections[i].id) {
           throw new Error(`Invalid section identity: ${lang}.${article.id}.${section.id}`);
         }
-        sectionIds.add(section.id);
+        anchorIds.add(section.id);
         section.blocks.forEach((block, j) => {
-          if (block.type !== reference.sections[i].blocks[j].type) throw new Error('Documentation block types differ');
+          const referenceBlock = reference.sections[i].blocks[j];
+          if (block.type !== referenceBlock.type) throw new Error('Documentation block types differ');
+          if (block.id) {
+            if (block.type !== 'paragraph' || !/^[a-z][a-z-]+$/.test(block.id) ||
+                anchorIds.has(block.id) || block.id !== referenceBlock.id) {
+              throw new Error(`Invalid documentation anchor: ${lang}.${article.id}.${block.id}`);
+            }
+            anchorIds.add(block.id);
+          }
+          if (block.link) {
+            if (block.type !== 'paragraph' || block.link.target !== referenceBlock.link.target) {
+              throw new Error(`Invalid documentation link: ${lang}.${article.id}.${section.id}`);
+            }
+            linkTargets.add(block.link.target);
+          }
           renderBlock(block, docs[lang].ui);
         });
       });
+      for (const target of linkTargets) {
+        if (!anchorIds.has(target)) throw new Error(`Missing documentation link target: ${lang}.${article.id}.${target}`);
+      }
     }
   }
   return docs;
@@ -47,7 +65,15 @@ export async function loadDocs() {
 
 function renderBlock(block, ui) {
   switch (block.type) {
-    case 'paragraph': return `<p>${e(block.text)}</p>`;
+    case 'paragraph': {
+      const id = block.id ? ` id="${e(block.id)}"` : '';
+      if (!block.link) return `<p${id}>${e(block.text)}</p>`;
+      const { label, target } = block.link;
+      const start = block.text.indexOf(label);
+      if (start < 0) throw new Error(`Missing documentation link label: ${label}`);
+      const end = start + label.length;
+      return `<p${id}>${e(block.text.slice(0, start))}<a href="#${e(target)}">${e(label)}</a>${e(block.text.slice(end))}</p>`;
+    }
     case 'note': return `<aside class="docs-note">${icon('help')}<p>${e(block.text)}</p></aside>`;
     case 'steps': return `<ol class="docs-steps">${block.items.map(text => `<li>${e(text)}</li>`).join('')}</ol>`;
     case 'list': return `<ul>${block.items.map(text => `<li>${e(text)}</li>`).join('')}</ul>`;

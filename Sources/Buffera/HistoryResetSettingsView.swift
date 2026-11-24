@@ -2,12 +2,16 @@ import AppKit
 import BufferaLocalization
 
 final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
+    var onPromotionChange: ((Bool) -> Void)?
+
     private let defaults: UserDefaults
     private let enabled = NSButton(checkboxWithTitle: L10n.text("Сбрасывать состояние окна"), target: nil, action: nil)
     private let immediately = NSButton(radioButtonWithTitle: L10n.text("Сразу после закрытия"), target: nil, action: nil)
     private let afterDelay = NSButton(radioButtonWithTitle: L10n.text("Через"), target: nil, action: nil)
     private let minutes = NSTextField(string: "1")
     private let stepper = NSStepper()
+    private let deferPromotion = NSButton(
+        checkboxWithTitle: L10n.text("Откладывать поднятие карточек с первого экрана"), target: nil, action: nil)
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -59,7 +63,22 @@ final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
         let note = NSTextField(wrappingLabelWithString: L10n.text("Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)."))
         note.identifier = NSUserInterfaceItemIdentifier("settings.historyReset.note")
         note.font = .systemFont(ofSize: 11); note.textColor = .secondaryLabelColor
-        for child in [enabled, modes, note] { addArrangedSubview(child) }
+        deferPromotion.identifier = NSUserInterfaceItemIdentifier("settings.historyPromotion.deferFirstScreen")
+        deferPromotion.target = self; deferPromotion.action = #selector(togglePromotion)
+        deferPromotion.font = .systemFont(ofSize: 12)
+        let promotionTitle = deferPromotion.title
+        let promotionHelp = SettingsHelpButton(id: "settings.historyPromotion.help", title: promotionTitle) {
+            let detail = L10n.text("""
+                Выключено. Выбранная карточка становится первой после копирования.
+
+                Включено. Карточки вверху списка остаются на своих местах, когда вы быстро открываете историю снова. \
+                Карточка из глубины сразу становится первой.
+                """)
+            return SettingsHelpView(id: "historyPromotion.help", title: promotionTitle, detail: detail)
+        }
+        let promotion = NSStackView(views: [deferPromotion, promotionHelp])
+        promotion.orientation = .horizontal; promotion.alignment = .centerY; promotion.spacing = 6
+        for child in [enabled, modes, note, promotion] { addArrangedSubview(child) }
         modes.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         note.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         refresh()
@@ -76,6 +95,13 @@ final class HistoryResetSettingsView: NSStackView, NSTextFieldDelegate {
         minutes.integerValue = value.minutes; stepper.integerValue = value.minutes
         minutes.isEnabled = value.isEnabled && value.timing == .afterDelay
         stepper.isEnabled = minutes.isEnabled
+        deferPromotion.state = HistoryPromotionPreferences.isEnabled(in: defaults) ? .on : .off
+    }
+
+    @objc private func togglePromotion() {
+        let enabled = deferPromotion.state == .on
+        HistoryPromotionPreferences.setEnabled(enabled, in: defaults)
+        onPromotionChange?(enabled)
     }
 
     @objc private func toggleEnabled() {

@@ -10,6 +10,7 @@ final class SettingsWindow: NSWindowController {
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onSecretHistoryChange: SecretHistorySettingsView.Apply?
     var onTemporaryHistoryChange: ((Bool) -> Void)?
+    var onHistoryPromotionChange: ((Bool) -> Void)?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -72,6 +73,7 @@ final class SettingsWindow: NSWindowController {
             apply(mode, completion)
         }
         settings.onTemporaryHistoryChange = { [weak self] value in self?.onTemporaryHistoryChange?(value) }
+        settings.onHistoryPromotionChange = { [weak self] value in self?.onHistoryPromotionChange?(value) }
         settings.onRevealData = { [weak self] in self?.onRevealData?() }
         settings.onCopyMCPConfiguration = { [weak self] configuration in
             guard let copy = self?.onCopyMCPConfiguration else { throw MCPSettingsError.copyUnavailable }
@@ -166,6 +168,7 @@ private final class SettingsContentController: NSViewController {
     var onLimitsChange: ((HistoryLimits) -> Void)?
     var onSecretHistoryChange: SecretHistorySettingsView.Apply?
     var onTemporaryHistoryChange: ((Bool) -> Void)?
+    var onHistoryPromotionChange: ((Bool) -> Void)?
     var onShowSetup: (() -> Void)?
     var onRestart: (() -> Void)?
     var onRevealData: (() -> Void)?
@@ -230,6 +233,7 @@ private final class SettingsContentController: NSViewController {
             apply(mode, completion)
         }
         temporaryHistory.onChange = { [weak self] value in self?.onTemporaryHistoryChange?(value) }
+        historyReset.onPromotionChange = { [weak self] value in self?.onHistoryPromotionChange?(value) }
         shortcutSettings.onApply = { [weak self] value in
             guard let self, let apply = self.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
             try apply(value)

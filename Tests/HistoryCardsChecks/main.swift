@@ -346,6 +346,16 @@ check((0..<contentClips.count).allSatisfy { index in
 check((1..<contentClips.count).allSatisfy { abs(itemFrame($0).minY - itemFrame($0 - 1).maxY - HistoryCardsMetrics.gap) < 1 },
       "heterogeneous panel cards retain the normal gap without empty row space")
 
+check(contentGrid.isOnFirstScreen(at: 3) && !contentGrid.isOnFirstScreen(at: 20),
+      "first-screen classification uses actual compact card frames")
+for index in contentClips.indices {
+    let projected = contentGrid.isOnFirstScreen(at: index, count: contentClips.count) { row, width, height in
+        ClipCardView.preferredHeight(for: contentClips[row], revealedText: nil, width: width, maximumHeight: height)
+    }
+    check(projected == contentGrid.isOnFirstScreen(at: index),
+          "unfiltered layout projected during search matches actual card visibility")
+}
+
 contentGrid.select(20, scrollIntoView: true)
 let contentCenterSelectionEvents = contentSelections.count
 contentGrid.scrollToSelection(centered: true)

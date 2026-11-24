@@ -47,6 +47,8 @@ let checks: [(String, (HistoryStoreTests) -> () throws -> Void)] = [
     ("Usage preserves date filters and persists after reopen", HistoryStoreTests.testMarkUsedPreservesDateFiltersAndPersistsAfterReopen),
     ("Use recency pagination keeps stable tie ordering", HistoryStoreTests.testUseRecencyPaginationHasStableTies),
     ("Count pruning retains used clips and cascades unused payloads", HistoryStoreTests.testPruningKeepsRecentlyUsedRecordsAndCascadesUnusedPayloads),
+    ("Deferred use preserves position and protects against pruning after reopen", HistoryStoreTests.testDeferredUsePreservesPositionAndSurvivesPruning),
+    ("Schema ten preserves display and retention order during migration", HistoryStoreTests.testVersionTenBackfillsRetentionFromUsageOrder),
     ("Byte pruning retains used clips", HistoryStoreTests.testBytePruningKeepsRecentlyUsedRecords),
     ("Repeat capture after use updates recency and source", HistoryStoreTests.testRepeatCaptureAfterUseUpdatesRecencyAndSource),
     ("Missing usage update throws and leaves history usable", HistoryStoreTests.testMissingMarkUsedThrowsMissingAndLeavesStoreUsable),

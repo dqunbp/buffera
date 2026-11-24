@@ -621,6 +621,8 @@
 "Копирование текста как файла" = "Copier du texte en fichier";
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "Dans le menu d’un élément, choisissez « Copier autrement », puis « En fichier .txt » ou « En fichier .md ». Buffera crée un fichier contenant tout le texte, à coller dans le Finder ou à utiliser en pièce jointe.";
 "Сбрасывать состояние окна" = "Réinitialiser l’état de la fenêtre";
+"Откладывать поднятие карточек с первого экрана" = "Reporter la remontée des éléments du premier écran";
+"Выключено. Выбранная карточка становится первой после копирования.\n\nВключено. Карточки вверху списка остаются на своих местах, когда вы быстро открываете историю снова. Карточка из глубины сразу становится первой." = "Désactivé. L’élément sélectionné passe en tête de liste après la copie.\n\nActivé. Les éléments en haut de la liste gardent leur place si vous rouvrez rapidement l’historique. Un élément situé plus bas passe immédiatement en tête de liste.";
 "Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)." = "Rétablir automatiquement l’état par défaut de l’interface à la prochaine ouverture (effacer la recherche et les filtres, quitter les Favoris).";
 
 "Пояснение: %1$@" = "Aide : %1$@";

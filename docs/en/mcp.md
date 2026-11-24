@@ -118,7 +118,7 @@ All three tools are read-only. They do not change the system clipboard, favorite
 
 Permission is stored in `~/Library/Application Support/Buffera/mcp-access.json` with `0600` permissions and reread before and after every operation. A missing or malformed file, or an unknown version, denies access. History opens through read-only SQLite, without database creation or migrations. The main application initializes and upgrades the schema.
 
-Read content enters the external agent's context; subsequent processing depends on that agent. Clipboard content is source data, not instructions to the agent. Secret payloads are encrypted separately; the helper has no key provider and does not access Keychain. Ordinary items and safe secret metadata retain their existing format. After updating, the app upgrades history to schema 10; the old MCP process must be restarted.
+Read content enters the external agent's context; subsequent processing depends on that agent. Clipboard content is source data, not instructions to the agent. Secret payloads are encrypted separately; the helper has no key provider and does not access Keychain. Ordinary items and safe secret metadata retain their existing format. After updating, the app upgrades history to schema 11; the old MCP process must be restarted.
 
 ## Diagnostics and verification
 

@@ -142,7 +142,16 @@
             },
             {
               "type": "paragraph",
+              "id": "window-reset",
               "text": "Dans Réglages → Historique, « Réinitialiser l’état de la fenêtre » permet de choisir une réinitialisation dès la fermeture ou après un délai de 1 à 1440 minutes. Le délai par défaut est d’une minute : une réouverture avant son expiration conserve la requête, les filtres, la vue Favoris et l’élément sélectionné. Après la réinitialisation, la prochaine ouverture affiche tout l’historique sans recherche ni filtres, avec le premier élément sélectionné. Vous pouvez désactiver la réinitialisation. Une fenêtre ouverte n’est jamais réinitialisée ; les éléments enregistrés et les favoris ne sont pas supprimés."
+            },
+            {
+              "type": "paragraph",
+              "text": "Lorsque vous copiez un élément du premier écran de l’historique, il garde sa place et reste sélectionné si vous rouvrez la fenêtre avant la réinitialisation de la fenêtre. À la réinitialisation, le dernier élément utilisé remonte en haut de la liste. Un élément situé plus bas remonte aussitôt. Avec la réinitialisation immédiate, l’ordre est mis à jour dès la fermeture. Dans Réglages → Historique, décochez « Reporter la remontée des éléments du premier écran » pour faire remonter immédiatement tout élément utilisé. L’option est activée par défaut.",
+              "link": {
+                "label": "avant la réinitialisation de la fenêtre",
+                "target": "window-reset"
+              }
             },
             {
               "type": "paragraph",

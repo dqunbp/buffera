@@ -642,6 +642,8 @@
 "Копирование текста как файла" = "Copy text as a file";
 "В меню записи выберите «Скопировать иначе», затем «Как файл .txt» или «Как файл .md». Buffera создаст файл с полным текстом для вставки в Finder или как вложение." = "In an entry’s menu, choose “Copy Differently”, then “As .txt file” or “As .md file”. Buffera creates a file with the full text to paste into Finder or use as an attachment.";
 "Сбрасывать состояние окна" = "Reset window state";
+"Откладывать поднятие карточек с первого экрана" = "Defer moving first-screen clips to the top";
+"Выключено. Выбранная карточка становится первой после копирования.\n\nВключено. Карточки вверху списка остаются на своих местах, когда вы быстро открываете историю снова. Карточка из глубины сразу становится первой." = "Off. The selected clip moves to the top after copying.\n\nOn. Clips near the top stay in place when you quickly reopen history. A clip farther down moves to the top immediately.";
 "Автоматический сброс интерфейса в дефолтное состояние при следующем открытии (очистить поиск и фильтры, выйти из избранного)." = "Automatically reset the interface to its default state on the next opening (clear the search and filters, leave Favorites).";
 
 "Пояснение: %1$@" = "Help: %1$@";

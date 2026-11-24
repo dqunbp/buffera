@@ -25,6 +25,18 @@ test('guides have complete localized content, stable anchors and route-specific 
   }
 });
 
+test('the history promotion paragraph links to the reset explanation in each language', () => {
+  for (const lang of languages) {
+    const history = docs[lang].articles.find(article => article.id === 'history');
+    const blocks = history.sections.find(section => section.id === 'find').blocks;
+    const explanation = blocks.find(block => block.id === 'window-reset');
+    const promotion = blocks.find(block => block.link?.target === explanation.id);
+    const html = render(lang, 'history');
+    assert.ok(html.includes(`<p id="${explanation.id}">`));
+    assert.ok(html.includes(`<a href="#${explanation.id}">${promotion.link.label}</a>`));
+  }
+});
+
 test('neutral docs URLs select a language and retain the article, query and anchor', () => {
   for (const id of ['', 'privacy', 'agents']) {
     const route = `/docs/${id ? `${id}/` : ''}`;

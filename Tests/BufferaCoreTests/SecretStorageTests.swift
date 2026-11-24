@@ -448,6 +448,7 @@ func runSecretStorageChecks() -> Int {
                 DROP TABLE old_data;
                 DROP TABLE secret_maintenance;
                 ALTER TABLE clips DROP COLUMN label;
+                ALTER TABLE clips DROP COLUMN retention_date;
                 PRAGMA user_version=8;
                 PRAGMA wal_checkpoint(TRUNCATE);
                 """)

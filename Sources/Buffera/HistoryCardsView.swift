@@ -162,6 +162,32 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         }.sorted()
     }
 
+    func isOnFirstScreen(at index: Int) -> Bool {
+        guard (0..<itemCount).contains(index) else { return false }
+        collectionView.layoutSubtreeIfNeeded()
+        let height = scrollView.contentView.bounds.height
+        return collectionView.layoutAttributesForItem(at: indexPath(index))
+            .map { $0.frame.minY < height } ?? false
+    }
+
+    /// Project the unfiltered first screen when another list owns the collection.
+    func isOnFirstScreen(at index: Int, count: Int,
+                         heightForCard: (Int, CGFloat, CGFloat) -> CGFloat) -> Bool {
+        let layout = metrics
+        let height = scrollView.contentView.bounds.height
+        let targetRowStart = index / layout.columns * layout.columns
+        var y: CGFloat = 0
+        for start in stride(from: 0, to: targetRowStart, by: layout.columns) {
+            let end = min(count, start + layout.columns)
+            let rowHeight = sizesToContent ? (start..<end).map {
+                measuredHeight(at: $0, layout: layout, heightForCard: heightForCard)
+            }.max() ?? layout.itemSize.height : layout.itemSize.height
+            y += rowHeight + HistoryCardsMetrics.gap
+            if y >= height { return false }
+        }
+        return y < height
+    }
+
     func invalidateHeight(at index: Int) {
         measuredHeights.removeValue(forKey: index)
         if sizesToContent { flow.invalidateLayout() }
@@ -252,12 +278,17 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         let end = min(itemCount, first + layout.columns)
         let height = (first..<end).map { index -> CGFloat in
             if let cached = measuredHeights[index] { return cached }
-            let measured = heightForCard(index, layout.itemSize.width, layout.itemSize.height)
-            let result = measured.isFinite && measured > 0 ? ceil(measured) : layout.itemSize.height
+            let result = measuredHeight(at: index, layout: layout, heightForCard: heightForCard)
             measuredHeights[index] = result
             return result
         }.max() ?? layout.itemSize.height
         return NSSize(width: layout.itemSize.width, height: height)
+    }
+
+    private func measuredHeight(at index: Int, layout: HistoryCardsMetrics,
+                                heightForCard: (Int, CGFloat, CGFloat) -> CGFloat) -> CGFloat {
+        let height = heightForCard(index, layout.itemSize.width, layout.itemSize.height)
+        return height.isFinite && height > 0 ? ceil(height) : layout.itemSize.height
     }
 
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt path: IndexPath) -> NSCollectionViewItem {

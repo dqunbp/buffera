@@ -142,7 +142,16 @@
             },
             {
               "type": "paragraph",
+              "id": "window-reset",
               "text": "Unter „Einstellungen → Verlauf“ kannst du mit „Fensterzustand zurücksetzen“ zwischen sofortigem Zurücksetzen nach dem Schließen und einer Verzögerung von 1–1440 Minuten wählen. Standardmäßig gilt eine Minute: Beim erneuten Öffnen vor Ablauf bleiben Suchanfrage, Filter, Favoritenansicht und ausgewählter Eintrag erhalten. Nach dem Zurücksetzen zeigt das nächste Öffnen den gesamten Verlauf ohne Suche und Filter; der erste Eintrag ist ausgewählt. Du kannst das Zurücksetzen deaktivieren. Ein geöffnetes Fenster wird nie zurückgesetzt; gespeicherte Einträge und Favoriten werden nicht gelöscht."
+            },
+            {
+              "type": "paragraph",
+              "text": "Wenn du einen Eintrag auf der ersten Bildschirmseite des Verlaufs kopierst, bleibt er an seinem Platz. Wenn du den Verlauf vor dem Zurücksetzen des Fensters erneut öffnest, bleibt der Eintrag ausgewählt. Beim Zurücksetzen rückt der zuletzt verwendete Eintrag nach oben. Ein weiter unten liegender Eintrag rückt sofort nach oben. Beim sofortigen Zurücksetzen ändert sich die Reihenfolge schon beim Schließen. Unter „Einstellungen → Verlauf“ kannst du „Einträge der ersten Bildschirmseite später nach oben verschieben“ deaktivieren. Dann rückt jeder verwendete Eintrag sofort nach oben. Die Option ist standardmäßig aktiviert.",
+              "link": {
+                "label": "vor dem Zurücksetzen des Fensters",
+                "target": "window-reset"
+              }
             },
             {
               "type": "paragraph",
