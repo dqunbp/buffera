@@ -273,11 +273,14 @@ func runLocalizationSmokeTest() throws {
         throw HistoryError.database("History promotion help missing")
     }
     try check(promotionHelp.bezelStyle == .helpButton &&
-              promotionHelp.accessibilityLabel() == L10n.text("Пояснение: \(deferPromotion.title)") &&
-              promotionHelp.superview === deferPromotion.superview &&
-              promotionHelp.frame.minX >= deferPromotion.frame.maxX &&
-              promotionRow.bounds.insetBy(dx: -1, dy: -1).contains(promotionHelp.frame),
-              "The accessible help button must fit beside the promotion checkbox")
+              promotionHelp.accessibilityLabel() == L10n.text("Пояснение: \(deferPromotion.title)"),
+              "History promotion help must have a native help bezel and a localized accessibility label")
+    // AppKit lays out native controls by alignment rect. Their frames also include bezel margins.
+    let checkboxRect = deferPromotion.alignmentRect(forFrame: deferPromotion.frame)
+    let helpRect = promotionHelp.alignmentRect(forFrame: promotionHelp.frame)
+    try check(promotionRow === deferPromotion.superview && !helpRect.isEmpty &&
+              helpRect.minX >= checkboxRect.maxX && promotionRow.bounds.contains(helpRect),
+              "History promotion help must fit beside the checkbox within the row")
     do {
         let wasVisible = window.isVisible
         let alpha = window.alphaValue
