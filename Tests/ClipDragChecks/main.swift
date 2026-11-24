@@ -134,7 +134,7 @@ var completions: [Int64] = []
 var confirmations: [Int64] = []
 var refreshes = 0
 panel.onDragCompleted = { completions.append($0) }
-panel.onConfirm = { confirmations.append($0) }
+panel.onConfirm = { id, _ in confirmations.append(id) }
 panel.request = { _, _, _ in refreshes += 1 }
 panel.requestDragPayload = { _, _, _ in }
 let card = cards.card(at: 0)!

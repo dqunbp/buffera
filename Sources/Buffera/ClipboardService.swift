@@ -185,7 +185,8 @@ final class ClipboardService {
         ClipboardText.decode(representations)
     }
 
-    func restore(_ payload: ClipPayload) throws {
+    @discardableResult
+    func restore(_ payload: ClipPayload) throws -> Int {
         let items = payload.items.map { representations -> NSPasteboardItem in
             let item = NSPasteboardItem()
             for representation in representations { item.setData(representation.data, forType: .init(representation.type)) }
@@ -196,6 +197,7 @@ final class ClipboardService {
         let success = pasteboard.writeObjects(items)
         lastChange = pasteboard.changeCount
         guard success else { throw ClipboardFailure.writeFailed }
+        return lastChange
     }
 
     static func thumbnail(_ payload: ClipPayload) -> NSImage? {

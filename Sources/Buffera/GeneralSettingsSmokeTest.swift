@@ -42,9 +42,16 @@ func runGeneralSettingsChecks() throws {
     func button(_ id: String) -> NSButton { descendants(root).first { $0.identifier?.rawValue == id } as! NSButton }
     let login = button("settings.launchAtLogin")
     let menu = button("settings.menuBarIcon")
+    let paste = button("settings.pasteOnEnter")
+    try check(paste.state == .off && !preferences.pasteOnEnter, "Paste on Enter must be opt-in")
+    preferences.pasteOnEnter = true
     let approval = button("settings.loginApproval")
     let status = descendants(root).first { $0.identifier?.rawValue == "settings.loginStatus" } as! NSTextField
     let general = descendants(root).compactMap { $0 as? GeneralSettingsView }.first!
+    general.refresh()
+    try check(paste.state == .on && AppPreferences(defaults: defaults).pasteOnEnter, "Paste preference must persist")
+    paste.performClick(nil)
+    try check(!preferences.pasteOnEnter && paste.state == .off, "Disabling paste must restore copy-only behavior")
     try check(requests.isEmpty && changes.isEmpty && menu.state == .on && login.state == .off,
               "Opening settings must not register login or change menu visibility")
     login.performClick(nil)

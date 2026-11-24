@@ -6,6 +6,8 @@ final class GeneralSettingsView: NSStackView {
     private let preferences: AppPreferences
     private let login = NSButton(checkboxWithTitle: L10n.text("Запускать при входе в систему"), target: nil, action: nil)
     private let menuBar = NSButton(checkboxWithTitle: L10n.text("Показывать значок в строке меню"), target: nil, action: nil)
+    private let paste = NSButton(checkboxWithTitle: L10n.text("Вставлять выбранную запись по Enter"), target: nil, action: nil)
+    private let pasteHelp = SetupUI.text(L10n.text("Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V."), size: 12)
     private let status = SetupUI.text("", size: 12)
     private let approval = NSButton(title: L10n.text("Открыть настройки входа macOS"), target: nil, action: nil)
     private var activationObserver: NSObjectProtocol?
@@ -19,13 +21,17 @@ final class GeneralSettingsView: NSStackView {
         menuBar.identifier = .init("settings.menuBarIcon")
         status.identifier = .init("settings.loginStatus")
         approval.identifier = .init("settings.loginApproval")
+        paste.identifier = .init("settings.pasteOnEnter")
+        paste.target = self
+        paste.action = #selector(changePaste)
+        pasteHelp.textColor = .secondaryLabelColor
         login.target = self; login.action = #selector(changeLogin)
         menuBar.target = self; menuBar.action = #selector(changeMenuBar)
         approval.target = self; approval.action = #selector(openApproval)
         approval.bezelStyle = .rounded
         let access = SetupUI.text(L10n.text("Без значка откройте историю сочетанием клавиш или запустите Buffera снова, чтобы открыть настройки."), size: 12)
         access.textColor = .secondaryLabelColor
-        let startup = SetupUI.card([SetupUI.text(L10n.text("Запуск и доступ"), bold: true), login, status, approval, menuBar, access])
+        let startup = SetupUI.card([SetupUI.text(L10n.text("Запуск и доступ"), bold: true), login, status, approval, menuBar, access, paste, pasteHelp])
         let version = SetupUI.text(L10n.text("Версия \(AppVersion.version) · сборка \(AppVersion.build)"), size: 13)
         version.identifier = .init("settings.version")
         version.isSelectable = true
@@ -53,6 +59,8 @@ final class GeneralSettingsView: NSStackView {
     }
 
     func refresh() {
+        paste.state = preferences.pasteOnEnter ? .on : .off
+        pasteHelp.isHidden = !preferences.pasteOnEnter || CGPreflightPostEventAccess()
         menuBar.state = preferences.showsMenuBarIcon ? .on : .off
         let value = preferences.loginStatus()
         login.state = value == .enabled ? .on : value == .requiresApproval ? .mixed : .off
@@ -76,6 +84,12 @@ final class GeneralSettingsView: NSStackView {
             status.textColor = .systemRed
             status.isHidden = false
         }
+    }
+
+    @objc private func changePaste() {
+        preferences.pasteOnEnter = paste.state == .on
+        if preferences.pasteOnEnter && !CGPreflightPostEventAccess() { _ = CGRequestPostEventAccess() }
+        refresh()
     }
 
     @objc private func changeMenuBar() { preferences.showsMenuBarIcon = menuBar.state == .on }

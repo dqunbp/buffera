@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera 不会自动粘贴。如果 macOS 请求剪贴板访问权限，请允许，以便 Buffera 保存历史记录。"
+              "text": "要按回车键直接粘贴，请在“设置 → 通用”中启用此选项，并在 macOS 辅助功能设置中授权 Buffera。如果 macOS 请求剪贴板访问权限，请允许，以便 Buffera 保存历史记录。"
             }
           ]
         },

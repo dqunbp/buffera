@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Buffera no pega automáticamente. Si macOS solicita acceso al portapapeles, permítelo para que Buffera pueda guardar tu historial."
+              "text": "Para pegar directamente con Intro, activa la opción en Ajustes → General y concede a Buffera el permiso de Accesibilidad de macOS. Si macOS solicita acceso al portapapeles, permítelo para que Buffera pueda guardar tu historial."
             }
           ]
         },

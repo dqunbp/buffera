@@ -26,7 +26,7 @@ if (( ${#targets[@]} == 0 )); then targets=(HistoryPanelChecks HistoryCardsCheck
 for test in "${targets[@]}"; do
 swiftc -I "$CHECK_DIR" -I "$BIN_DIR/Modules" -L "$CHECK_DIR" -lBufferaCore -lBufferaLocalization \
   -Xlinker -rpath -Xlinker "$CHECK_DIR" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
-  Sources/Buffera/HistoryPanel.swift Sources/Buffera/NearbyIntroductionWindow.swift Sources/Buffera/SetupUI.swift Sources/Buffera/CopyTransformOperation.swift \
+  Sources/Buffera/HistoryPanel.swift Sources/Buffera/PasteOnEnter.swift Sources/Buffera/NearbyIntroductionWindow.swift Sources/Buffera/SetupUI.swift Sources/Buffera/CopyTransformOperation.swift \
   Sources/Buffera/CopyTransformMenu.swift Sources/Buffera/TextFileNaming.swift Sources/Buffera/NearbyHistoryState.swift \
   Sources/Buffera/ShortcutPreferences.swift Sources/Buffera/HistoryShortcutGesture.swift Sources/Buffera/HistoryCardsView.swift \
   Sources/Buffera/GroupGallery.swift Sources/Buffera/ClipCardView.swift Sources/Buffera/ClipDragController.swift \

@@ -40,6 +40,7 @@ final class PanelHarness {
     let cards: HistoryCardsView
     var requests: [Request] = []
     var nearbyRequests: [NearbyRequest] = []
+    var enterConfirmations: [Int64] = []
     var confirmations: [Int64] = []
 
     init(rows: [ClipSummary] = [], resetDefaults: UserDefaults = .standard, currentDate: @escaping () -> Date = Date.init) {
@@ -62,7 +63,10 @@ final class PanelHarness {
             self.requests.append(Request(query: filter.query, offset: offset, limit: limit,
                                          silent: self.panel.isRefreshingSearchIndex, filter: filter, mode: self.panel.searchMode))
         }
-        panel.onConfirm = { [weak self] in self?.confirmations.append($0) }
+        panel.onConfirm = { [weak self] id, confirmation in
+            self?.confirmations.append(id)
+            if case .enter = confirmation { self?.enterConfirmations.append(id) }
+        }
         panel.requestNearby = { [weak self] id, token in
             self?.nearbyRequests.append(NearbyRequest(anchorID: id, token: token))
         }
@@ -90,6 +94,26 @@ final class PanelHarness {
 }
 
 _ = NSApplication.shared
+
+// Capture generated events in memory. These checks never post keys or request macOS permissions.
+do {
+    let paste = PasteOnEnter(target: .current, clipboardVersion: 1)
+    var events: [(CGEvent, pid_t)] = []
+    func attempt(current: Bool = true, permitted: Bool = true, front: NSRunningApplication? = .current) {
+        paste.afterActivation(frontmost: { front }, canPost: { permitted }, post: { events.append(($0, $1)) },
+                              isCurrent: { current })
+    }
+    attempt(current: false)
+    attempt(permitted: false)
+    attempt(front: nil)
+    check(events.isEmpty, "Cancel paste on stale confirmation, missing permission or missing focus")
+    attempt()
+    check(events.map { $0.0.type } == [.keyDown, .keyUp] &&
+          events.allSatisfy { event, pid in
+              pid == paste.target.processIdentifier && event.flags == .maskCommand &&
+              event.getIntegerValueField(.keyboardEventKeycode) == 9
+          }, "Enter sends one Command-V key pair to the intended process")
+}
 NSApp.setActivationPolicy(.prohibited)
 NSApp.finishLaunching()
 searchStatusChecks()
@@ -376,7 +400,7 @@ check(completions < 20, "continuous OCR completions do not postpone refresh unti
 entering.enter()
 check(!entering.search.isEnabled, "Enter waits while an empty search is loading OCR matches")
 entering.panel.receive([fixture(42)], total: 1, offset: 0)
-check(entering.confirmations == [42], "pending Enter confirms the first OCR match without deadlocking")
+check(entering.enterConfirmations == [42], "pending Enter confirms the first OCR match without deadlocking")
 entering.finish()
 
 let failed = PanelHarness()
@@ -615,7 +639,7 @@ func shortcutChecks() -> [(Bool, String)] {
                     "a second press in the opening hold moves once without confirming early"))
     cycling.panel.window.onFlagsChanged?([.option])
     cycling.panel.window.onFlagsChanged?([])
-    results.append((cycling.confirmations == [2] && !cycling.search.isEnabled,
+    results.append((cycling.confirmations == [2] && cycling.enterConfirmations.isEmpty && !cycling.search.isEnabled,
                     "releasing Command after cycling confirms the selected record exactly once"))
 
     let reverse = opened()
@@ -787,7 +811,7 @@ func selectionLifecycleChecks() -> [(Bool, String)] {
     let confirmed = harness()
     confirmed.panel.move(5)
     confirmed.enter()
-    results.append((confirmed.confirmations == [6], "Enter confirms the selected record rather than the first row"))
+    results.append((confirmed.enterConfirmations == [6], "Enter confirms the selected record rather than the first row"))
     confirmed.panel.clipboardDidCapture(id: 999)
     confirmed.panel.closeAfterConfirmation()
     confirmed.panel.open()
@@ -1096,7 +1120,7 @@ func previewPrivacyChecks() {
                                 windowNumber: hidden.window!.windowNumber, context: nil,
                                 characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
     NSApp.sendEvent(enter)
-    check(value.confirmations == [secret.id], "Enter in unlocked preview retains the normal history confirmation path")
+    check(value.enterConfirmations == [secret.id], "Enter in unlocked preview retains the normal history confirmation path")
 }
 previewPrivacyChecks()
 

@@ -2,7 +2,7 @@ import AppKit
 import ServiceManagement
 import Carbon
 
-/// The system owns login registration; only menu visibility is an app preference.
+/// The system owns login registration.
 final class AppPreferences {
     static let menuBarKey = "showMenuBarIcon"
     let defaults: UserDefaults
@@ -22,6 +22,11 @@ final class AppPreferences {
         self.loginStatus = loginStatus
         self.setLoginEnabled = setLoginEnabled
         self.openLoginSettings = openLoginSettings
+    }
+
+    var pasteOnEnter: Bool {
+        get { defaults.bool(forKey: "pasteOnEnter") }
+        set { defaults.set(newValue, forKey: "pasteOnEnter") }
     }
 
     var showsMenuBarIcon: Bool {
