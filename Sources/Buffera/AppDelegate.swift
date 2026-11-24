@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let appPreferences = AppPreferences()
     private var store: HistoryStore!
     private let secretKeys = KeychainSecretKeyProvider()
+    private let singleItemClips = NSCache<NSNumber, NSNumber>()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
     // Accessed on work alongside capture and history ordering writes.
     private var usePromotion = HistoryUsePromotion()
@@ -210,6 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         clipboard.discardPendingChanges()
         clipboard.start()
         panel.applyShortcuts(hotKeys.preferences)
+        hotKeys.onCapture = { [weak self] keyCode, modifiers in
+            self?.settings?.captureRegisteredShortcut(keyCode: keyCode, modifiers: modifiers) ?? false
+        }
         hotKeys.onPress = { [weak self] delta, isRepeat in
             guard let self else { return }
             if self.panel.isAvailableForShortcut { self.panel.shortcutPressed(delta, isRepeat: isRepeat, fromGlobalShortcut: true) }
@@ -329,12 +333,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 }
             }
         }
-        panel.requestDragPayload = { [weak self] id, completion in
+        singleItemClips.countLimit = 4096
+        panel.requestGroupTiles = { [weak self] id, completion in
+            guard let self else { return }
+            self.work.async {
+                let key = NSNumber(value: id)
+                guard self.singleItemClips.object(forKey: key) == nil,
+                      let summary = try? self.store.summary(id: id), !summary.isConcealed,
+                      let payload = try? self.store.payload(id: id) else { return }
+                guard payload.items.count > 1 else { self.singleItemClips.setObject(true, forKey: key); return }
+                let tiles = GroupTile.previews(payload)
+                DispatchQueue.main.async { completion(tiles) }
+            }
+        }
+        panel.requestDragPayload = { [weak self] id, index, completion in
             guard let self else { completion(.failure(ClipDragFailure.unreadable)); return }
             self.work.async {
                 let result = Result {
+                    if index != nil, try self.store.summary(id: id).isConcealed { throw ClipDragFailure.unreadable }
                     try self.retrySecretAccess(id: id)
-                    return try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports)
+                    return try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports, itemIndex: index)
                 }
                 DispatchQueue.main.async { completion(result) }
             }
@@ -962,7 +980,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func updateRecordingMenu() {
         guard pauseItem != nil, skipNextItem != nil else { return }
         let preferences = hotKeys.preferences
-        func suffix(_ letter: String?) -> String { letter.map { "    " + preferences.base.title + $0 } ?? "" }
+        func suffix(_ key: ShortcutKey?) -> String { key.map { "    " + preferences.title(for: $0) } ?? "" }
         pauseItem.title = (clipboard.paused ? L10n.text("Возобновить запись") : L10n.text("Приостановить запись")) + suffix(preferences.pause)
         pauseItem.state = clipboard.paused ? .on : .off
         skipNextItem.title = (clipboard.skipsNextCopy ? L10n.text("Отменить пропуск копирования") : L10n.text("Пропустить следующее копирование")) + suffix(preferences.skipNext)

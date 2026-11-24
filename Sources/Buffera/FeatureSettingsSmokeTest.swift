@@ -195,9 +195,21 @@ private func checkDiscoveredModelPresentation() throws {
         RunLoop.current.run(until: Date().addingTimeInterval(0.01))
     }
     let connect = try control("models.assistant.connectSource", NSButton.self)
-    try featureCheck(source.numberOfItems == 1 && source.indexOfSelectedItem == 0 && connect.isEnabled,
+    try featureCheck(source.indexOfSelectedItem == 0 && connect.isEnabled,
                      "First discovered model should be preselected without connecting")
+    let assistantModels = ExternalModels.supported.filter { $0.role == .assistant && $0.engine == .liteRT }
+    try featureCheck(source.numberOfItems == assistantModels.count &&
+                     source.itemTitles.contains { $0.hasPrefix("Gemma 4 E4B ·") },
+                     "Assistant choices must include E4B and exclude models for semantic search")
+    guard let gemma12BIndex = source.itemTitles.firstIndex(where: { $0.hasPrefix("Gemma 4 12B ·") }),
+          let gemma12B = assistantModels.first(where: { $0.title == "Gemma 4 12B" }) else {
+        throw HistoryError.database("Missing discovered Gemma 4 12B")
+    }
+    source.selectItem(at: gemma12BIndex)
     source.sendAction(source.action!, to: source.target)
+    let path = try control("models.assistant.sourcePath", NSTextField.self)
+    try featureCheck(path.stringValue == root.appendingPathComponent(gemma12B.filename).path,
+                     "Choosing Gemma 4 12B must select its own file")
     try featureCheck(connect.isEnabled && fixture.manager.snapshots.allSatisfy { $0.externalURL == nil && !$0.isEnabled },
                      "Browsing files must not select or enable a model")
     let supported = try control("models.assistant.supportedSources", NSTextField.self)

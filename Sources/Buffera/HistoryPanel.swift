@@ -84,6 +84,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     }
     private var shortcutModifiersTimer: Timer?
     private var cardMenuTracking = false
+    private let groupIDs = NSCache<NSNumber, NSNumber>()
     private var dragSourceID: Int64?
     private var dragHistoryDirty = false
     private var outsideClickMonitor: Any?
@@ -118,7 +119,8 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
     var requestNearby: ((Int64, Int) -> Void)?
     var onNavigate: (() -> Void)?
     var onConfirm: ((Int64) -> Void)?
-    var requestDragPayload: ((Int64, @escaping (Result<ClipDragPayload, Error>) -> Void) -> Void)?
+    var requestGroupTiles: ((Int64, @escaping ([GroupTile]) -> Void) -> Void)?
+    var requestDragPayload: ((Int64, Int?, @escaping (Result<ClipDragPayload, Error>) -> Void) -> Void)?
     var onDragCompleted: ((Int64) -> Void)?
     var onReveal: ((Int64) -> Void)?
     var onConceal: ((Int64) -> Void)?
@@ -146,10 +148,14 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         }
         guard let index = unfilteredHistoryPrefix.firstIndex(where: { $0.id == id }) else { return false }
         return cards.isOnFirstScreen(at: index, count: unfilteredHistoryPrefix.count) { index, width, maximumHeight in
-            ClipCardView.preferredHeight(for: self.unfilteredHistoryPrefix[index], revealedText: nil,
-                                         width: width, maximumHeight: maximumHeight)
+            self.cardHeight(for: self.unfilteredHistoryPrefix[index], width: width, maximumHeight: maximumHeight)
         }
     }
+    private func cardHeight(for clip: ClipSummary, width: CGFloat, maximumHeight: CGFloat) -> CGFloat {
+        if !clip.isConcealed, groupIDs.object(forKey: NSNumber(value: clip.id)) != nil { return maximumHeight }
+        return ClipCardView.preferredHeight(for: clip, revealedText: nil, width: width, maximumHeight: maximumHeight)
+    }
+
     var onShortcutGestureEnd: (() -> Void)?
     var onShowSettings: (() -> Void)?
     var onShowFeatures: (() -> Void)?
@@ -176,6 +182,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         self.currentFrontmostApplication = currentFrontmostApplication
         super.init()
         build()
+        groupIDs.countLimit = 4096
         thumbnails.countLimit = 150
         if !window.setFrameUsingName(Self.frameName) { window.center() }
         window.delegate = self
@@ -207,10 +214,7 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
         cards.makeCard = { [unowned self] index in self.makeCard(at: index) }
         cards.heightForCard = { [weak self] index, width, maximumHeight in
             guard let self, self.rows.indices.contains(index) else { return maximumHeight }
-            let clip = self.rows[index]
-            return ClipCardView.preferredHeight(for: clip,
-                revealedText: nil,
-                width: width, maximumHeight: maximumHeight)
+            return self.cardHeight(for: self.rows[index], width: width, maximumHeight: maximumHeight)
         }
         cards.onSelect = { [weak self] _ in self?.updateSelection() }
         cards.onActivate = { [weak self] _ in
@@ -1431,12 +1435,23 @@ final class HistoryPanel: NSObject, NSSearchFieldDelegate, NSWindowDelegate {
             self.cancelDragPreparation = { [weak card] in card?.cancelDragPreparation() }
             self.confirming = true
             self.updateNavigationControls(); self.updateVisibleCards()
-            request(clip.id, completion)
+            request(clip.id, card.draggedItemIndex, completion)
         }
         card.onDragFinished = { [weak self] operation, error in
             self?.dragFinished(id: clip.id, operation: operation, error: error)
         }
         configure(card, row: row)
+        if !clip.isConcealed {
+            requestGroupTiles?(clip.id) { [weak self, weak card] tiles in
+                guard let self, let card, tiles.count > 1 else { return }
+                card.setGroupTiles(tiles)
+                let key = NSNumber(value: clip.id)
+                if self.groupIDs.object(forKey: key) == nil {
+                    self.groupIDs.setObject(true, forKey: key)
+                    if self.rows.indices.contains(row), self.rows[row].id == clip.id { self.cards.invalidateHeight(at: row) }
+                }
+            }
+        }
         if ClipboardService.canPreviewImage(clip) && thumbnails.object(forKey: NSNumber(value: clip.id)) == nil {
             requestThumbnail?(clip.id) { [weak self, weak card] image in
                 guard let self, let image,

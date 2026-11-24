@@ -167,7 +167,35 @@ func historyResetChecks() {
     check(harness.panel.selected?.id == clips.first?.id && harness.requests.last?.query == "",
           "returning from a chat source cannot resurrect an expired selection")
 
+    groupedFirstScreenChecks()
     immediateHistoryResetChecks(defaults: defaults)
+}
+
+private func groupedFirstScreenChecks() {
+    let harness = PanelHarness()
+    defer { harness.finish() }
+    let clips = (1...30).map(fixture)
+    let tile = GroupTile(title: "Fixture", isFile: false, image: NSImage(size: NSSize(width: 8, height: 8)))
+    harness.panel.requestGroupTiles = { _, done in done([tile, tile]) }
+    harness.cards.columns = 1
+    harness.cards.visibleRows = 3
+    harness.cards.sizesToContent = true
+    harness.search.stringValue = ""
+    harness.panel.refresh()
+    harness.panel.receive(clips, total: clips.count, offset: 0)
+    harness.panel.window.contentView?.layoutSubtreeIfNeeded()
+    let visible = clips.map { harness.panel.isOnFirstHistoryScreen(id: $0.id) }
+    check(visible.first == true && visible.last == false, "group fixture spans the first screen")
+    let textOnly = clips.indices.map { index in
+        harness.cards.isOnFirstScreen(at: index, count: clips.count) { row, width, maximumHeight in
+            ClipCardView.preferredHeight(for: clips[row], revealedText: nil, width: width, maximumHeight: maximumHeight)
+        }
+    }
+    check(textOnly != visible, "treating groups as short text changes the promotion boundary")
+    harness.panel.unfilteredHistoryPrefix = clips
+    harness.search.stringValue = "fixture"
+    check(clips.map { harness.panel.isOnFirstHistoryScreen(id: $0.id) } == visible,
+          "filtered promotion accounts for full-height group cards above the selected clip")
 }
 
 private func immediateHistoryResetChecks(defaults: UserDefaults) {

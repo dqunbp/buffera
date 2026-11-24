@@ -537,13 +537,17 @@
 "ожидает питания" = "waiting for power";
 
 "%1$@ — открыть / следующий элемент\n%2$@ — предыдущий в открытом окне\nСтрелки — выбрать запись\n⌘⌥S — скрыть или показать боковое меню\n⌘, — настройки\n⌘1–9 — выбрать одну из первых девяти записей\n⌘F — перейти к поиску, ⌘0 — вся история\nEscape — закрыть просмотр или окно\n\n%3$@\n\nДействия находятся внутри карточек и в их контекстном меню. Подсказки кнопок показывают сочетания. Пробел открывает просмотр при выборе записи; в поле поиска он вводит пробел. ⌘Y открывает просмотр и из поиска.\n\nЗапрос, фильтры и раздел сохраняются между открытиями окна до перезапуска %4$@. Избранное хранится постоянно и не удаляется автоматически при достижении лимитов обычной истории.\n\nТекст на новых и ранее сохранённых картинках распознаётся на Mac в фоне и участвует в обычном поиске. Поддерживаются русский и английский. Прогресс и повтор неудачных попыток доступны через значок %5$@ в строке меню. Скрытые записи не распознаются.\n\nEnter копирует запись, поднимает её наверх и закрывает окно. Дата копирования сохраняется. Escape и переход в другое приложение закрывают без выбора. Вставку выполняете сами (на Mac обычно ⌘V).\n\n«Показать в Finder» создаёт временную PNG-копию: очистка через 24 часа, лимит 256 МиБ. «Сохранить как…» сохраняет файл постоянно.\n\nВ настройках истории выберите: не сохранять секреты или сохранять их зашифрованными. Сохранённые секреты скрыты точками. Открытие замка возвращает запись в обычную историю до ручного скрытия. Закрытие замка шифрует и скрывает запись." = "%1$@ — open / next item\n%2$@ — previous item in the open window\nArrow keys — select an item\n⌘⌥S — hide or show the sidebar\n⌘, — settings\n⌘1–9 — select one of the first nine items\n⌘F — focus search, ⌘0 — all history\nEscape — close the preview or window\n\n%3$@\n\nActions are available on each card and in its context menu. Button tooltips show shortcuts. Space opens a preview when an item is selected; in the search field it types a space. ⌘Y also opens a preview from search.\n\nYour query, filters and section are kept between window openings until you restart %4$@. Favorites are saved permanently and are not automatically deleted when regular history limits are reached.\n\nText in new and previously saved images is recognized on your Mac in the background and included in regular search. Russian and English are supported. Progress and retries are available from the %5$@ menu bar icon. Concealed items are excluded.\n\nEnter copies the item, moves it to the top and closes the window. Its original copy date is kept. Escape and switching to another app close the window without choosing an item. Paste it yourself (usually ⌘V on Mac).\n\n“Show in Finder” creates a temporary PNG copy, cleaned up after 24 hours with a 256 MiB limit. “Save As…” saves a permanent file.\n\nIn History settings, choose whether to skip secrets or save them encrypted. Saved secrets are masked with dots. Unlocking returns the entry to ordinary history until you hide it manually. Locking encrypts and hides the entry.";
-"Выберите буквы от A до Z." = "Choose letters from A to Z.";
-"Для следующей и предыдущей записи нужны разные буквы." = "Choose different letters for the next and previous items.";
-"%1$@ уже используется другой командой Buffera. Выберите другую букву или базу." = "%1$@ is already used by another Buffera command. Choose a different letter or modifier combination.";
+"Изменить" = "Change";
+"Назначить" = "Assign";
+"Нажмите «Изменить» или «Назначить» и введите сочетание клавиш." = "Click Change or Assign, then press the shortcut.";
+"Нажмите сочетание…" = "Press a shortcut…";
+"Снять назначение" = "Clear shortcut";
+"Модификаторы общие для всех команд. Сочетания привязаны к физическим клавишам." = "All commands share the same modifiers. Shortcuts use physical keys.";
+"Используйте ⌃, ⌘⌥, ⌃⌥, ⌃⇧, ⌘⇧ или ⌃⌘⌥." = "Use ⌃, ⌘⌥, ⌃⌥, ⌃⇧, ⌘⇧, or ⌃⌘⌥.";
+"Выберите букву, цифру или клавишу с символом." = "Choose a letter, number, or symbol key.";
+"%1$@ уже используется другой командой Buffera. Выберите другое сочетание." = "%1$@ is already used by another Buffera command. Choose a different shortcut.";
+"Не удалось зарегистрировать сочетание (%1$@). Возможно, оно занято другой программой или системой. Выберите другое сочетание. История доступна через значок в строке меню." = "Could not register the shortcut (%1$@). Another app or the system may be using it. Choose a different shortcut. History is available from the menu bar icon.";
 "Не удалось применить сочетания. Попробуйте открыть настройки снова." = "Could not apply shortcuts. Try reopening Settings.";
-"Не удалось зарегистрировать сочетание (%1$@). Возможно, оно занято другой программой или системой. Выберите другую базу или буквы. История доступна через значок в строке меню." = "Could not register the shortcut (%1$@). Another app or the system may be using it. Choose different modifiers or letters. History is available from the menu bar icon.";
-"Базовые клавиши" = "Modifier keys";
-"Буквы A–Z обозначают клавиши латинской раскладки; сочетания работают и в других раскладках." = "Letters A–Z refer to physical keys in the Latin layout; shortcuts also work in other layouts.";
 "Нажмите «Применить», чтобы сохранить новые сочетания." = "Click Apply to save the new shortcuts.";
 "Сохранено: %1$@ и %2$@." = "Saved: %1$@ and %2$@.";
 "%1$@ подключено" = "%1$@ connected";
@@ -745,7 +749,7 @@
 "Не назначено" = "Not assigned";
 "Приостановить / возобновить запись" = "Pause / resume recording";
 "Пропустить следующее копирование" = "Skip next copy";
-"Для разных действий нужны разные сочетания." = "Use different shortcuts for different actions.";
+"Сочетание %1$@ назначено нескольким действиям. Выберите разные сочетания." = "%1$@ is assigned to more than one action. Choose different shortcuts.";
 "Сочетания сохранены." = "Shortcuts saved.";
 "Запись приостановлена" = "Recording paused";
 "Запись возобновлена" = "Recording resumed";
@@ -753,3 +757,9 @@
 "Пропуск отменён" = "Skip cancelled";
 "Возобновить запись" = "Resume Recording";
 "Отменить пропуск копирования" = "Cancel Skip Next Copy";
+"Документация" = "Documentation";
+"Открыть документацию Buffera в браузере" = "Open the Buffera documentation in your browser";
+"Перетащите нужный элемент" = "Drag the item you want";
+"Группа файлов" = "File group";
+"Группа элементов" = "Item group";
+"Нажмите для просмотра. Потяните, чтобы перенести всю группу." = "Click to view. Drag to transfer the whole group.";

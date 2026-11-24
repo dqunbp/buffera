@@ -138,6 +138,51 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     var onCopyTransform: ((CopyTransformOperation) -> Void)?
     var requestDrag: ClipDragController.Preparation?
     var onDragFinished: ((NSDragOperation, Error?) -> Void)?
+    private(set) var fan: GroupFan?
+    private(set) var gallery: GroupGallery?
+    private(set) var draggedItemIndex: Int?
+    private var scrubbed = false
+    func setGroupTiles(_ tiles: [GroupTile]) {
+        guard !scrubbed, !clip.isConcealed, tiles.count > 1, fan == nil,
+              let content = thumbnailView.superview else { return }
+        let name = clip.kind == .file ? L10n.text("Группа файлов") : L10n.text("Группа элементов")
+        let group = GroupFan(tiles, name: name)
+        content.subviews.filter { $0 !== quickShortcut }.forEach { $0.isHidden = true }
+        group.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(group, positioned: .below, relativeTo: quickShortcut)
+        NSLayoutConstraint.activate([
+            group.leadingAnchor.constraint(equalTo: content.leadingAnchor), group.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            group.topAnchor.constraint(equalTo: content.topAnchor), group.bottomAnchor.constraint(equalTo: content.bottomAnchor)
+        ])
+        fan = group
+    }
+
+    private func openGallery(_ fan: GroupFan) {
+        let tiles = fan.tiles
+        let name = clip.kind == .file ? L10n.text("Группа файлов") : L10n.text("Группа элементов")
+        let grid = GroupGallery(tiles: tiles, name: name, drag: { [weak self] index, view, event in
+            self?.startDrag(index: index, view: view, event: event)
+        }, cancel: { [weak self] in self?.cancelDragPreparation() })
+        guard let content = fan.superview else { return }
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(grid, positioned: .below, relativeTo: quickShortcut)
+        NSLayoutConstraint.activate([
+            grid.leadingAnchor.constraint(equalTo: fan.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: fan.trailingAnchor),
+            grid.topAnchor.constraint(equalTo: fan.topAnchor),
+            grid.bottomAnchor.constraint(equalTo: fan.bottomAnchor)
+        ])
+        fan.isHidden = true
+        gallery = grid
+        content.layoutSubtreeIfNeeded()
+    }
+
+    private func collapseGroup() {
+        gallery?.removeFromSuperview()
+        gallery = nil
+        fan?.isHidden = false
+    }
+
     private var dragMouseDown: NSEvent?
     private var dragController: ClipDragController?
 
@@ -159,11 +204,12 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
         // action buttons interactive without exposing NSTextField's text menu.
         var ancestor: NSView? = hit
         while let view = ancestor, view !== self {
-            if view is NSButton { return hit }
+            if view is NSButton || (actionsEnabled && (view is GroupGallery.TileView || view is NSScroller)) { return hit }
             ancestor = view.superview
         }
         return self
     }
+
 
     override func rightMouseDown(with event: NSEvent) {
         onSelect?()
@@ -180,13 +226,20 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard actionsEnabled, dragController == nil, let start = dragMouseDown, let requestDrag,
+        guard actionsEnabled, dragController == nil, let start = dragMouseDown,
               hypot(event.locationInWindow.x - start.locationInWindow.x,
                     event.locationInWindow.y - start.locationInWindow.y) >= 5 else { return }
         dragMouseDown = nil
-        let controller = ClipDragController(view: self, clip: clip, event: start) { [weak self] operation, error in
+        startDrag(index: nil, view: self, event: start)
+    }
+
+    private func startDrag(index: Int?, view: NSView, event: NSEvent) {
+        guard actionsEnabled, dragController == nil, let requestDrag else { return }
+        draggedItemIndex = index
+        let controller = ClipDragController(view: view, clip: clip, event: event) { [weak self] operation, error in
             guard let self else { return }
             self.dragController = nil
+            self.draggedItemIndex = nil
             self.onDragFinished?(operation, error)
         }
         dragController = controller
@@ -194,6 +247,10 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if actionsEnabled, dragMouseDown != nil, let fan,
+           bounds.contains(convert(event.locationInWindow, from: nil)) {
+            if gallery == nil { openGallery(fan) } else { collapseGroup() }
+        }
         dragMouseDown = nil
         cancelDragPreparation()
     }
@@ -246,6 +303,10 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
 
     /// Scrub an outgoing ordinary card before replacing it with concealed metadata.
     func prepareForConcealment() {
+        scrubbed = true
+        collapseGroup()
+        fan?.removeFromSuperview(); fan = nil
+        contentText.isHidden = false
         contentText.stringValue = "••••••••"
         contentText.setAccessibilityLabel(L10n.text("Скрытая запись"))
         thumbnailView.image = nil
@@ -294,6 +355,7 @@ final class ClipCardView: NSTableCellView, NSMenuDelegate {
     }
 
     func setActionsEnabled(_ enabled: Bool) {
+        if !enabled && dragController == nil { collapseGroup() }
         actionsEnabled = enabled
         buttons.values.forEach { $0.isEnabled = enabled }
         activeCopyTransformMenu?.setActionsEnabled(enabled)

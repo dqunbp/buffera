@@ -1,5 +1,6 @@
 import BufferaLocalization
 import AppKit
+import Carbon
 import BufferaCore
 
 // Run both languages: zsh scripts/check-history-panel.sh
@@ -547,7 +548,8 @@ func shortcutChecks() -> [(Bool, String)] {
 
     for base in ShortcutPreferences.Base.allCases {
         let configured = opened(fromShortcut: false)
-        let value = ShortcutPreferences(base: base, next: "J", previous: "K")
+        let value = ShortcutPreferences(base: base, next: ShortcutKey(code: UInt16(kVK_ANSI_J))!,
+                                        previous: ShortcutKey(code: UInt16(kVK_ANSI_K))!)
         configured.panel.applyShortcuts(value)
         configured.panel.close(restoreFocus: false)
         configured.panel.open(fromShortcut: true)
@@ -558,9 +560,24 @@ func shortcutChecks() -> [(Bool, String)] {
         configured.panel.window.onFlagsChanged?([])
         results.append((configured.confirmations == [2], "custom pair navigates by physical keys and confirms for \(base)"))
     }
+    let control = ShortcutPreferences(base: .control, next: ShortcutKey(code: UInt16(kVK_ANSI_Grave))!,
+                                      previous: ShortcutKey(code: UInt16(kVK_ANSI_0))!)
+    let punctuation = opened(fromShortcut: false)
+    punctuation.panel.applyShortcuts(control)
+    punctuation.panel.close(restoreFocus: false)
+    punctuation.panel.open(fromShortcut: true)
+    punctuation.panel.receive(clips, total: clips.count, offset: 0)
+    key(punctuation, code: control.next.code, characters: "ё", flags: .control)
+    key(punctuation, code: control.next.code, characters: "`", flags: .control)
+    key(punctuation, code: control.previous.code, characters: "0", flags: .control)
+    punctuation.panel.window.onFlagsChanged?(.control)
+    results.append((punctuation.confirmations.isEmpty, "Control with punctuation and digits waits for modifier release"))
+    punctuation.panel.window.onFlagsChanged?([])
+    results.append((punctuation.confirmations == [2], "Control with punctuation and digits navigates across layouts and confirms once"))
+
     let changed = opened()
     changed.panel.shortcutPressed(1)
-    changed.panel.applyShortcuts(ShortcutPreferences(base: .controlShift, next: "J", previous: "K"))
+    changed.panel.applyShortcuts(control)
     changed.panel.window.onFlagsChanged?([])
     results.append((changed.confirmations.isEmpty, "changing shortcuts cancels an armed gesture"))
 

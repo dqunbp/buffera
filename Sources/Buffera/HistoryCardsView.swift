@@ -188,6 +188,11 @@ final class HistoryCardsView: NSView, NSCollectionViewDataSource, NSCollectionVi
         return y < height
     }
 
+    func invalidateHeight(at index: Int) {
+        measuredHeights.removeValue(forKey: index)
+        if sizesToContent { flow.invalidateLayout() }
+    }
+
     func reloadCard(at index: Int) {
         guard (0..<itemCount).contains(index) else { return }
         let origin = scrollView.contentView.bounds.origin

@@ -526,15 +526,15 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Atalhos, escolha teclas modificadoras compartilhadas e duas letras diferentes: uma para abrir ou avançar e outra para voltar. Clique em Aplicar; não é necessário reiniciar. Redefinir atalhos recupera ⌘⌥V / ⌘⌥C."
+              "text": "Em Atalhos, clique em “Alterar” ou “Atribuir” ao lado de um comando e pressione a combinação desejada. Por exemplo, pressione Control e a tecla do acento grave para abrir o histórico. Você pode usar letras, números e teclas de símbolos. Todos os comandos usam os mesmos modificadores. “Aplicar” salva as alterações sem reiniciar. Redefinir atalhos recupera ⌘⌥V / ⌘⌥C."
             },
             {
               "type": "paragraph",
-              "text": "Os atalhos usam teclas físicas do layout latino, então continuam funcionando quando você muda o idioma de entrada. Se o registro falhar, o par anterior é mantido."
+              "text": "Os atalhos acompanham as teclas físicas mesmo quando você muda o idioma de entrada. A dica de seleção rápida se atualiza assim que você informa um par válido. Se dois comandos usam o mesmo atalho, um aviso aparece na hora e “Aplicar” fica desativado. Se o registro falhar, os atalhos anteriores continuam ativos."
             },
             {
               "type": "note",
-              "text": "Soltar as teclas depois de abrir mantém o histórico aberto. Para percorrê-lo rapidamente, mantenha ⌘⌥ pressionado, pressione V ou C de novo e solte os modificadores para copiar o item selecionado."
+              "text": "Solte as teclas logo após abrir o histórico para mantê-lo aberto. Para percorrê-lo rapidamente, mantenha os modificadores pressionados desde a abertura, pressione novamente a tecla do item seguinte ou anterior e solte os modificadores para copiar o item selecionado."
             }
           ]
         },
@@ -544,7 +544,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Em Ajustes → Atalhos, atribua uma letra A–Z a “Pausar / retomar o registro” e outra a “Ignorar a próxima cópia”, com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto."
+              "text": "Em Ajustes → Atalhos, clique em “Atribuir” ou “Alterar” ao lado de um comando de registro e pressione um atalho com os modificadores compartilhados. Por padrão, ambos ficam sem atalho; os comandos continuam disponíveis no menu. Todas as combinações devem ser diferentes. Redefinir atalhos restaura ⌘⌥V / ⌘⌥C e remove os atalhos de registro. Manter uma tecla pressionada não alterna o modo novamente, mesmo após fechar o histórico. Uma breve confirmação aparece sem tirar o foco, mesmo com o ícone da barra de menus oculto."
             }
           ]
         }

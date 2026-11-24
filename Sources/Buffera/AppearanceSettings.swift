@@ -58,6 +58,8 @@ final class SettingsWindow: NSWindowController {
         }
         super.init(window: window)
         window.contentViewController = settings
+        window.onShortcutKeyDown = { [weak settings] event in settings?.captureShortcut(event) ?? false }
+        window.onShortcutFocusLost = { [weak settings] in settings?.cancelShortcutCapture() }
         settings.onShortcutsChange = { [weak self] value in
             guard let apply = self?.onShortcutsChange else { throw ShortcutPreferenceError.unavailable }
             try apply(value)
@@ -114,6 +116,11 @@ final class SettingsWindow: NSWindowController {
     func selectUpdates() { settings.selectUpdates() }
     func selectSection(_ index: Int) { settings.selectSection(index) }
 
+    func captureRegisteredShortcut(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        guard window?.isKeyWindow == true else { return false }
+        return settings.captureShortcut(keyCode: keyCode, modifiers: modifiers)
+    }
+
     func updateAppearance(_ value: HistoryAppearance) { settings.updateAppearance(value) }
     func updateModels(_ snapshots: [LocalModelSnapshot]) { settings.updateModels(snapshots) }
     func updateModelCheck(role: ModelRole, status: String, running: Bool) {
@@ -129,15 +136,29 @@ final class SettingsWindow: NSWindowController {
 }
 
 private final class SettingsPanel: NSWindow {
+    var onShortcutKeyDown: ((NSEvent) -> Bool)?
+    var onShortcutFocusLost: (() -> Void)?
+
     override func cancelOperation(_ sender: Any?) { performClose(sender) }
 
+    override func sendEvent(_ event: NSEvent) {
+        if onShortcutKeyDown?(event) == true { return }
+        super.sendEvent(event)
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if onShortcutKeyDown?(event) == true { return true }
         let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         if event.keyCode == 13 && modifiers == .command {
             performClose(nil)
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        onShortcutFocusLost?()
     }
 }
 
@@ -241,6 +262,11 @@ private final class SettingsContentController: NSViewController {
         presentPage(index)
     }
     func refreshShortcuts() { shortcutSettings.refresh(.load(from: shortcutDefaults)) }
+    func captureShortcut(_ event: NSEvent) -> Bool { shortcutSettings.capture(event) }
+    func captureShortcut(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        shortcutSettings.capture(keyCode: keyCode, modifiers: modifiers)
+    }
+    func cancelShortcutCapture() { shortcutSettings.cancelCapture() }
     func refreshMCPAccess() { mcp.refresh() }
     func refreshModels() { models.refresh() }
     func showFeatures() {
@@ -295,7 +321,9 @@ private final class SettingsContentController: NSViewController {
         root.addSubview(body)
 
         saveNotice.font = .systemFont(ofSize: 11); saveNotice.textColor = .tertiaryLabelColor
-        let footer = NSStackView(views: [saveNotice, NSView(), SupportBufferaButton()])
+        let footer = NSStackView(views: [
+            saveNotice, NSView(), SupportBufferaButton(support: .documentation), SupportBufferaButton()
+        ])
         footer.spacing = 18
         footer.alignment = .centerY
         footer.translatesAutoresizingMaskIntoConstraints = false
@@ -548,6 +576,7 @@ private final class SettingsContentController: NSViewController {
 
     private func presentPage(_ index: Int) {
         guard pages.indices.contains(index) else { return }
+        shortcutSettings.cancelCapture()
         saveNotice.stringValue = index == 2 ? L10n.text("Сочетания применяются без перезапуска") : L10n.text("Изменения сохраняются сразу")
         for view in body.subviews { view.removeFromSuperview() }
         let page = pages[index]

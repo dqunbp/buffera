@@ -8,7 +8,9 @@ public enum ExternalModels {
         liteRT(.embedding, title: "EmbeddingGemma 2", size: 474_120_192,
                hash: "e53f38d71e58996659a926d1aece11f6b182b83ff7f34ae9c986405909c7b1fe"),
         liteRT(.assistant, title: "Gemma 4 E4B", size: 3_659_530_240,
-               hash: "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0")
+               hash: "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0"),
+        liteRT(.assistant, title: "Gemma 4 12B", size: 6_883_278_368,
+               hash: "ddfeab9430185ed153d45644fd8cc103491bbd667d7abddc8486416d706844a5")
     ]
 
     private static func liteRT(_ role: ModelRole, title: String, size: Int64,

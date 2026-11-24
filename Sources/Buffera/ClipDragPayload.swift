@@ -22,11 +22,12 @@ struct ClipDragPayload {
     let items: [[Representation]]
 
     static func prepare(_ payload: ClipPayload, id: Int64,
-                        exports: TemporaryImageExports) throws -> ClipDragPayload {
+                        exports: TemporaryImageExports, itemIndex: Int? = nil) throws -> ClipDragPayload {
         guard !payload.items.isEmpty, payload.items.allSatisfy({ !$0.isEmpty }) else {
             throw ClipDragFailure.unreadable
         }
-        var items = payload.items
+        if let itemIndex, !payload.items.indices.contains(itemIndex) { throw ClipDragFailure.unreadable }
+        var items = itemIndex.map { [payload.items[$0]] } ?? payload.items
         var images: [TemporaryImageExports.Image] = []
         for index in items.indices {
             let original = items[index]
@@ -42,7 +43,7 @@ struct ClipDragPayload {
                 continue
             }
             if let image = try imageFile(original) {
-                images.append(.init(data: image.0, fileExtension: image.1, itemIndex: index))
+                images.append(.init(data: image.0, fileExtension: image.1, itemIndex: itemIndex ?? index))
             }
             if !original.contains(where: { $0.type == NSPasteboard.PasteboardType.string.rawValue }) {
                 if let text = ClipboardText.decode(original) ?? string(.URL, in: original) {
@@ -59,7 +60,7 @@ struct ClipDragPayload {
         if !images.isEmpty {
             let urls = try exports.files(images, id: id)
             for (image, url) in zip(images, urls) {
-                items[image.itemIndex!].append(.init(type: NSPasteboard.PasteboardType.fileURL.rawValue,
+                items[itemIndex == nil ? image.itemIndex! : 0].append(.init(type: NSPasteboard.PasteboardType.fileURL.rawValue,
                                                    data: Data(url.absoluteString.utf8)))
             }
         }
