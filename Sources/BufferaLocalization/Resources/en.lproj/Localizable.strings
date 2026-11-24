@@ -757,3 +757,7 @@
 "Отменить пропуск копирования" = "Cancel Skip Next Copy";
 "Документация" = "Documentation";
 "Открыть документацию Buffera в браузере" = "Open the Buffera documentation in your browser";
+"Перетащите нужный элемент" = "Drag the item you want";
+"Группа файлов" = "File group";
+"Группа элементов" = "Item group";
+"Нажмите для просмотра. Потяните, чтобы перенести всю группу." = "Click to view. Drag to transfer the whole group.";

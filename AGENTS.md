@@ -26,6 +26,7 @@ Buffera is a Swift/AppKit clipboard manager for macOS 14+. `Sources/Buffera/` ow
 
 Verify these contracts in `Sources/Buffera/HistoryPanel.swift`, `Sources/Buffera/HistoryShortcutGesture.swift`, and `Tests/HistoryPanelChecks/main.swift`:
 
+- Ordinary multi-item records show a preview fan and adjacent count below the group label and click/drag instructions, or beside the label when the card is short. Clicking expands the item grid in the same card; clicking the heading restores the fan. A tile drag prepares only its original item, while dragging the card transfers the whole group. See `Sources/Buffera/GroupGallery.swift` and `Tests/ClipDragChecks/`.
 - Successful and cancelled drags leave history open; only a completed copy drop counts as drag use. Subsequent outside clicks/application switches dismiss an unpinned panel unless a drag, menu, preview, sheet, filter, or introduction currently blocks dismissal.
 - Escape cancels drag preparation or dismisses transient UI without also closing the panel; otherwise it closes unpinned history. Pinning prevents Escape/focus-loss dismissal, but explicit copy confirmation still closes pinned history.
 - Ending a card context menu is not an outside interaction: invalidate queued focus-loss dismissal across menu tracking, preserve history on cancellation, and let the selected action run. Subsequent outside interactions still dismiss unpinned history. See `Tests/HistoryPanelChecks/MenuFocusChecks.swift`.
@@ -75,6 +76,10 @@ Model, runtime, search, and chat suites above use fixtures by default. Real-mode
 For visual website review, `npm run preview` in `landing/` starts a persistent local server; it is not a terminating validation command.
 
 Swift tests are executable harnesses, not `swift test`; register regression methods in their runners. Use synthetic data, temporary databases, and named pasteboards. Verify changed UI in every affected locale. Distinguish automated checks, manual observation, and unreproduced reports; passing a synthetic case does not establish reproduction of an intermittent user sequence. Listed commands are not evidence of passing: require successful completion, not just intermediate PASS messages, before reporting a check as successful or proceeding with release.
+
+Track planned features, bugs, and follow-up work in [GitHub Issues](https://github.com/dqunbp/buffera/issues). Use the `todo` label for work planned next and `backlog` for ideas to revisit later. Record the original scenario, the problem it causes, and the expected behavior in the issue. Link the issue from the implementing PR. For a small change without an issue, preserve the reason in the PR description or, if there is no PR, in the commit body.
+
+Write issue titles and descriptions, commit subjects and bodies, and PR titles and descriptions in English.
 
 Use focused imperative commits. PRs should explain behavior, validation, limitations, and include relevant issues/screenshots. Inspect existing changes before staging; exclude local history, models, support archives, and signing material.
 

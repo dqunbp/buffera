@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let appPreferences = AppPreferences()
     private var store: HistoryStore!
     private let secretKeys = KeychainSecretKeyProvider()
+    private let singleItemClips = NSCache<NSNumber, NSNumber>()
     private let work = DispatchQueue(label: "app.buffera.history", qos: .userInitiated)
     private let thumbnailCache = ThumbnailCache()
     private let clipboard = ClipboardService()
@@ -323,12 +324,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 }
             }
         }
-        panel.requestDragPayload = { [weak self] id, completion in
+        singleItemClips.countLimit = 4096
+        panel.requestGroupTiles = { [weak self] id, completion in
+            guard let self else { return }
+            self.work.async {
+                let key = NSNumber(value: id)
+                guard self.singleItemClips.object(forKey: key) == nil,
+                      let summary = try? self.store.summary(id: id), !summary.isConcealed,
+                      let payload = try? self.store.payload(id: id) else { return }
+                guard payload.items.count > 1 else { self.singleItemClips.setObject(true, forKey: key); return }
+                let tiles = GroupTile.previews(payload)
+                DispatchQueue.main.async { completion(tiles) }
+            }
+        }
+        panel.requestDragPayload = { [weak self] id, index, completion in
             guard let self else { completion(.failure(ClipDragFailure.unreadable)); return }
             self.work.async {
                 let result = Result {
+                    if index != nil, try self.store.summary(id: id).isConcealed { throw ClipDragFailure.unreadable }
                     try self.retrySecretAccess(id: id)
-                    return try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports)
+                    return try ClipDragPayload.prepare(self.store.restorablePayload(id: id), id: id, exports: self.temporaryImageExports, itemIndex: index)
                 }
                 DispatchQueue.main.async { completion(result) }
             }
