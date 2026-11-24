@@ -291,7 +291,9 @@ private final class SettingsContentController: NSViewController {
         root.addSubview(body)
 
         saveNotice.font = .systemFont(ofSize: 11); saveNotice.textColor = .tertiaryLabelColor
-        let footer = NSStackView(views: [saveNotice, NSView(), SupportBufferaButton()])
+        let footer = NSStackView(views: [
+            saveNotice, NSView(), SupportBufferaButton(support: .documentation), SupportBufferaButton()
+        ])
         footer.spacing = 18
         footer.alignment = .centerY
         footer.translatesAutoresizingMaskIntoConstraints = false

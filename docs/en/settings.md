@@ -1,5 +1,7 @@
 # Application settings
 
+The **Documentation ↗** link at the bottom of Settings opens the Buffera user guide in your browser. The guide opens in the app's interface language.
+
 Settings use a compact sidebar with navigation aligned at the top: General, AI, Appearance, History, Shortcuts, MCP, and Updates. Icons and labels have inset spacing. Appearance and history options are grouped into cards; AI brings together semantic search and the assistant. Existing actions and model checks are retained.
 
 The selected section name appears only in the sidebar. Each AI feature card has a “Connect your model” button that opens an explanation and a guided compatible-file selection flow.

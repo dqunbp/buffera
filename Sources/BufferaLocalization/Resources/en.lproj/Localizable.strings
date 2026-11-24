@@ -751,3 +751,5 @@
 "Пропуск отменён" = "Skip cancelled";
 "Возобновить запись" = "Resume Recording";
 "Отменить пропуск копирования" = "Cancel Skip Next Copy";
+"Документация" = "Documentation";
+"Открыть документацию Buffera в браузере" = "Open the Buffera documentation in your browser";
