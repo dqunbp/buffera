@@ -21,6 +21,7 @@ struct SetupPreferences {
     static let completionKey = "setup.completedVersion"
     var language: LanguagePreference
     var theme: InterfaceTheme
+    var pasteOnEnter: Bool
     var limits: HistoryLimits
     var mcpEnabled: Bool
     var embeddingEnabled: Bool
@@ -30,6 +31,7 @@ struct SetupPreferences {
     init(defaults: UserDefaults = .standard, mcpEnabled: Bool, snapshots: [LocalModelSnapshot]) {
         language = .load(from: defaults)
         theme = .load(from: defaults)
+        pasteOnEnter = AppPreferences(defaults: defaults).pasteOnEnter
         limits = .load(from: defaults)
         self.mcpEnabled = mcpEnabled
         embeddingEnabled = snapshots.contains { $0.descriptor.role == .embedding && $0.isEnabled }
@@ -40,7 +42,7 @@ struct SetupPreferences {
     mutating func skip(_ step: SetupStep, restoring initial: Self) {
         switch step {
         case .language: language = initial.language; theme = initial.theme
-        case .shortcuts: break
+        case .shortcuts: pasteOnEnter = initial.pasteOnEnter
         case .storage: limits = initial.limits
         case .mcp: mcpEnabled = initial.mcpEnabled
         case .models:

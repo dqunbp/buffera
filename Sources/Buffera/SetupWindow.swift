@@ -177,6 +177,9 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
     }
 
     private func shortcutsPage() -> NSView {
+        let paste = toggle(L10n.text("Вставлять выбранную запись по Enter"), value: draft.pasteOnEnter, id: "pasteOnEnter")
+        let accessHelp = SetupUI.text(L10n.text("Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V."), size: 12)
+        capturePage = { [weak self] in self?.draft.pasteOnEnter = paste.state == .on }
         let quick = SetupUI.card([
             SetupUI.text(L10n.text("Быстро выбрать запись"), bold: true),
             SetupUI.text(L10n.text("\(shortcuts.nextTitle) — следующая     \(shortcuts.previousTitle) — предыдущая"), size: 16, bold: true),
@@ -184,7 +187,7 @@ final class SetupWindow: NSWindowController, NSWindowDelegate {
         ], tinted: true)
         return SetupUI.column([
             SetupUI.card([SetupUI.text(L10n.text("Открыть историю"), bold: true), SetupUI.text(shortcuts.nextTitle, size: 30, bold: true), quick]),
-            SetupUI.card([SetupUI.text(L10n.text("Выбрать и скопировать"), bold: true), SetupUI.text("↑ ↓  →  Enter", size: 27, bold: true)]),
+            SetupUI.card([SetupUI.text(L10n.text("Выбрать запись"), bold: true), SetupUI.text("↑ ↓  →  Enter", size: 27, bold: true), paste, accessHelp]),
             SetupUI.card([SetupUI.text(L10n.text("Посмотреть подробно"), bold: true), SetupUI.text(L10n.text("Пробел"), size: 27, bold: true)])
         ], spacing: 12)
     }

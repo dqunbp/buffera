@@ -102,7 +102,7 @@
             },
             {
               "type": "note",
-              "text": "Para pegar directamente con Intro, activa la opción en Ajustes → General y concede a Buffera el permiso de Accesibilidad de macOS. Si macOS solicita acceso al portapapeles, permítelo para que Buffera pueda guardar tu historial. Si ya has concedido el acceso y aún no puedes pegar, reinicia Buffera."
+              "text": "Para pegar directamente con Intro, activa la opción en el paso de atajos de la configuración inicial o en Ajustes → General y concede a Buffera el permiso de Accesibilidad de macOS. Si macOS solicita acceso al portapapeles, permítelo para que Buffera pueda guardar tu historial. Si ya has concedido el acceso y aún no puedes pegar, reinicia Buffera."
             }
           ]
         },

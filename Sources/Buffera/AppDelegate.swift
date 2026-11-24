@@ -798,6 +798,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard let self else { return }
             // Persist the only throwing permission write first. No downloads start on failure.
             if draft.mcpEnabled != initial.mcpEnabled { try access.setEnabled(draft.mcpEnabled) }
+            if draft.pasteOnEnter != initial.pasteOnEnter { self.appPreferences.setPasteOnEnter(draft.pasteOnEnter) }
             if draft.language != initial.language { draft.language.save() }
             if draft.theme != initial.theme { draft.theme.save(); draft.theme.apply() }
             if draft.limits != initial.limits { draft.limits.save() }

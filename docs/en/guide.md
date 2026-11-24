@@ -176,7 +176,7 @@ Choose 1–4 columns and a density of 3–12 visible rows. One column gives a li
 
 ## Initial setup
 
-On first launch, a separate setup window walks through five steps: language and theme, main shortcuts, storage, MCP, search and answers. History window placement, columns, visible rows and the sidebar are configured in Settings → Appearance; the wizard leaves them unchanged. Any step can be skipped. Set Up Later or closing the window cancels the entire draft. Reopen the wizard with Set Up Buffera… in the menu or Run Setup Again… at the bottom of Settings → Appearance.
+On first launch, a separate setup window walks through five steps: language and theme, keyboard shortcuts and paste on Enter, storage, MCP, search and answers. History window placement, columns, visible rows and the sidebar are configured in Settings → Appearance; the wizard leaves them unchanged. The shortcuts step shows the current paste-on-Enter setting. If you enable it, Buffera requests any missing macOS Accessibility permission after Apply and Start. Any step can be skipped. Set Up Later or closing the window cancels the entire draft. Reopen the wizard with Set Up Buffera… in the menu or Run Setup Again… at the bottom of Settings → Appearance.
 
 Until Apply and Start, MCP permission and model settings remain unchanged and downloads do not begin. Skipping a step during repeat setup preserves its previous values. A new language takes effect after restart; the theme applies when setup finishes, with a preview inside the wizard.
 

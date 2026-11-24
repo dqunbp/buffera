@@ -88,10 +88,17 @@ func runSetupSmokeTest() throws {
     try click("setup.skip")
     try check(controller.draft.language == initial.language, "Skipping must discard page edits")
     try checkStep(.shortcuts)
+    try check(try control(root, "setup.pasteOnEnter", NSButton.self).state == .off, "Paste starts disabled")
+    try click("setup.pasteOnEnter")
     try click("setup.back")
     try checkStep(.language)
     try click("setup.next")
     try checkStep(.shortcuts)
+    try check(try control(root, "setup.pasteOnEnter", NSButton.self).state == .on, "Back retains the paste draft")
+    try click("setup.skip")
+    try check(!controller.draft.pasteOnEnter, "Skipping shortcuts restores the saved paste preference")
+    try click("setup.back")
+    try click("setup.pasteOnEnter")
     try capture("setup-keys")
     let keyFields = views(root).compactMap { $0 as? NSTextField }.filter { !$0.isHiddenOrHasHiddenAncestor }
     for (index, field) in keyFields.enumerated() {
@@ -103,7 +110,7 @@ func runSetupSmokeTest() throws {
     }
     let keyTexts = keyFields.map(\.stringValue)
     try check(keyTexts.contains { $0.contains("⌘⌥C") && $0.contains("⌘⌥V") }, "Quick selection must show complete combinations")
-    try check(!keyTexts.contains { $0.contains("Esc") || $0.contains("⌘V") }, "No redundant shortcuts in the setup reminder")
+    try check(keyTexts.contains { $0.contains("⌘V") }, "Setup explains manual paste when Accessibility access is missing")
     try click("setup.next")
     try checkStep(.storage)
     try capture("setup-storage")
@@ -159,7 +166,7 @@ func runSetupSmokeTest() throws {
     try click("setup.next")
     try check(applied == nil && controller.step == .models, "A failed finish must keep the draft and current page")
     try click("setup.next")
-    try check(applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
+    try check(applied?.pasteOnEnter == true && applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
               "Retry must apply the retained draft")
 
     let skippedModels = SetupWindow(initial: initial, modelsAvailable: true, access: access)
