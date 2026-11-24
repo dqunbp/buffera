@@ -87,6 +87,7 @@ final class GroupFan: NSView {
         title = NSTextField(labelWithString: name)
         super.init(frame: .zero)
         title.font = .systemFont(ofSize: 13, weight: .semibold)
+        title.lineBreakMode = .byTruncatingTail
         hint.font = .systemFont(ofSize: 11)
         title.alignment = .center; hint.alignment = .center
         hint.textColor = .secondaryLabelColor
@@ -96,16 +97,51 @@ final class GroupFan: NSView {
 
     override func layout() {
         super.layout()
-        let width = max(1, bounds.width - 8)
-        let hintHeight = ceil(hint.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 100)).height ?? 28)
-        hint.isHidden = bounds.height < 40 + hintHeight
-        title.frame = NSRect(x: 4, y: max(0, bounds.height - 19), width: width, height: 17)
-        hint.frame = NSRect(x: 4, y: max(0, title.frame.minY - hintHeight - 1), width: width, height: hintHeight)
-        let available = max(0, (hint.isHidden ? title.frame.minY : hint.frame.minY) - 3)
-        let height = min(available, width * 26 / mark.naturalWidth)
-        let markWidth = height * mark.naturalWidth / 26
-        mark.frame = NSRect(x: bounds.midX - markWidth / 2, y: (available - height) / 2, width: markWidth, height: height)
+        let content = bounds.insetBy(dx: 4, dy: 2)
+        let titleHeight: CGFloat = 17
+        let hintHeight = measuredHintHeight(width: content.width)
+        let stackedHeight = content.height - titleHeight - hintHeight - 4
+        let aspect = mark.naturalWidth / 26
+
+        if stackedHeight < 54 || content.width < 54 * aspect {
+            layoutSideBySide(in: content, titleHeight: titleHeight, aspect: aspect)
+        } else {
+            title.alignment = .center
+            hint.alignment = .center
+            hint.isHidden = false
+            title.frame = NSRect(x: content.minX, y: content.maxY - titleHeight,
+                                 width: content.width, height: titleHeight)
+            hint.frame = NSRect(x: content.minX, y: title.frame.minY - hintHeight - 1,
+                                width: content.width, height: hintHeight)
+            let height = min(stackedHeight, content.width / aspect)
+            mark.frame = NSRect(x: content.midX - height * aspect / 2,
+                                y: content.minY + (stackedHeight - height) / 2,
+                                width: height * aspect, height: height)
+        }
         mark.needsDisplay = true
+    }
+
+    private func layoutSideBySide(in content: NSRect, titleHeight: CGFloat, aspect: CGFloat) {
+        let markWidth = max(0, min(content.width * 0.48, content.height * aspect))
+        let markHeight = markWidth / aspect
+        mark.frame = NSRect(x: content.minX, y: content.midY - markHeight / 2,
+                            width: markWidth, height: markHeight)
+
+        let textX = mark.frame.maxX + 6
+        let textWidth = max(0, content.maxX - textX)
+        title.alignment = .left
+        hint.alignment = .left
+        let hintHeight = measuredHintHeight(width: textWidth)
+        hint.isHidden = titleHeight + hintHeight + 1 > content.height
+        let height = hint.isHidden ? titleHeight : titleHeight + hintHeight + 1
+        let textTop = content.midY + height / 2
+        title.frame = NSRect(x: textX, y: textTop - titleHeight, width: textWidth, height: titleHeight)
+        hint.frame = NSRect(x: textX, y: textTop - height, width: textWidth, height: hintHeight)
+    }
+
+    private func measuredHintHeight(width: CGFloat) -> CGFloat {
+        let area = NSRect(x: 0, y: 0, width: max(1, width), height: 100)
+        return ceil(hint.cell?.cellSize(forBounds: area).height ?? 28)
     }
     required init?(coder: NSCoder) { fatalError() }
 }

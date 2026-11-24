@@ -153,6 +153,14 @@ let countedMark = roomyFan.subviews.first { $0 !== roomyFan.title && $0 !== room
 try check(countedMark.frame.midX == roomyFan.bounds.midX && countedMark.frame.height > 140
           && roomyFan.title.frame.minY >= roomyFan.hint.frame.maxY && roomyFan.hint.frame.minY >= countedMark.frame.maxY
           && !roomyFan.hint.isHidden, "large centered fan uses the space below both labels")
+roomyFan.frame.size = NSSize(width: 230, height: 48)
+roomyFan.layoutSubtreeIfNeeded()
+try check(countedMark.frame.height >= 42 && countedMark.frame.maxX < roomyFan.title.frame.minX,
+          "short cards give the counted fan nearly their full height beside the title")
+roomyFan.frame.size = NSSize(width: 320, height: 200)
+roomyFan.layoutSubtreeIfNeeded()
+try check(roomyFan.title.frame.minY >= countedMark.frame.maxY && !roomyFan.hint.isHidden,
+          "resizing a short card restores the centered layout with both labels above")
 try check(card.gallery == nil && card.fan?.hint.stringValue.isEmpty == false, "group shows fan with instructions before click")
 card.mouseDown(with: mouse(.leftMouseDown, in: card))
 card.mouseUp(with: mouse(.leftMouseUp, in: card))
