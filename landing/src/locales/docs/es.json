@@ -116,7 +116,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Para iniciar Buffera con tu Mac, activa «Iniciar al iniciar sesión» en Ajustes → General. Puedes descargar los modelos de búsqueda y del asistente más tarde; el historial normal del portapapeles funciona sin ellos."
+              "text": "Activa el inicio automático al iniciar sesión en el último paso de la configuración o en Ajustes → General. Puedes descargar los modelos de búsqueda y del asistente más tarde; el historial normal del portapapeles funciona sin ellos."
             }
           ]
         }

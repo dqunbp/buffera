@@ -15,7 +15,7 @@ func runSetupSmokeTest() throws {
         try? FileManager.default.removeItem(at: directory)
     }
     let access = MCPAccess(directory: directory)
-    var initial = SetupPreferences(defaults: defaults, mcpEnabled: false, snapshots: [])
+    var initial = SetupPreferences(defaults: defaults, mcpEnabled: false, snapshots: [], launchAtLogin: false)
     initial.limits = HistoryLimits(maxCount: 42_000, maxBytes: 3_500_000_000)
     func check(_ value: @autoclosure () throws -> Bool, _ message: String) throws {
         if try !value() { throw HistoryError.database(message) }
@@ -167,22 +167,28 @@ func runSetupSmokeTest() throws {
     try check(try control(root, "mcp.status", NSTextField.self).textColor == .systemRed, "Failed copy must not report success")
     try click("setup.next")
     try checkStep(.models)
+    let login = try control(root, "setup.launchAtLogin", NSButton.self)
+    try check(login.state == .off && !login.isHiddenOrHasHiddenAncestor, "Show login registration on the last page")
     try capture("setup-models")
+    try click("setup.launchAtLogin")
     try control(root, "setup.embedding", NSButton.self).performClick(nil)
     try check(!access.isEnabled() && defaults.persistentDomain(forName: suite)?.isEmpty != false,
               "Walking through setup must not persist settings or permissions")
     try click("setup.next")
     try check(applied == nil && controller.step == .models, "A failed finish must keep the draft and current page")
     try click("setup.next")
-    try check(applied?.pasteOnEnter == true && applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
+    try check(applied?.launchAtLogin == true && applied?.pasteOnEnter == true && applied?.mcpEnabled == true && applied?.embeddingEnabled == true && attempts == 2,
               "Retry must apply the retained draft")
 
-    let skippedModels = SetupWindow(initial: initial, modelsAvailable: true, access: access)
+    var registered = initial
+    registered.launchAtLogin = true
+    let skippedModels = SetupWindow(initial: registered, modelsAvailable: true, access: access)
     let skippedRoot = skippedModels.window!.contentView!
     var skippedDraft: SetupPreferences?
     skippedModels.onFinish = { value, _ in skippedDraft = value }
     for _ in 0..<4 { try control(skippedRoot, "setup.next", NSButton.self).performClick(nil) }
-    for id in ["embedding", "assistant", "power"] {
+    try check(try control(skippedRoot, "setup.launchAtLogin", NSButton.self).state == .on, "Reopened setup reflects login registration")
+    for id in ["embedding", "assistant", "power", "launchAtLogin"] {
         try control(skippedRoot, "setup." + id, NSButton.self).performClick(nil)
     }
     try control(skippedRoot, "setup.back", NSButton.self).performClick(nil)
@@ -191,7 +197,7 @@ func runSetupSmokeTest() throws {
               "Leaving the models page must retain its edits in the draft")
     try control(skippedRoot, "setup.next", NSButton.self).performClick(nil)
     try control(skippedRoot, "setup.skip", NSButton.self).performClick(nil)
-    try check(skippedDraft?.embeddingEnabled == initial.embeddingEnabled &&
+    try check(skippedDraft?.launchAtLogin == true && skippedDraft?.embeddingEnabled == initial.embeddingEnabled &&
               skippedDraft?.assistantEnabled == initial.assistantEnabled &&
               skippedDraft?.onlyOnExternalPower == initial.onlyOnExternalPower,
               "Skipping the final step must restore model and power settings before finishing")

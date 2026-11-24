@@ -747,7 +747,16 @@
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Para pegar, permite que Buffera controle el ordenador en los ajustes de Accesibilidad de macOS. Mientras tanto, usa ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Si ya has concedido el acceso y aún no puedes pegar, reinicia Buffera.";
 
-"Скопировать — я вставлю через ⌘V" = "Copiar — lo pegaré con ⌘V";
-"Вставить сразу в предыдущее приложение" = "Pegar directamente en la aplicación anterior";
-"После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V." = "Al terminar la configuración, macOS pedirá permiso para pegar. Activa Buffera en Accesibilidad. Mientras tanto, puedes pegar con ⌘V.";
-"Выберите запись стрелками ↑ ↓. Что сделает Enter?" = "Elige un elemento con ↑ ↓. ¿Qué debe hacer Intro?";
+"Запускать Buffera при входе в систему" = "Abrir Buffera al iniciar sesión";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "Copiar al portapapeles y pegar después con ⌘V";
+"Сразу вставить в активное приложение" = "Pegar directamente en la aplicación activa";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "Al terminar la configuración, macOS te pedirá permiso para que Buffera pueda pulsar ⌘V por ti.";
+"Откройте историю" = "Abre el historial";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "Podrás cambiar el atajo en Ajustes → Atajos.";
+"Выберите запись" = "Selecciona un elemento";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Usa las flechas para desplazarte. Pulsa la barra espaciadora para ver una vista previa.";
+"Нажмите Enter" = "Pulsa Intro";
+"Что делать с выбранной записью?" = "¿Qué quieres hacer con el elemento seleccionado?";
+"Быстрый выбор с клавиатуры" = "Selección rápida con el teclado";
+"Как пользоваться" = "Cómo usar Buffera";
+"Завершение настройки" = "Finalizar la configuración";

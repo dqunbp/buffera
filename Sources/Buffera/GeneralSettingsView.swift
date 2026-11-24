@@ -86,8 +86,7 @@ final class GeneralSettingsView: NSStackView {
     }
 
     @objc private func changeLogin() {
-        let current = preferences.loginStatus()
-        let enabled = current != .enabled && current != .requiresApproval
+        let enabled = !preferences.loginRequested
         do {
             try preferences.setLoginEnabled(enabled)
             refresh()

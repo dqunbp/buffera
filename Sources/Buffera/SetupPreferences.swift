@@ -8,10 +8,10 @@ enum SetupStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .language: return L10n.text("Язык и тема")
-        case .shortcuts: return L10n.text("Клавиши")
+        case .shortcuts: return L10n.text("Как пользоваться")
         case .storage: return L10n.text("Хранение")
         case .mcp: return "MCP"
-        case .models: return L10n.text("Поиск и ответы")
+        case .models: return L10n.text("Завершение настройки")
         }
     }
 }
@@ -26,9 +26,11 @@ struct SetupPreferences {
     var mcpEnabled: Bool
     var embeddingEnabled: Bool
     var assistantEnabled: Bool
+    var launchAtLogin: Bool
     var onlyOnExternalPower: Bool
 
-    init(defaults: UserDefaults = .standard, mcpEnabled: Bool, snapshots: [LocalModelSnapshot]) {
+    init(defaults: UserDefaults = .standard, mcpEnabled: Bool, snapshots: [LocalModelSnapshot], launchAtLogin: Bool) {
+        self.launchAtLogin = launchAtLogin
         language = .load(from: defaults)
         theme = .load(from: defaults)
         pasteOnEnter = AppPreferences(defaults: defaults).pasteOnEnter
@@ -46,6 +48,7 @@ struct SetupPreferences {
         case .storage: limits = initial.limits
         case .mcp: mcpEnabled = initial.mcpEnabled
         case .models:
+            launchAtLogin = initial.launchAtLogin
             embeddingEnabled = initial.embeddingEnabled; assistantEnabled = initial.assistantEnabled
             onlyOnExternalPower = initial.onlyOnExternalPower
         }

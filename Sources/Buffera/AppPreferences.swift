@@ -43,6 +43,11 @@ final class AppPreferences {
         return true
     }
 
+    var loginRequested: Bool {
+        let status = loginStatus()
+        return status == .enabled || status == .requiresApproval
+    }
+
     var showsMenuBarIcon: Bool {
         get { defaults.object(forKey: Self.menuBarKey) as? Bool ?? true }
         set {

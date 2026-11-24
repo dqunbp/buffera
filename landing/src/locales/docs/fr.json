@@ -116,7 +116,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Pour lancer Buffera avec votre Mac, activez « Lancer à l’ouverture de session » dans Réglages → Général. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
+              "text": "Activez le lancement à l’ouverture de session à la dernière étape de la configuration ou dans Réglages → Général. Vous pourrez télécharger les modèles de recherche et d’assistant plus tard ; l’historique ordinaire fonctionne sans eux."
             }
           ]
         }

@@ -747,7 +747,16 @@
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Para colar, permita que o Buffera controle o computador nos ajustes de Acessibilidade do macOS. Até lá, use ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Se o acesso já foi concedido e ainda não é possível colar, reinicie o Buffera.";
 
-"Скопировать — я вставлю через ⌘V" = "Copiar — vou colar com ⌘V";
-"Вставить сразу в предыдущее приложение" = "Colar diretamente no aplicativo anterior";
-"После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V." = "Ao concluir a configuração, o macOS pedirá permissão para colar. Ative o Buffera em Acessibilidade. Enquanto isso, use ⌘V para colar.";
-"Выберите запись стрелками ↑ ↓. Что сделает Enter?" = "Selecione um item com ↑ ↓. O que Enter deve fazer?";
+"Запускать Buffera при входе в систему" = "Iniciar o Buffera ao iniciar sessão";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "Copiar para a área de transferência e colar depois com ⌘V";
+"Сразу вставить в активное приложение" = "Colar diretamente no aplicativo ativo";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "Após a configuração, o macOS pedirá permissão para que o Buffera pressione ⌘V por você.";
+"Откройте историю" = "Abra o histórico";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "Você poderá alterar o atalho em Ajustes → Atalhos.";
+"Выберите запись" = "Selecione um item";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Use as setas para navegar. Pressione a barra de espaço para visualizar o item.";
+"Нажмите Enter" = "Pressione Enter";
+"Что делать с выбранной записью?" = "O que fazer com o item selecionado?";
+"Быстрый выбор с клавиатуры" = "Seleção rápida pelo teclado";
+"Как пользоваться" = "Como usar o Buffera";
+"Завершение настройки" = "Concluir configuração";

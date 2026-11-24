@@ -747,7 +747,16 @@
 "Для вставки разрешите Buffera управлять компьютером в настройках универсального доступа macOS. Пока доступ закрыт, используйте ⌘V." = "Erlaube Buffera in den macOS-Einstellungen für Bedienungshilfen, deinen Computer zu steuern. Verwende bis dahin ⌘V.";
 "Если доступ уже выдан, а вставка не работает, перезапустите Buffera." = "Wenn der Zugriff erlaubt ist und das Einfügen weiterhin fehlschlägt, starte Buffera neu.";
 
-"Скопировать — я вставлю через ⌘V" = "Kopieren — ich füge mit ⌘V ein";
-"Вставить сразу в предыдущее приложение" = "Direkt in die vorherige App einfügen";
-"После завершения настройки macOS запросит доступ для вставки. Включите Buffera в разделе «Универсальный доступ». До этого можно вставлять через ⌘V." = "Nach der Einrichtung fragt macOS nach der Berechtigung zum Einfügen. Aktiviere Buffera unter Bedienungshilfen. Bis dahin kannst du mit ⌘V einfügen.";
-"Выберите запись стрелками ↑ ↓. Что сделает Enter?" = "Wähle einen Eintrag mit ↑ ↓. Was soll die Eingabetaste tun?";
+"Запускать Buffera при входе в систему" = "Buffera bei der Anmeldung starten";
+"Поместить в буфер обмена — затем вставьте через ⌘V" = "In die Zwischenablage kopieren und dann mit ⌘V einfügen";
+"Сразу вставить в активное приложение" = "Direkt in die aktive App einfügen";
+"После завершения настройки macOS попросит разрешение, чтобы Buffera могла нажимать ⌘V за вас." = "Nach der Einrichtung bittet macOS um Erlaubnis, damit Buffera für dich ⌘V drücken kann.";
+"Откройте историю" = "Verlauf öffnen";
+"Сочетание клавиш можно будет изменить в «Настройки → Клавиши»." = "Du kannst die Tastenkombination später unter Einstellungen → Kurzbefehle ändern.";
+"Выберите запись" = "Eintrag auswählen";
+"Перемещайтесь стрелками. Нажмите пробел для просмотра записи." = "Navigiere mit den Pfeiltasten. Drücke die Leertaste für eine Vorschau.";
+"Нажмите Enter" = "Eingabetaste drücken";
+"Что делать с выбранной записью?" = "Was soll mit dem ausgewählten Eintrag passieren?";
+"Быстрый выбор с клавиатуры" = "Schnellauswahl mit der Tastatur";
+"Как пользоваться" = "So verwendest du Buffera";
+"Завершение настройки" = "Einrichtung abschließen";
