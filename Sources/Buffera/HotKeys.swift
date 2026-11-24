@@ -17,6 +17,7 @@ final class HotKeys {
     private var registrations: [Binding: Registration] = [:]
     private var handler: EventHandlerRef?
     private var pressedIDs: Set<UInt32> = []
+    private var capturedIDs: Set<UInt32> = []
     private var nextID: UInt32 = 0
     private var previousEnabled = false
     private let customRegister: Register?
@@ -27,6 +28,7 @@ final class HotKeys {
     var onPause: (() -> Void)?
     var onSkipNext: (() -> Void)?
     var onPress: ((Int, Bool) -> Void)?
+    var onCapture: ((UInt16, NSEvent.ModifierFlags) -> Bool)?
 
     init(preferences: ShortcutPreferences = .load(), register: Register? = nil) {
         self.preferences = (try? preferences.validate()) != nil ? preferences : .defaults
@@ -34,12 +36,12 @@ final class HotKeys {
     }
 
     private func binding(_ value: ShortcutPreferences, previous: Bool) -> Binding {
-        Binding(key: previous ? value.previousKeyCode : value.nextKeyCode, modifiers: value.base.carbonModifiers)
+        Binding(key: (previous ? value.previous : value.next).code, modifiers: value.base.carbonModifiers)
     }
 
     private func captureBindings(_ value: ShortcutPreferences) -> [Binding] {
         [value.pause, value.skipNext].compactMap { $0 }.map {
-            Binding(key: ShortcutPreferences.keyCode($0), modifiers: value.base.carbonModifiers)
+            Binding(key: $0.code, modifiers: value.base.carbonModifiers)
         }
     }
 
@@ -97,6 +99,7 @@ final class HotKeys {
         for key in Array(registrations.keys) where !keep.contains(key) {
             if let registration = registrations.removeValue(forKey: key) {
                 pressedIDs.remove(registration.id)
+                capturedIDs.remove(registration.id)
                 registration.release()
             }
         }
@@ -123,13 +126,23 @@ final class HotKeys {
 
     func receive(id: UInt32, released: Bool) {
         guard let entry = registrations.first(where: { $0.value.id == id }) else { return }
-        if released { pressedIDs.remove(id); return }
+        if released {
+            pressedIDs.remove(id)
+            capturedIDs.remove(id)
+            return
+        }
         let isRepeat = !pressedIDs.insert(id).inserted
-        if let letter = preferences.pause, entry.key.key == ShortcutPreferences.keyCode(letter) {
+        // Carbon can deliver an already-registered combination instead of an AppKit key event.
+        guard !capturedIDs.contains(id) else { return }
+        if !isRepeat, onCapture?(entry.key.key, preferences.base.modifiers) == true {
+            capturedIDs.insert(id)
+            return
+        }
+        if entry.key.key == preferences.pause?.code {
             if !isRepeat { onPause?() }
             return
         }
-        if let letter = preferences.skipNext, entry.key.key == ShortcutPreferences.keyCode(letter) {
+        if entry.key.key == preferences.skipNext?.code {
             if !isRepeat { onSkipNext?() }
             return
         }
@@ -154,6 +167,6 @@ final class HotKeys {
 struct HotKeyError: LocalizedError {
     let status: OSStatus
     var errorDescription: String? {
-        L10n.text("Не удалось зарегистрировать сочетание (\(status)). Возможно, оно занято другой программой или системой. Выберите другую базу или буквы. История доступна через значок в строке меню.")
+        L10n.text("Не удалось зарегистрировать сочетание (\(status)). Возможно, оно занято другой программой или системой. Выберите другое сочетание. История доступна через значок в строке меню.")
     }
 }
